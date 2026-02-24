@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
     "db:migrate": "node server/db/migrate.js",
@@ -16,10 +16,15 @@
     "test:frontend": "vitest run --config vite.config.ts",
     "test:backend": "vitest run --config vitest.config.server.ts",
     "test:all": "npm run test:frontend && npm run test:backend",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
+    "@types/leaflet": "^1.9.21",
+    "@types/leaflet-draw": "^1.0.13",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -30,6 +35,8 @@
     "helmet": "^8.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.2",
+    "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
     "lucide-react": "^0.300.0",
     "pg": "^8.11.3",
     "rate-limit": "^0.1.1",
@@ -41,10 +48,10 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
-    "@vitest/coverage-v8": "^3.2.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -53,6 +60,7 @@
     "@types/react-dom": "^18.2.17",
     "@types/supertest": "^2.0.16",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.16",
     "jsdom": "^25.0.1",
     "postcss": "^8.4.32",

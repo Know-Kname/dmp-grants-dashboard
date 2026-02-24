@@ -3,20 +3,28 @@
  * Provides type-safe data fetching with caching, loading states, and mutations
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getErrorMessage, ApiRequestError } from '../lib/api';
-import { queryKeys } from '../lib/query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, getErrorMessage } from "../lib/api";
+import {
+  DEMO_BURIALS,
+  DEMO_CUSTOMERS,
+  DEMO_GRANTS,
+  DEMO_INVENTORY,
+  DEMO_WORK_ORDERS,
+  isDemoMode,
+} from "../lib/demo-data";
+import { queryKeys } from "../lib/query";
 import type {
-  WorkOrder,
-  Grant,
-  InventoryItem,
-  Customer,
+  AccountsPayable,
+  AccountsReceivable,
   Burial,
   Contract,
+  Customer,
   Deposit,
-  AccountsReceivable,
-  AccountsPayable,
-} from '../types';
+  Grant,
+  InventoryItem,
+  WorkOrder,
+} from "../types";
 
 // ============================================
 // GENERIC TYPES
@@ -32,9 +40,13 @@ interface MutationCallbacks<T> {
 // ============================================
 
 export function useWorkOrders() {
+  const demo = isDemoMode();
   return useQuery({
     queryKey: queryKeys.workOrders.list(),
-    queryFn: () => api.get<WorkOrder[]>('/work-orders'),
+    queryFn: () =>
+      demo
+        ? Promise.resolve(DEMO_WORK_ORDERS)
+        : api.get<WorkOrder[]>("/work-orders"),
   });
 }
 
@@ -50,8 +62,9 @@ export function useCreateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) =>
-      api.post<WorkOrder>('/work-orders', data),
+    mutationFn: (
+      data: Omit<WorkOrder, "id" | "createdAt" | "updatedAt" | "createdBy">,
+    ) => api.post<WorkOrder>("/work-orders", data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
       callbacks?.onSuccess?.(data);
@@ -78,11 +91,14 @@ export function useUpdateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
   });
 }
 
-export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: boolean }>) {
+export function useDeleteWorkOrder(
+  callbacks?: MutationCallbacks<{ success: boolean }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/work-orders/${id}`),
+    mutationFn: (id: string) =>
+      api.delete<{ success: boolean }>(`/work-orders/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
       callbacks?.onSuccess?.(data);
@@ -98,9 +114,11 @@ export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: bool
 // ============================================
 
 export function useGrants() {
+  const demo = isDemoMode();
   return useQuery({
     queryKey: queryKeys.grants.list(),
-    queryFn: () => api.get<Grant[]>('/grants'),
+    queryFn: () =>
+      demo ? Promise.resolve(DEMO_GRANTS) : api.get<Grant[]>("/grants"),
   });
 }
 
@@ -116,8 +134,8 @@ export function useCreateGrant(callbacks?: MutationCallbacks<Grant>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Grant>('/grants', data),
+    mutationFn: (data: Omit<Grant, "id" | "createdAt" | "updatedAt">) =>
+      api.post<Grant>("/grants", data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grants.all });
       callbacks?.onSuccess?.(data);
@@ -144,11 +162,14 @@ export function useUpdateGrant(callbacks?: MutationCallbacks<Grant>) {
   });
 }
 
-export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean }>) {
+export function useDeleteGrant(
+  callbacks?: MutationCallbacks<{ success: boolean }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/grants/${id}`),
+    mutationFn: (id: string) =>
+      api.delete<{ success: boolean }>(`/grants/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grants.all });
       callbacks?.onSuccess?.(data);
@@ -164,9 +185,13 @@ export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean 
 // ============================================
 
 export function useInventory() {
+  const demo = isDemoMode();
   return useQuery({
     queryKey: queryKeys.inventory.list(),
-    queryFn: () => api.get<InventoryItem[]>('/inventory'),
+    queryFn: () =>
+      demo
+        ? Promise.resolve(DEMO_INVENTORY)
+        : api.get<InventoryItem[]>("/inventory"),
   });
 }
 
@@ -178,12 +203,14 @@ export function useInventoryItem(id: string) {
   });
 }
 
-export function useCreateInventoryItem(callbacks?: MutationCallbacks<InventoryItem>) {
+export function useCreateInventoryItem(
+  callbacks?: MutationCallbacks<InventoryItem>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<InventoryItem>('/inventory', data),
+    mutationFn: (data: Omit<InventoryItem, "id" | "createdAt" | "updatedAt">) =>
+      api.post<InventoryItem>("/inventory", data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
       callbacks?.onSuccess?.(data);
@@ -194,7 +221,9 @@ export function useCreateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
   });
 }
 
-export function useUpdateInventoryItem(callbacks?: MutationCallbacks<InventoryItem>) {
+export function useUpdateInventoryItem(
+  callbacks?: MutationCallbacks<InventoryItem>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -210,11 +239,14 @@ export function useUpdateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
   });
 }
 
-export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: boolean }>) {
+export function useDeleteInventoryItem(
+  callbacks?: MutationCallbacks<{ success: boolean }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/inventory/${id}`),
+    mutationFn: (id: string) =>
+      api.delete<{ success: boolean }>(`/inventory/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
       callbacks?.onSuccess?.(data);
@@ -230,9 +262,13 @@ export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: 
 // ============================================
 
 export function useCustomers() {
+  const demo = isDemoMode();
   return useQuery({
     queryKey: queryKeys.customers.list(),
-    queryFn: () => api.get<Customer[]>('/customers'),
+    queryFn: () =>
+      demo
+        ? Promise.resolve(DEMO_CUSTOMERS)
+        : api.get<Customer[]>("/customers"),
   });
 }
 
@@ -248,8 +284,8 @@ export function useCreateCustomer(callbacks?: MutationCallbacks<Customer>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Customer>('/customers', data),
+    mutationFn: (data: Omit<Customer, "id" | "createdAt" | "updatedAt">) =>
+      api.post<Customer>("/customers", data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       callbacks?.onSuccess?.(data);
@@ -276,11 +312,14 @@ export function useUpdateCustomer(callbacks?: MutationCallbacks<Customer>) {
   });
 }
 
-export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boolean }>) {
+export function useDeleteCustomer(
+  callbacks?: MutationCallbacks<{ success: boolean }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/customers/${id}`),
+    mutationFn: (id: string) =>
+      api.delete<{ success: boolean }>(`/customers/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       callbacks?.onSuccess?.(data);
@@ -296,9 +335,11 @@ export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boole
 // ============================================
 
 export function useBurials() {
+  const demo = isDemoMode();
   return useQuery({
     queryKey: queryKeys.burials.list(),
-    queryFn: () => api.get<Burial[]>('/burials'),
+    queryFn: () =>
+      demo ? Promise.resolve(DEMO_BURIALS) : api.get<Burial[]>("/burials"),
   });
 }
 
@@ -314,8 +355,8 @@ export function useCreateBurial(callbacks?: MutationCallbacks<Burial>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Burial, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Burial>('/burials', data),
+    mutationFn: (data: Omit<Burial, "id" | "createdAt" | "updatedAt">) =>
+      api.post<Burial>("/burials", data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
       callbacks?.onSuccess?.(data);
@@ -342,11 +383,14 @@ export function useUpdateBurial(callbacks?: MutationCallbacks<Burial>) {
   });
 }
 
-export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean }>) {
+export function useDeleteBurial(
+  callbacks?: MutationCallbacks<{ success: boolean }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/burials/${id}`),
+    mutationFn: (id: string) =>
+      api.delete<{ success: boolean }>(`/burials/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
       callbacks?.onSuccess?.(data);
@@ -364,7 +408,7 @@ export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean
 export function useContracts() {
   return useQuery({
     queryKey: queryKeys.contracts.list(),
-    queryFn: () => api.get<Contract[]>('/contracts'),
+    queryFn: () => api.get<Contract[]>("/contracts"),
   });
 }
 
@@ -380,8 +424,8 @@ export function useCreateContract(callbacks?: MutationCallbacks<Contract>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Contract, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Contract>('/contracts', data),
+    mutationFn: (data: Omit<Contract, "id" | "createdAt" | "updatedAt">) =>
+      api.post<Contract>("/contracts", data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
       callbacks?.onSuccess?.(data);
@@ -408,11 +452,14 @@ export function useUpdateContract(callbacks?: MutationCallbacks<Contract>) {
   });
 }
 
-export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boolean }>) {
+export function useDeleteContract(
+  callbacks?: MutationCallbacks<{ success: boolean }>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/contracts/${id}`),
+    mutationFn: (id: string) =>
+      api.delete<{ success: boolean }>(`/contracts/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
       callbacks?.onSuccess?.(data);
@@ -430,7 +477,7 @@ export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boole
 export function useDeposits() {
   return useQuery({
     queryKey: queryKeys.financial.deposits.list(),
-    queryFn: () => api.get<Deposit[]>('/financial/deposits'),
+    queryFn: () => api.get<Deposit[]>("/financial/deposits"),
   });
 }
 
@@ -438,10 +485,12 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>) =>
-      api.post<Deposit>('/financial/deposits', data),
+    mutationFn: (data: Omit<Deposit, "id" | "createdAt" | "createdBy">) =>
+      api.post<Deposit>("/financial/deposits", data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.financial.deposits.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.financial.deposits.all,
+      });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -457,18 +506,26 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
 export function useReceivables() {
   return useQuery({
     queryKey: queryKeys.financial.receivables.list(),
-    queryFn: () => api.get<AccountsReceivable[]>('/financial/receivables'),
+    queryFn: () => api.get<AccountsReceivable[]>("/financial/receivables"),
   });
 }
 
-export function useCreateReceivable(callbacks?: MutationCallbacks<AccountsReceivable>) {
+export function useCreateReceivable(
+  callbacks?: MutationCallbacks<AccountsReceivable>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<AccountsReceivable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>) =>
-      api.post<AccountsReceivable>('/financial/receivables', data),
+    mutationFn: (
+      data: Omit<
+        AccountsReceivable,
+        "id" | "createdAt" | "updatedAt" | "amountPaid" | "status"
+      >,
+    ) => api.post<AccountsReceivable>("/financial/receivables", data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.financial.receivables.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.financial.receivables.all,
+      });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -477,14 +534,24 @@ export function useCreateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
   });
 }
 
-export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceivable>) {
+export function useUpdateReceivable(
+  callbacks?: MutationCallbacks<AccountsReceivable>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) =>
-      api.put<AccountsReceivable>(`/financial/receivables/${id}`, data),
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      amountPaid?: number;
+      status?: string;
+    }) => api.put<AccountsReceivable>(`/financial/receivables/${id}`, data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.financial.receivables.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.financial.receivables.all,
+      });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -500,18 +567,26 @@ export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
 export function usePayables() {
   return useQuery({
     queryKey: queryKeys.financial.payables.list(),
-    queryFn: () => api.get<AccountsPayable[]>('/financial/payables'),
+    queryFn: () => api.get<AccountsPayable[]>("/financial/payables"),
   });
 }
 
-export function useCreatePayable(callbacks?: MutationCallbacks<AccountsPayable>) {
+export function useCreatePayable(
+  callbacks?: MutationCallbacks<AccountsPayable>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<AccountsPayable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>) =>
-      api.post<AccountsPayable>('/financial/payables', data),
+    mutationFn: (
+      data: Omit<
+        AccountsPayable,
+        "id" | "createdAt" | "updatedAt" | "amountPaid" | "status"
+      >,
+    ) => api.post<AccountsPayable>("/financial/payables", data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.financial.payables.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.financial.payables.all,
+      });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -520,14 +595,24 @@ export function useCreatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
   });
 }
 
-export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>) {
+export function useUpdatePayable(
+  callbacks?: MutationCallbacks<AccountsPayable>,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) =>
-      api.put<AccountsPayable>(`/financial/payables/${id}`, data),
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      amountPaid?: number;
+      status?: string;
+    }) => api.put<AccountsPayable>(`/financial/payables/${id}`, data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.financial.payables.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.financial.payables.all,
+      });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {

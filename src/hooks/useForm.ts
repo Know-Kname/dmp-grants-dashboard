@@ -3,8 +3,8 @@
  * Provides form state management with real-time validation
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { z } from 'zod';
+import { useCallback, useMemo, useState } from "react";
+import { z } from "zod";
 
 interface UseFormOptions<T> {
   /** Zod schema for validation */
@@ -49,10 +49,16 @@ interface UseFormReturn<T> {
   /** Handle form submission */
   handleSubmit: (e?: React.FormEvent) => Promise<void>;
   /** Get props for an input field */
-  getFieldProps: <K extends keyof T>(field: K) => {
+  getFieldProps: <K extends keyof T>(
+    field: K,
+  ) => {
     name: K;
     value: T[K];
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+    onChange: (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => void;
     onBlur: () => void;
   };
   /** Validate a single field */
@@ -70,7 +76,9 @@ export function useForm<T extends Record<string, unknown>>({
 }: UseFormOptions<T>): UseFormReturn<T> {
   const [values, setValuesState] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
-  const [touched, setTouchedState] = useState<Partial<Record<keyof T, boolean>>>({});
+  const [touched, setTouchedState] = useState<
+    Partial<Record<keyof T, boolean>>
+  >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialValuesRef] = useState(initialValues);
 
@@ -85,31 +93,36 @@ export function useForm<T extends Record<string, unknown>>({
   }, [errors]);
 
   // Validate a single field
-  const validateField = useCallback((field: keyof T): boolean => {
-    try {
-      // Create a partial schema for just this field
-      const fieldSchema = (schema as z.ZodObject<z.ZodRawShape>).shape[field as string];
-      if (fieldSchema) {
-        fieldSchema.parse(values[field]);
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next[field];
-          return next;
-        });
+  const validateField = useCallback(
+    (field: keyof T): boolean => {
+      try {
+        // Create a partial schema for just this field
+        const fieldSchema = (schema as z.ZodObject<z.ZodRawShape>).shape[
+          field as string
+        ];
+        if (fieldSchema) {
+          fieldSchema.parse(values[field]);
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+          });
+          return true;
+        }
+        return true;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          setErrors((prev) => ({
+            ...prev,
+            [field]: error.errors[0]?.message || "Invalid value",
+          }));
+          return false;
+        }
         return true;
       }
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors((prev) => ({
-          ...prev,
-          [field]: error.errors[0]?.message || 'Invalid value',
-        }));
-        return false;
-      }
-      return true;
-    }
-  }, [schema, values]);
+    },
+    [schema, values],
+  );
 
   // Validate entire form
   const validate = useCallback((): boolean => {
@@ -131,13 +144,16 @@ export function useForm<T extends Record<string, unknown>>({
   }, [schema, values]);
 
   // Set a single value
-  const setValue = useCallback(<K extends keyof T>(field: K, value: T[K]) => {
-    setValuesState((prev) => ({ ...prev, [field]: value }));
-    if (validateOnChange) {
-      // Validate after state update
-      setTimeout(() => validateField(field), 0);
-    }
-  }, [validateOnChange, validateField]);
+  const setValue = useCallback(
+    <K extends keyof T>(field: K, value: T[K]) => {
+      setValuesState((prev) => ({ ...prev, [field]: value }));
+      if (validateOnChange) {
+        // Validate after state update
+        setTimeout(() => validateField(field), 0);
+      }
+    },
+    [validateOnChange, validateField],
+  );
 
   // Set multiple values
   const setValues = useCallback((newValues: Partial<T>) => {
@@ -145,12 +161,15 @@ export function useForm<T extends Record<string, unknown>>({
   }, []);
 
   // Set touched state
-  const setTouched = useCallback((field: keyof T) => {
-    setTouchedState((prev) => ({ ...prev, [field]: true }));
-    if (validateOnBlur) {
-      validateField(field);
-    }
-  }, [validateOnBlur, validateField]);
+  const setTouched = useCallback(
+    (field: keyof T) => {
+      setTouchedState((prev) => ({ ...prev, [field]: true }));
+      if (validateOnBlur) {
+        validateField(field);
+      }
+    },
+    [validateOnBlur, validateField],
+  );
 
   // Set error
   const setError = useCallback((field: keyof T, error: string) => {
@@ -172,60 +191,74 @@ export function useForm<T extends Record<string, unknown>>({
   }, []);
 
   // Reset form
-  const reset = useCallback((newValues?: T) => {
-    setValuesState(newValues || initialValues);
-    setErrors({});
-    setTouchedState({});
-  }, [initialValues]);
+  const reset = useCallback(
+    (newValues?: T) => {
+      setValuesState(newValues || initialValues);
+      setErrors({});
+      setTouchedState({});
+    },
+    [initialValues],
+  );
 
   // Handle form submission
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault();
-    }
-
-    // Mark all fields as touched
-    const allTouched: Partial<Record<keyof T, boolean>> = {};
-    for (const key of Object.keys(values)) {
-      allTouched[key as keyof T] = true;
-    }
-    setTouchedState(allTouched);
-
-    // Validate
-    const result = schema.safeParse(values);
-    if (!result.success) {
-      const newErrors: Partial<Record<keyof T, string>> = {};
-      for (const error of result.error.errors) {
-        const field = error.path[0] as keyof T;
-        if (!newErrors[field]) {
-          newErrors[field] = error.message;
-        }
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      if (e) {
+        e.preventDefault();
       }
-      setErrors(newErrors);
-      return;
-    }
 
-    // Submit
-    setIsSubmitting(true);
-    try {
-      await onSubmit(result.data);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [schema, values, onSubmit]);
+      // Mark all fields as touched
+      const allTouched: Partial<Record<keyof T, boolean>> = {};
+      for (const key of Object.keys(values)) {
+        allTouched[key as keyof T] = true;
+      }
+      setTouchedState(allTouched);
+
+      // Validate
+      const result = schema.safeParse(values);
+      if (!result.success) {
+        const newErrors: Partial<Record<keyof T, string>> = {};
+        for (const error of result.error.errors) {
+          const field = error.path[0] as keyof T;
+          if (!newErrors[field]) {
+            newErrors[field] = error.message;
+          }
+        }
+        setErrors(newErrors);
+        return;
+      }
+
+      // Submit
+      setIsSubmitting(true);
+      try {
+        await onSubmit(result.data);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [schema, values, onSubmit],
+  );
 
   // Get field props for easy binding
-  const getFieldProps = useCallback(<K extends keyof T>(field: K) => ({
-    name: field,
-    value: values[field],
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      const value = e.target.type === 'checkbox'
-        ? (e.target as HTMLInputElement).checked
-        : e.target.value;
-      setValue(field, value as T[K]);
-    },
-    onBlur: () => setTouched(field),
-  }), [values, setValue, setTouched]);
+  const getFieldProps = useCallback(
+    <K extends keyof T>(field: K) => ({
+      name: field,
+      value: values[field],
+      onChange: (
+        e: React.ChangeEvent<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >,
+      ) => {
+        const value =
+          e.target.type === "checkbox"
+            ? (e.target as HTMLInputElement).checked
+            : e.target.value;
+        setValue(field, value as T[K]);
+      },
+      onBlur: () => setTouched(field),
+    }),
+    [values, setValue, setTouched],
+  );
 
   return {
     values,
@@ -258,7 +291,7 @@ export function useForm<T extends Record<string, unknown>>({
 export function getFieldError<T>(
   field: keyof T,
   errors: Partial<Record<keyof T, string>>,
-  touched: Partial<Record<keyof T, boolean>>
+  touched: Partial<Record<keyof T, boolean>>,
 ): string | undefined {
   return touched[field] ? errors[field] : undefined;
 }

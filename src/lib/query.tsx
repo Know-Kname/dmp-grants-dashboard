@@ -3,9 +3,9 @@
  * TanStack Query setup with error handling and defaults
  */
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode } from 'react';
-import { isApiError, isNetworkError } from './api';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { isApiError, isNetworkError } from "./api";
 
 // Default stale time: 5 minutes
 const DEFAULT_STALE_TIME = 5 * 60 * 1000;
@@ -80,11 +80,7 @@ interface QueryProviderProps {
 export function QueryProvider({ children }: QueryProviderProps) {
   const client = getQueryClient();
 
-  return (
-    <QueryClientProvider client={client}>
-      {children}
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
 // ============================================
@@ -97,67 +93,68 @@ export function QueryProvider({ children }: QueryProviderProps) {
 export const queryKeys = {
   // Work Orders
   workOrders: {
-    all: ['work-orders'] as const,
-    list: () => [...queryKeys.workOrders.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.workOrders.all, 'detail', id] as const,
+    all: ["work-orders"] as const,
+    list: () => [...queryKeys.workOrders.all, "list"] as const,
+    detail: (id: string) =>
+      [...queryKeys.workOrders.all, "detail", id] as const,
   },
 
   // Grants
   grants: {
-    all: ['grants'] as const,
-    list: () => [...queryKeys.grants.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.grants.all, 'detail', id] as const,
+    all: ["grants"] as const,
+    list: () => [...queryKeys.grants.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.grants.all, "detail", id] as const,
   },
 
   // Inventory
   inventory: {
-    all: ['inventory'] as const,
-    list: () => [...queryKeys.inventory.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.inventory.all, 'detail', id] as const,
-    lowStock: () => [...queryKeys.inventory.all, 'low-stock'] as const,
+    all: ["inventory"] as const,
+    list: () => [...queryKeys.inventory.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.inventory.all, "detail", id] as const,
+    lowStock: () => [...queryKeys.inventory.all, "low-stock"] as const,
   },
 
   // Customers
   customers: {
-    all: ['customers'] as const,
-    list: () => [...queryKeys.customers.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.customers.all, 'detail', id] as const,
+    all: ["customers"] as const,
+    list: () => [...queryKeys.customers.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.customers.all, "detail", id] as const,
   },
 
   // Burials
   burials: {
-    all: ['burials'] as const,
-    list: () => [...queryKeys.burials.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.burials.all, 'detail', id] as const,
+    all: ["burials"] as const,
+    list: () => [...queryKeys.burials.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.burials.all, "detail", id] as const,
   },
 
   // Contracts
   contracts: {
-    all: ['contracts'] as const,
-    list: () => [...queryKeys.contracts.all, 'list'] as const,
-    detail: (id: string) => [...queryKeys.contracts.all, 'detail', id] as const,
+    all: ["contracts"] as const,
+    list: () => [...queryKeys.contracts.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.contracts.all, "detail", id] as const,
   },
 
   // Financial
   financial: {
     deposits: {
-      all: ['financial', 'deposits'] as const,
-      list: () => [...queryKeys.financial.deposits.all, 'list'] as const,
+      all: ["financial", "deposits"] as const,
+      list: () => [...queryKeys.financial.deposits.all, "list"] as const,
     },
     receivables: {
-      all: ['financial', 'receivables'] as const,
-      list: () => [...queryKeys.financial.receivables.all, 'list'] as const,
+      all: ["financial", "receivables"] as const,
+      list: () => [...queryKeys.financial.receivables.all, "list"] as const,
     },
     payables: {
-      all: ['financial', 'payables'] as const,
-      list: () => [...queryKeys.financial.payables.all, 'list'] as const,
+      all: ["financial", "payables"] as const,
+      list: () => [...queryKeys.financial.payables.all, "list"] as const,
     },
   },
 
   // Users
   users: {
-    all: ['users'] as const,
-    list: () => [...queryKeys.users.all, 'list'] as const,
-    me: () => [...queryKeys.users.all, 'me'] as const,
+    all: ["users"] as const,
+    list: () => [...queryKeys.users.all, "list"] as const,
+    me: () => [...queryKeys.users.all, "me"] as const,
   },
 };

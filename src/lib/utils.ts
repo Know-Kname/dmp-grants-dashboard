@@ -38,7 +38,7 @@ export function toSnakeCaseKeys<T>(obj: T): T {
     return obj as T;
   }
 
-  if (typeof obj === 'object') {
+  if (typeof obj === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       const snakeKey = toSnakeCase(key);
@@ -67,7 +67,7 @@ export function toCamelCaseKeys<T>(obj: T): T {
     return obj as T;
   }
 
-  if (typeof obj === 'object') {
+  if (typeof obj === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       const camelKey = toCamelCase(key);
@@ -87,32 +87,34 @@ export function toCamelCaseKeys<T>(obj: T): T {
  * Format a date for display
  */
 export function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
 }
 
 /**
  * Format a date for form inputs (YYYY-MM-DD)
  */
-export function formatDateForInput(date: Date | string | null | undefined): string {
-  if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toISOString().split('T')[0];
+export function formatDateForInput(
+  date: Date | string | null | undefined,
+): string {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toISOString().split("T")[0];
 }
 
 /**
  * Format currency
  */
 export function formatCurrency(amount: number | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  if (amount === null || amount === undefined) return "$0.00";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
   }).format(amount);
 }
 
@@ -124,7 +126,7 @@ export function formatCurrency(amount: number | null | undefined): string {
  * Capitalize first letter of a string
  */
 export function capitalize(str: string): string {
-  if (!str) return '';
+  if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
@@ -133,11 +135,11 @@ export function capitalize(str: string): string {
  * e.g., "in_progress" -> "In Progress"
  */
 export function formatStatus(status: string): string {
-  if (!status) return '';
+  if (!status) return "";
   return status
-    .split('_')
+    .split("_")
     .map((word) => capitalize(word))
-    .join(' ');
+    .join(" ");
 }
 
 // ============================================
@@ -148,14 +150,15 @@ export function formatStatus(status: string): string {
  * Check if a value is a non-null object
  */
 export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
  * Check if a value is a valid UUID
  */
 export function isUUID(value: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(value);
 }
 
@@ -168,7 +171,7 @@ export function isUUID(value: string): boolean {
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
-  wait: number
+  wait: number,
 ): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -189,6 +192,8 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 /**
  * Conditionally join class names
  */
-export function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(' ');
+export function cn(
+  ...classes: (string | boolean | undefined | null)[]
+): string {
+  return classes.filter(Boolean).join(" ");
 }

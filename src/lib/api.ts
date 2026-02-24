@@ -8,7 +8,7 @@
  * - Automatic token refresh handling
  */
 
-import { toCamelCaseKeys, toSnakeCaseKeys } from './utils';
+import { toCamelCaseKeys, toSnakeCaseKeys } from "./utils";
 
 // ============================================
 // TYPES
@@ -75,7 +75,7 @@ export class ApiRequestError extends Error {
 
   constructor(error: ApiError) {
     super(error.message);
-    this.name = 'ApiRequestError';
+    this.name = "ApiRequestError";
     this.statusCode = error.statusCode;
     this.code = error.code;
     this.details = error.details;
@@ -89,40 +89,42 @@ export class ApiRequestError extends Error {
 
   /** Check if error is authentication related */
   isAuthError(): boolean {
-    return this.statusCode === 401 || this.code === 'UNAUTHORIZED';
+    return this.statusCode === 401 || this.code === "UNAUTHORIZED";
   }
 
   /** Check if error is validation related */
   isValidationError(): boolean {
-    return this.statusCode === 400 || this.code === 'VALIDATION_ERROR';
+    return this.statusCode === 400 || this.code === "VALIDATION_ERROR";
   }
 
   /** Check if error is not found */
   isNotFound(): boolean {
-    return this.statusCode === 404 || this.code === 'NOT_FOUND';
+    return this.statusCode === 404 || this.code === "NOT_FOUND";
   }
 
   /** Check if error is a conflict (duplicate) */
   isConflict(): boolean {
-    return this.statusCode === 409 || this.code === 'CONFLICT';
+    return this.statusCode === 409 || this.code === "CONFLICT";
   }
 }
 
 export class NetworkError extends Error {
   public readonly isNetworkError = true;
 
-  constructor(message: string = 'Network error. Please check your connection.') {
+  constructor(
+    message: string = "Network error. Please check your connection.",
+  ) {
     super(message);
-    this.name = 'NetworkError';
+    this.name = "NetworkError";
   }
 }
 
 export class TimeoutError extends Error {
   public readonly isTimeoutError = true;
 
-  constructor(message: string = 'Request timed out. Please try again.') {
+  constructor(message: string = "Request timed out. Please try again.") {
     super(message);
-    this.name = 'TimeoutError';
+    this.name = "TimeoutError";
   }
 }
 
@@ -130,26 +132,30 @@ export class TimeoutError extends Error {
 // API CLIENT
 // ============================================
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = "/api";
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
 /**
  * Get authentication headers
  */
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token');
+  const token =
+    localStorage.getItem("token") || localStorage.getItem("dmp-token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 /**
  * Build URL with query parameters
  */
-function buildUrl(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
+function buildUrl(
+  endpoint: string,
+  params?: Record<string, string | number | boolean | undefined>,
+): string {
   const url = new URL(`${API_BASE_URL}${endpoint}`, window.location.origin);
 
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         url.searchParams.append(key, String(value));
       }
     });
@@ -161,14 +167,17 @@ function buildUrl(endpoint: string, params?: Record<string, string | number | bo
 /**
  * Handle API response
  */
-async function handleResponse<T>(response: Response, config: RequestConfig = {}): Promise<T> {
+async function handleResponse<T>(
+  response: Response,
+  config: RequestConfig = {},
+): Promise<T> {
   // Handle non-JSON responses
-  const contentType = response.headers.get('content-type');
-  if (!contentType?.includes('application/json')) {
+  const contentType = response.headers.get("content-type");
+  if (!contentType?.includes("application/json")) {
     if (!response.ok) {
       throw new ApiRequestError({
         message: `Server error: ${response.statusText}`,
-        code: 'SERVER_ERROR',
+        code: "SERVER_ERROR",
         statusCode: response.status,
       });
     }
@@ -181,8 +190,8 @@ async function handleResponse<T>(response: Response, config: RequestConfig = {})
   if (json.success === false && json.error) {
     const error = json.error;
     throw new ApiRequestError({
-      message: error.message || 'An error occurred',
-      code: error.code || 'UNKNOWN_ERROR',
+      message: error.message || "An error occurred",
+      code: error.code || "UNKNOWN_ERROR",
       statusCode: json.statusCode || response.status,
       details: error.details,
       requestId: json.requestId,
@@ -192,8 +201,11 @@ async function handleResponse<T>(response: Response, config: RequestConfig = {})
   // Handle HTTP error status codes
   if (!response.ok) {
     throw new ApiRequestError({
-      message: json.message || json.error || `Request failed with status ${response.status}`,
-      code: json.code || 'REQUEST_FAILED',
+      message:
+        json.message ||
+        json.error ||
+        `Request failed with status ${response.status}`,
+      code: json.code || "REQUEST_FAILED",
       statusCode: response.status,
       details: json.details,
     });
@@ -228,9 +240,15 @@ async function request<T>(
   method: string,
   endpoint: string,
   data?: unknown,
-  config: RequestConfig = {}
+  config: RequestConfig = {},
 ): Promise<T> {
-  const { headers = {}, params, timeout = DEFAULT_TIMEOUT, signal, skipSnakeCase } = config;
+  const {
+    headers = {},
+    params,
+    timeout = DEFAULT_TIMEOUT,
+    signal,
+    skipSnakeCase,
+  } = config;
 
   // Build URL with query params
   const url = buildUrl(endpoint, params);
@@ -248,7 +266,7 @@ async function request<T>(
     const requestInit: RequestInit = {
       method,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...getAuthHeaders(),
         ...headers,
       },
@@ -256,7 +274,7 @@ async function request<T>(
     };
 
     // Add body for methods that support it
-    if (data && ['POST', 'PUT', 'PATCH'].includes(method)) {
+    if (data && ["POST", "PUT", "PATCH"].includes(method)) {
       // Transform request body keys from camelCase to snake_case
       const transformedData = skipSnakeCase ? data : toSnakeCaseKeys(data);
       requestInit.body = JSON.stringify(transformedData);
@@ -266,13 +284,13 @@ async function request<T>(
 
     // Handle 401 Unauthorized - clear token and redirect
     if (response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       // Dispatch event for auth state change
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+      window.dispatchEvent(new CustomEvent("auth:logout"));
       throw new ApiRequestError({
-        message: 'Session expired. Please log in again.',
-        code: 'UNAUTHORIZED',
+        message: "Session expired. Please log in again.",
+        code: "UNAUTHORIZED",
         statusCode: 401,
       });
     }
@@ -280,12 +298,12 @@ async function request<T>(
     return await handleResponse<T>(response, config);
   } catch (error) {
     // Handle abort/timeout
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (error instanceof DOMException && error.name === "AbortError") {
       throw new TimeoutError();
     }
 
     // Handle network errors
-    if (error instanceof TypeError && error.message.includes('fetch')) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new NetworkError();
     }
 
@@ -296,7 +314,7 @@ async function request<T>(
 
     // Wrap unknown errors
     throw new NetworkError(
-      error instanceof Error ? error.message : 'An unexpected error occurred'
+      error instanceof Error ? error.message : "An unexpected error occurred",
     );
   } finally {
     clearTimeout(timeoutId);
@@ -312,35 +330,47 @@ export const api = {
    * GET request
    */
   get: <T>(endpoint: string, config?: RequestConfig): Promise<T> => {
-    return request<T>('GET', endpoint, undefined, config);
+    return request<T>("GET", endpoint, undefined, config);
   },
 
   /**
    * POST request
    */
-  post: <T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> => {
-    return request<T>('POST', endpoint, data, config);
+  post: <T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig,
+  ): Promise<T> => {
+    return request<T>("POST", endpoint, data, config);
   },
 
   /**
    * PUT request
    */
-  put: <T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> => {
-    return request<T>('PUT', endpoint, data, config);
+  put: <T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig,
+  ): Promise<T> => {
+    return request<T>("PUT", endpoint, data, config);
   },
 
   /**
    * PATCH request
    */
-  patch: <T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> => {
-    return request<T>('PATCH', endpoint, data, config);
+  patch: <T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig,
+  ): Promise<T> => {
+    return request<T>("PATCH", endpoint, data, config);
   },
 
   /**
    * DELETE request
    */
   delete: <T>(endpoint: string, config?: RequestConfig): Promise<T> => {
-    return request<T>('DELETE', endpoint, undefined, config);
+    return request<T>("DELETE", endpoint, undefined, config);
   },
 };
 
@@ -358,27 +388,51 @@ export interface LoginResponse {
   };
 }
 
+const SERVER_UNAVAILABLE_MESSAGE =
+  "Sign-in server is not available. Use Preview Demo below to explore the app without signing in.";
+
 export const authApi = {
   /**
    * Login with email and password
    */
   login: async (email: string, password: string): Promise<LoginResponse> => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 
-    return await handleResponse<LoginResponse>(response);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (response.status === 404 || !contentType.includes("application/json")) {
+      throw new ApiRequestError({
+        message: SERVER_UNAVAILABLE_MESSAGE,
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: response.status || 503,
+      });
+    }
+
+    const data = await handleResponse<LoginResponse>(response);
+    if (!data?.token) {
+      throw new ApiRequestError({
+        message: SERVER_UNAVAILABLE_MESSAGE,
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+      });
+    }
+    return data;
   },
 
   /**
    * Register a new user
    */
-  register: async (data: { email: string; password: string; name: string }): Promise<LoginResponse> => {
+  register: async (data: {
+    email: string;
+    password: string;
+    name: string;
+  }): Promise<LoginResponse> => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(toSnakeCaseKeys(data)),
     });
 
@@ -389,9 +443,9 @@ export const authApi = {
    * Logout (client-side only)
    */
   logout: (): void => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.dispatchEvent(new CustomEvent('auth:logout'));
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.dispatchEvent(new CustomEvent("auth:logout"));
   },
 };
 
@@ -428,13 +482,13 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   if (isNetworkError(error)) {
-    return 'Unable to connect to server. Please check your internet connection.';
+    return "Unable to connect to server. Please check your internet connection.";
   }
   if (isTimeoutError(error)) {
-    return 'Request timed out. Please try again.';
+    return "Request timed out. Please try again.";
   }
   if (error instanceof Error) {
     return error.message;
   }
-  return 'An unexpected error occurred. Please try again.';
+  return "An unexpected error occurred. Please try again.";
 }

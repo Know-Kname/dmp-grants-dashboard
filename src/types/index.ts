@@ -3,7 +3,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'manager' | 'staff';
+  role: "admin" | "manager" | "staff";
   createdAt: Date;
 }
 
@@ -12,9 +12,9 @@ export interface WorkOrder {
   id: string;
   title: string;
   description: string;
-  type: 'maintenance' | 'burial_prep' | 'grounds' | 'repair' | 'other';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  type: "maintenance" | "burial_prep" | "grounds" | "repair" | "other";
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "pending" | "in_progress" | "completed" | "cancelled";
   assignedTo?: string;
   dueDate?: Date;
   completedDate?: Date;
@@ -27,7 +27,7 @@ export interface WorkOrder {
 export interface InventoryItem {
   id: string;
   name: string;
-  category: 'casket' | 'urn' | 'vault' | 'marker' | 'supplies' | 'other';
+  category: "casket" | "urn" | "vault" | "marker" | "supplies" | "other";
   sku?: string;
   quantity: number;
   reorderPoint: number;
@@ -43,7 +43,7 @@ export interface Deposit {
   id: string;
   amount: number;
   date: Date;
-  method: 'cash' | 'check' | 'credit_card' | 'wire' | 'other';
+  method: "cash" | "check" | "credit_card" | "wire" | "other";
   reference?: string;
   customerId?: string;
   notes?: string;
@@ -58,7 +58,7 @@ export interface AccountsReceivable {
   amount: number;
   amountPaid: number;
   dueDate: Date;
-  status: 'pending' | 'partial' | 'paid' | 'overdue';
+  status: "pending" | "partial" | "paid" | "overdue";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,7 +70,7 @@ export interface AccountsPayable {
   amount: number;
   amountPaid: number;
   dueDate: Date;
-  status: 'pending' | 'partial' | 'paid' | 'overdue';
+  status: "pending" | "partial" | "paid" | "overdue";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -101,11 +101,11 @@ export interface Burial {
 export interface Contract {
   id: string;
   contractNumber: string;
-  type: 'pre_need' | 'at_need';
+  type: "pre_need" | "at_need";
   customerId: string;
   totalAmount: number;
   amountPaid: number;
-  status: 'active' | 'paid' | 'cancelled' | 'transferred';
+  status: "active" | "paid" | "cancelled" | "transferred";
   signedDate: Date;
   items: ContractItem[];
   paymentPlan?: PaymentPlan;
@@ -120,7 +120,7 @@ export interface ContractItem {
 }
 
 export interface PaymentPlan {
-  frequency: 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly';
+  frequency: "weekly" | "bi_weekly" | "monthly" | "quarterly";
   installmentAmount: number;
   startDate: Date;
   endDate?: Date;
@@ -131,11 +131,11 @@ export interface Grant {
   id: string;
   title: string;
   description: string;
-  type: 'grant' | 'benefit' | 'opportunity';
+  type: "grant" | "benefit" | "opportunity";
   source: string;
   amount?: number;
   deadline?: Date;
-  status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
+  status: "available" | "applied" | "approved" | "denied" | "received";
   applicationDate?: Date;
   notes?: string;
   createdAt: Date;

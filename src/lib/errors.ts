@@ -1,6 +1,9 @@
-import { isApiError } from './api';
+import { isApiError } from "./api";
 
-export const getErrorMessage = (error: unknown, fallback = 'Something went wrong') => {
+export const getErrorMessage = (
+  error: unknown,
+  fallback = "Something went wrong",
+) => {
   if (isApiError(error)) {
     return error.message || fallback;
   }
@@ -20,17 +23,21 @@ export const getErrorDetails = (error: unknown) => {
 
   if (Array.isArray(details)) {
     return details.map((detail) => {
-      if (typeof detail === 'string') return detail;
-      if (detail && typeof detail === 'object') {
-        const field = 'field' in detail && detail.field ? `${detail.field}: ` : '';
-        const message = 'message' in detail && detail.message ? detail.message : 'Invalid value';
+      if (typeof detail === "string") return detail;
+      if (detail && typeof detail === "object") {
+        const field =
+          "field" in detail && detail.field ? `${detail.field}: ` : "";
+        const message =
+          "message" in detail && detail.message
+            ? detail.message
+            : "Invalid value";
         return `${field}${message}`;
       }
       return String(detail);
     });
   }
 
-  if (typeof details === 'object') {
+  if (typeof details === "object") {
     return [JSON.stringify(details)];
   }
 

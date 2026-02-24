@@ -1,13 +1,14 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './lib/auth';
-import { ThemeProvider } from './lib/theme';
-import { QueryProvider } from './lib/query';
-import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import WorkOrders from './pages/WorkOrders';
-import Grants from './pages/Grants';
-import ErrorBoundary from './components/ErrorBoundary';
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary";
+import Layout from "./components/Layout";
+import { AuthProvider, useAuth } from "./lib/auth";
+import { QueryProvider } from "./lib/query";
+import { ThemeProvider } from "./lib/theme";
+import CemeteryMap from "./pages/CemeteryMap";
+import Dashboard from "./pages/Dashboard";
+import Grants from "./pages/Grants";
+import Login from "./pages/Login";
+import WorkOrders from "./pages/WorkOrders";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -21,7 +22,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
 function AppRoutes() {
@@ -37,13 +38,49 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="cemetery-map" element={<CemeteryMap />} />
         <Route path="work-orders" element={<WorkOrders />} />
-        <Route path="inventory" element={<div className="text-2xl text-foreground">Inventory (Coming Soon)</div>} />
-        <Route path="financial" element={<div className="text-2xl text-foreground">Financial (Coming Soon)</div>} />
-        <Route path="burials" element={<div className="text-2xl text-foreground">Burials (Coming Soon)</div>} />
-        <Route path="contracts" element={<div className="text-2xl text-foreground">Contracts (Coming Soon)</div>} />
+        <Route
+          path="inventory"
+          element={
+            <div className="text-2xl text-foreground">
+              Inventory (Coming Soon)
+            </div>
+          }
+        />
+        <Route
+          path="financial"
+          element={
+            <div className="text-2xl text-foreground">
+              Financial (Coming Soon)
+            </div>
+          }
+        />
+        <Route
+          path="burials"
+          element={
+            <div className="text-2xl text-foreground">
+              Burials (Coming Soon)
+            </div>
+          }
+        />
+        <Route
+          path="contracts"
+          element={
+            <div className="text-2xl text-foreground">
+              Contracts (Coming Soon)
+            </div>
+          }
+        />
         <Route path="grants" element={<Grants />} />
-        <Route path="customers" element={<div className="text-2xl text-foreground">Customers (Coming Soon)</div>} />
+        <Route
+          path="customers"
+          element={
+            <div className="text-2xl text-foreground">
+              Customers (Coming Soon)
+            </div>
+          }
+        />
       </Route>
     </Routes>
   );

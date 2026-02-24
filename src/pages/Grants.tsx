@@ -1,34 +1,65 @@
-import { useState, useMemo } from 'react';
-import { useGrants, useCreateGrant, useUpdateGrant, useDeleteGrant } from '../hooks/useData';
-import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
-import { formatCurrency, formatDateForInput } from '../lib/utils';
-import { Grant } from '../types';
-import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner } from '../components/ui';
-import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+import { format } from "date-fns";
+import {
+  AlertCircle,
+  Calendar,
+  DollarSign,
+  Edit,
+  ExternalLink,
+  Gift,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  EmptyState,
+  Input,
+  LoadingSpinner,
+  Modal,
+  Select,
+  Textarea,
+} from "../components/ui";
+import {
+  useCreateGrant,
+  useDeleteGrant,
+  useGrants,
+  useUpdateGrant,
+} from "../hooks/useData";
+import {
+  getErrorDetails,
+  getErrorMessage,
+  getErrorRequestId,
+} from "../lib/errors";
+import { formatCurrency, formatDateForInput } from "../lib/utils";
+import type { Grant } from "../types";
 
 type GrantFormData = {
   title: string;
   description: string;
-  type: 'grant' | 'benefit' | 'opportunity';
+  type: "grant" | "benefit" | "opportunity";
   source: string;
   amount: string;
   deadline: string;
-  status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
+  status: "available" | "applied" | "approved" | "denied" | "received";
   applicationDate: string;
   notes: string;
 };
 
 const initialFormData: GrantFormData = {
-  title: '',
-  description: '',
-  type: 'grant',
-  source: '',
-  amount: '',
-  deadline: '',
-  status: 'available',
-  applicationDate: '',
-  notes: '',
+  title: "",
+  description: "",
+  type: "grant",
+  source: "",
+  amount: "",
+  deadline: "",
+  status: "available",
+  applicationDate: "",
+  notes: "",
 };
 
 export default function Grants() {
@@ -55,9 +86,9 @@ export default function Grants() {
   // Local state
   const [showModal, setShowModal] = useState(false);
   const [editingGrant, setEditingGrant] = useState<Grant | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [formData, setFormData] = useState<GrantFormData>(initialFormData);
 
   // Filter grants using useMemo for performance
@@ -66,36 +97,40 @@ export default function Grants() {
 
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(g =>
-        g.title.toLowerCase().includes(search) ||
-        g.description?.toLowerCase().includes(search) ||
-        g.source?.toLowerCase().includes(search)
+      filtered = filtered.filter(
+        (g) =>
+          g.title.toLowerCase().includes(search) ||
+          g.description?.toLowerCase().includes(search) ||
+          g.source?.toLowerCase().includes(search),
       );
     }
 
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(g => g.status === statusFilter);
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((g) => g.status === statusFilter);
     }
 
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(g => g.type === typeFilter);
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((g) => g.type === typeFilter);
     }
 
     return filtered;
   }, [grants, searchTerm, statusFilter, typeFilter]);
 
   // Calculate totals using useMemo
-  const totals = useMemo(() => ({
-    available: filteredGrants
-      .filter(g => g.amount && g.status === 'available')
-      .reduce((sum, g) => sum + (g.amount || 0), 0),
-    applied: filteredGrants
-      .filter(g => g.amount && g.status === 'applied')
-      .reduce((sum, g) => sum + (g.amount || 0), 0),
-    received: filteredGrants
-      .filter(g => g.amount && g.status === 'received')
-      .reduce((sum, g) => sum + (g.amount || 0), 0),
-  }), [filteredGrants]);
+  const totals = useMemo(
+    () => ({
+      available: filteredGrants
+        .filter((g) => g.amount && g.status === "available")
+        .reduce((sum, g) => sum + (g.amount || 0), 0),
+      applied: filteredGrants
+        .filter((g) => g.amount && g.status === "applied")
+        .reduce((sum, g) => sum + (g.amount || 0), 0),
+      received: filteredGrants
+        .filter((g) => g.amount && g.status === "received")
+        .reduce((sum, g) => sum + (g.amount || 0), 0),
+    }),
+    [filteredGrants],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +150,9 @@ export default function Grants() {
     if (editingGrant) {
       updateMutation.mutate({ id: editingGrant.id, ...payload });
     } else {
-      createMutation.mutate(payload as Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>);
+      createMutation.mutate(
+        payload as Omit<Grant, "id" | "createdAt" | "updatedAt">,
+      );
     }
   };
 
@@ -123,20 +160,22 @@ export default function Grants() {
     setEditingGrant(grant);
     setFormData({
       title: grant.title,
-      description: grant.description || '',
+      description: grant.description || "",
       type: grant.type,
       source: grant.source,
-      amount: grant.amount?.toString() || '',
-      deadline: grant.deadline ? formatDateForInput(grant.deadline) : '',
+      amount: grant.amount?.toString() || "",
+      deadline: grant.deadline ? formatDateForInput(grant.deadline) : "",
       status: grant.status,
-      applicationDate: grant.applicationDate ? formatDateForInput(grant.applicationDate) : '',
-      notes: grant.notes || '',
+      applicationDate: grant.applicationDate
+        ? formatDateForInput(grant.applicationDate)
+        : "",
+      notes: grant.notes || "",
     });
     setShowModal(true);
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this grant/opportunity?')) {
+    if (confirm("Are you sure you want to delete this grant/opportunity?")) {
       deleteMutation.mutate(id);
     }
   };
@@ -146,45 +185,71 @@ export default function Grants() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'primary'> = {
-      available: 'info',
-      applied: 'warning',
-      approved: 'success',
-      denied: 'danger',
-      received: 'primary',
+    const variants: Record<
+      string,
+      "info" | "warning" | "success" | "danger" | "primary"
+    > = {
+      available: "info",
+      applied: "warning",
+      approved: "success",
+      denied: "danger",
+      received: "primary",
     };
-    return <Badge variant={variants[status]} dot>{status.replace('_', ' ')}</Badge>;
+    return (
+      <Badge variant={variants[status]} dot>
+        {status.replace("_", " ")}
+      </Badge>
+    );
   };
 
   const getTypeBadge = (type: string) => {
-    const variants: Record<string, 'primary' | 'success' | 'info'> = {
-      grant: 'primary',
-      benefit: 'success',
-      opportunity: 'info',
+    const variants: Record<string, "primary" | "success" | "info"> = {
+      grant: "primary",
+      benefit: "success",
+      opportunity: "info",
     };
-    return <Badge variant={variants[type]} size="sm">{type}</Badge>;
+    return (
+      <Badge variant={variants[type]} size="sm">
+        {type}
+      </Badge>
+    );
   };
 
   // Combine mutation errors
-  const mutationError = createMutation.error || updateMutation.error || deleteMutation.error;
-  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const mutationError =
+    createMutation.error || updateMutation.error || deleteMutation.error;
+  const isMutating =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
 
   const combinedError = error || mutationError;
   const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
+  const errorRequestId = combinedError
+    ? getErrorRequestId(combinedError)
+    : null;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Grants & Opportunities</h1>
-          <p className="text-foreground-muted mt-1">Track funding opportunities and veteran benefits</p>
+          <h1 className="text-3xl font-bold text-foreground">
+            Grants & Opportunities
+          </h1>
+          <p className="text-foreground-muted mt-1">
+            Track funding opportunities and veteran benefits
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
-            icon={<RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />}
+            icon={
+              <RefreshCw
+                size={18}
+                className={isLoading ? "animate-spin" : ""}
+              />
+            }
             onClick={() => refetch()}
             disabled={isLoading}
           >
@@ -231,8 +296,12 @@ export default function Grants() {
           <CardBody>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-foreground-muted mb-1">Available Funding</p>
-                <p className="text-2xl font-bold text-info">{formatCurrency(totals.available)}</p>
+                <p className="text-sm text-foreground-muted mb-1">
+                  Available Funding
+                </p>
+                <p className="text-2xl font-bold text-info">
+                  {formatCurrency(totals.available)}
+                </p>
               </div>
               <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
                 <Gift className="text-info" size={24} />
@@ -244,8 +313,12 @@ export default function Grants() {
           <CardBody>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-foreground-muted mb-1">Applied For</p>
-                <p className="text-2xl font-bold text-warning">{formatCurrency(totals.applied)}</p>
+                <p className="text-sm text-foreground-muted mb-1">
+                  Applied For
+                </p>
+                <p className="text-2xl font-bold text-warning">
+                  {formatCurrency(totals.applied)}
+                </p>
               </div>
               <div className="p-3 bg-warning-100 dark:bg-warning-950 rounded-lg">
                 <Calendar className="text-warning" size={24} />
@@ -258,7 +331,9 @@ export default function Grants() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-foreground-muted mb-1">Received</p>
-                <p className="text-2xl font-bold text-success">{formatCurrency(totals.received)}</p>
+                <p className="text-2xl font-bold text-success">
+                  {formatCurrency(totals.received)}
+                </p>
               </div>
               <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
                 <DollarSign className="text-success" size={24} />
@@ -280,22 +355,22 @@ export default function Grants() {
             />
             <Select
               options={[
-                { value: 'all', label: 'All Types' },
-                { value: 'grant', label: 'Grants' },
-                { value: 'benefit', label: 'Benefits' },
-                { value: 'opportunity', label: 'Opportunities' },
+                { value: "all", label: "All Types" },
+                { value: "grant", label: "Grants" },
+                { value: "benefit", label: "Benefits" },
+                { value: "opportunity", label: "Opportunities" },
               ]}
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
             />
             <Select
               options={[
-                { value: 'all', label: 'All Status' },
-                { value: 'available', label: 'Available' },
-                { value: 'applied', label: 'Applied' },
-                { value: 'approved', label: 'Approved' },
-                { value: 'denied', label: 'Denied' },
-                { value: 'received', label: 'Received' },
+                { value: "all", label: "All Status" },
+                { value: "available", label: "Available" },
+                { value: "applied", label: "Applied" },
+                { value: "approved", label: "Approved" },
+                { value: "denied", label: "Denied" },
+                { value: "received", label: "Received" },
               ]}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -313,7 +388,9 @@ export default function Grants() {
           <CardBody>
             <div className="py-12">
               <LoadingSpinner size="lg" />
-              <p className="text-center text-foreground-muted mt-4">Loading grants...</p>
+              <p className="text-center text-foreground-muted mt-4">
+                Loading grants...
+              </p>
             </div>
           </CardBody>
         </Card>
@@ -326,11 +403,17 @@ export default function Grants() {
             <EmptyState
               icon={<Gift size={48} />}
               title="No grants found"
-              description={searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
-                ? "Try adjusting your filters"
-                : "Add your first grant or funding opportunity"}
+              description={
+                searchTerm || statusFilter !== "all" || typeFilter !== "all"
+                  ? "Try adjusting your filters"
+                  : "Add your first grant or funding opportunity"
+              }
               action={
-                <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>
+                <Button
+                  variant="primary"
+                  icon={<Plus size={20} />}
+                  onClick={() => setShowModal(true)}
+                >
                   Add Grant
                 </Button>
               }
@@ -347,11 +430,15 @@ export default function Grants() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <h3 className="text-lg font-semibold text-foreground">{grant.title}</h3>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {grant.title}
+                      </h3>
                       {getTypeBadge(grant.type)}
                     </div>
                     {grant.description && (
-                      <p className="text-foreground-muted mb-3 line-clamp-2">{grant.description}</p>
+                      <p className="text-foreground-muted mb-3 line-clamp-2">
+                        {grant.description}
+                      </p>
                     )}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-foreground-muted">
                       <div className="flex items-center gap-1">
@@ -369,18 +456,27 @@ export default function Grants() {
                       {grant.deadline && (
                         <div className="flex items-center gap-1">
                           <Calendar size={14} />
-                          <span>Deadline: {format(new Date(grant.deadline), 'MMM d, yyyy')}</span>
+                          <span>
+                            Deadline:{" "}
+                            {format(new Date(grant.deadline), "MMM d, yyyy")}
+                          </span>
                         </div>
                       )}
                       {grant.applicationDate && (
                         <div className="text-xs">
-                          Applied: {format(new Date(grant.applicationDate), 'MMM d, yyyy')}
+                          Applied:{" "}
+                          {format(
+                            new Date(grant.applicationDate),
+                            "MMM d, yyyy",
+                          )}
                         </div>
                       )}
                     </div>
                     {grant.notes && (
                       <div className="mt-3 p-3 bg-background-muted rounded-lg">
-                        <p className="text-sm text-foreground-muted">{grant.notes}</p>
+                        <p className="text-sm text-foreground-muted">
+                          {grant.notes}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -419,7 +515,9 @@ export default function Grants() {
           setEditingGrant(null);
           resetForm();
         }}
-        title={editingGrant ? 'Edit Grant/Opportunity' : 'Add New Grant/Opportunity'}
+        title={
+          editingGrant ? "Edit Grant/Opportunity" : "Add New Grant/Opportunity"
+        }
         size="lg"
         footer={
           <>
@@ -431,7 +529,7 @@ export default function Grants() {
               onClick={handleSubmit}
               loading={isMutating}
             >
-              {editingGrant ? 'Update' : 'Add'}
+              {editingGrant ? "Update" : "Add"}
             </Button>
           </>
         }
@@ -440,42 +538,58 @@ export default function Grants() {
           <Input
             label="Title"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, title: e.target.value })
+            }
             required
           />
           <Textarea
             label="Description"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
           />
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="Type"
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as GrantFormData['type'] })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  type: e.target.value as GrantFormData["type"],
+                })
+              }
               options={[
-                { value: 'grant', label: 'Grant' },
-                { value: 'benefit', label: 'Benefit' },
-                { value: 'opportunity', label: 'Opportunity' },
+                { value: "grant", label: "Grant" },
+                { value: "benefit", label: "Benefit" },
+                { value: "opportunity", label: "Opportunity" },
               ]}
             />
             <Select
               label="Status"
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as GrantFormData['status'] })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  status: e.target.value as GrantFormData["status"],
+                })
+              }
               options={[
-                { value: 'available', label: 'Available' },
-                { value: 'applied', label: 'Applied' },
-                { value: 'approved', label: 'Approved' },
-                { value: 'denied', label: 'Denied' },
-                { value: 'received', label: 'Received' },
+                { value: "available", label: "Available" },
+                { value: "applied", label: "Applied" },
+                { value: "approved", label: "Approved" },
+                { value: "denied", label: "Denied" },
+                { value: "received", label: "Received" },
               ]}
             />
           </div>
           <Input
             label="Source/Organization"
             value={formData.source}
-            onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, source: e.target.value })
+            }
             required
           />
           <div className="grid grid-cols-2 gap-4">
@@ -483,26 +597,34 @@ export default function Grants() {
               label="Amount"
               type="number"
               value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, amount: e.target.value })
+              }
               placeholder="0.00"
             />
             <Input
               label="Deadline"
               type="date"
               value={formData.deadline}
-              onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, deadline: e.target.value })
+              }
             />
           </div>
           <Input
             label="Application Date"
             type="date"
             value={formData.applicationDate}
-            onChange={(e) => setFormData({ ...formData, applicationDate: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, applicationDate: e.target.value })
+            }
           />
           <Textarea
             label="Notes"
             value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, notes: e.target.value })
+            }
           />
         </form>
       </Modal>

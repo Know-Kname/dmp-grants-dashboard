@@ -1,32 +1,34 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import ErrorBoundary from './ErrorBoundary';
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import ErrorBoundary from "./ErrorBoundary";
 
 const Boom = () => {
-  throw new Error('Boom');
+  throw new Error("Boom");
 };
 
-describe('ErrorBoundary', () => {
-  it('renders children when no error occurs', () => {
+describe("ErrorBoundary", () => {
+  it("renders children when no error occurs", () => {
     render(
       <ErrorBoundary>
         <div>All good</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
-    expect(screen.getByText('All good')).toBeInTheDocument();
+    expect(screen.getByText("All good")).toBeInTheDocument();
   });
 
-  it('renders fallback UI when a child throws', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
+  it("renders fallback UI when a child throws", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     render(
       <ErrorBoundary>
         <Boom />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
 
     consoleError.mockRestore();
   });

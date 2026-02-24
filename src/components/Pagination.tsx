@@ -3,8 +3,13 @@
  * Provides navigation controls for paginated data
  */
 
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { Button } from './ui';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
+import { Button } from "./ui";
 
 export interface PaginationMeta {
   page: number;
@@ -31,7 +36,7 @@ export function Pagination({
   onLimitChange,
   showPageSize = true,
   pageSizeOptions = [10, 20, 50, 100],
-  className = '',
+  className = "",
 }: PaginationProps) {
   const { page, limit, total, totalPages, hasMore } = pagination;
   const hasPrev = pagination.hasPrev ?? page > 1;
@@ -42,8 +47,8 @@ export function Pagination({
   const end = Math.min(page * limit, total);
 
   // Generate page numbers to display
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    const pages: (number | 'ellipsis')[] = [];
+  const getPageNumbers = (): (number | "ellipsis")[] => {
+    const pages: (number | "ellipsis")[] = [];
     const maxVisible = 5;
 
     if (totalPages <= maxVisible + 2) {
@@ -56,7 +61,7 @@ export function Pagination({
       pages.push(1);
 
       if (page > 3) {
-        pages.push('ellipsis');
+        pages.push("ellipsis");
       }
 
       // Show pages around current
@@ -68,7 +73,7 @@ export function Pagination({
       }
 
       if (page < totalPages - 2) {
-        pages.push('ellipsis');
+        pages.push("ellipsis");
       }
 
       // Always show last page
@@ -83,11 +88,13 @@ export function Pagination({
   }
 
   return (
-    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}>
+    <div
+      className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}
+    >
       {/* Results info */}
       <div className="text-sm text-foreground-muted">
-        Showing <span className="font-medium text-foreground">{start}</span> to{' '}
-        <span className="font-medium text-foreground">{end}</span> of{' '}
+        Showing <span className="font-medium text-foreground">{start}</span> to{" "}
+        <span className="font-medium text-foreground">{end}</span> of{" "}
         <span className="font-medium text-foreground">{total}</span> results
       </div>
 
@@ -138,23 +145,26 @@ export function Pagination({
           {/* Page numbers */}
           <div className="hidden sm:flex items-center gap-1">
             {getPageNumbers().map((pageNum, index) =>
-              pageNum === 'ellipsis' ? (
-                <span key={`ellipsis-${index}`} className="px-2 text-foreground-muted">
+              pageNum === "ellipsis" ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="px-2 text-foreground-muted"
+                >
                   ...
                 </span>
               ) : (
                 <Button
                   key={pageNum}
-                  variant={pageNum === page ? 'primary' : 'ghost'}
+                  variant={pageNum === page ? "primary" : "ghost"}
                   size="sm"
                   onClick={() => onPageChange(pageNum)}
                   className="min-w-[32px]"
                   aria-label={`Page ${pageNum}`}
-                  aria-current={pageNum === page ? 'page' : undefined}
+                  aria-current={pageNum === page ? "page" : undefined}
                 >
                   {pageNum}
                 </Button>
-              )
+              ),
             )}
           </div>
 
@@ -195,7 +205,7 @@ export function Pagination({
 // PAGINATION HOOK
 // ============================================
 
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from "react";
 
 interface UsePaginationOptions {
   initialPage?: number;
@@ -232,10 +242,13 @@ export function usePagination({
     setLimitState(initialLimit);
   }, [initialPage, initialLimit]);
 
-  const queryParams = useMemo(() => ({
-    page: String(page),
-    limit: String(limit),
-  }), [page, limit]);
+  const queryParams = useMemo(
+    () => ({
+      page: String(page),
+      limit: String(limit),
+    }),
+    [page, limit],
+  );
 
   return {
     page,

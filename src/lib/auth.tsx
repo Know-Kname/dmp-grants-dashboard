@@ -1,14 +1,28 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '../types';
-import { authApi } from './api';
-import { isDemoMode, disableDemoMode, DEMO_USER } from './demo-data';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import type { User } from "../types";
+import { authApi } from "./api";
+import {
+  DEMO_USER,
+  disableDemoMode,
+  enableDemoMode as enableDemoStorage,
+  isDemoMode,
+} from "./demo-data";
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  enterDemoMode: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
   isDemo: boolean;
 }
 
@@ -18,19 +32,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isDemo, setIsDemo] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for demo mode first
     if (isDemoMode()) {
-      setToken('demo-token');
+      setToken("demo-token");
       setUser(DEMO_USER);
       setIsDemo(true);
+      setIsLoading(false);
       return;
     }
-    
-    // Then check for regular auth
-    const storedToken = localStorage.getItem('token') || localStorage.getItem('dmp-token');
-    const storedUser = localStorage.getItem('user') || localStorage.getItem('dmp-user');
+
+    const storedToken =
+      localStorage.getItem("token") || localStorage.getItem("dmp-token");
+    const storedUser =
+      localStorage.getItem("user") || localStorage.getItem("dmp-user");
     if (storedToken && storedUser) {
       setToken(storedToken);
       try {
@@ -39,6 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Invalid user data
       }
     }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -48,31 +65,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === 'token' && !event.newValue) {
+      if (event.key === "token" && !event.newValue) {
         handleLogout();
       }
     };
 
-    window.addEventListener('auth:logout', handleLogout);
-    window.addEventListener('storage', handleStorage);
+    window.addEventListener("auth:logout", handleLogout);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
-      window.removeEventListener('auth:logout', handleLogout);
-      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener("auth:logout", handleLogout);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
   const login = async (email: string, password: string) => {
     const data = await authApi.login(email, password);
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+    if (data?.token && data?.user) {
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       setToken(data.token);
       setUser(data.user);
     } else {
-      throw new Error('Login failed');
+      throw new Error(
+        "Sign-in server is not available. Use Preview Demo to explore without signing in.",
+      );
     }
   };
+
+  const enterDemoMode = useCallback(() => {
+    enableDemoStorage();
+    setToken("demo-token");
+    setUser(DEMO_USER);
+    setIsDemo(true);
+  }, []);
 
   const logout = () => {
     if (isDemo) {
@@ -86,7 +112,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isDemo }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        enterDemoMode,
+        isAuthenticated: !!token,
+        isLoading,
+        isDemo,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -94,6 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };

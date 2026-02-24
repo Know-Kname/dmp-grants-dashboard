@@ -7,6 +7,13 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontSize: {
+        display: ['var(--text-display)', { lineHeight: 'var(--text-display-line)' }],
+        title: ['var(--text-title)', { lineHeight: 'var(--text-title-line)' }],
+        subtitle: ['var(--text-subtitle)', { lineHeight: 'var(--text-subtitle-line)' }],
+        body: ['var(--text-body)', { lineHeight: 'var(--text-body-line)' }],
+        caption: ['var(--text-caption)', { lineHeight: 'var(--text-caption-line)' }],
+      },
       colors: {
         // Semantic colors using CSS variables
         background: {
@@ -24,6 +31,10 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
           hover: 'hsl(var(--card-hover))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
         },
         border: {
           DEFAULT: 'hsl(var(--border))',

@@ -1,13 +1,13 @@
-import '@testing-library/jest-dom';
-import { afterEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import "@testing-library/jest-dom";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
 
 afterEach(() => {
   cleanup();
 });
 
 if (!window.matchMedia) {
-  Object.defineProperty(window, 'matchMedia', {
+  Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (query: string) => ({
       matches: false,
@@ -26,11 +26,11 @@ if (!window.scrollTo) {
   window.scrollTo = () => { };
 }
 
-if (!window.localStorage || typeof window.localStorage.clear !== 'function') {
+if (!window.localStorage || typeof window.localStorage.clear !== "function") {
   const store = new Map<string, string>();
 
   const storage = {
-    getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+    getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => {
       store.set(key, String(value));
     },
@@ -46,7 +46,7 @@ if (!window.localStorage || typeof window.localStorage.clear !== 'function') {
     },
   };
 
-  Object.defineProperty(window, 'localStorage', {
+  Object.defineProperty(window, "localStorage", {
     value: storage,
     configurable: true,
   });

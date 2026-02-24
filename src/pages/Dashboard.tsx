@@ -1,17 +1,35 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
-import { Card, CardHeader, CardBody, LoadingSpinner, Badge } from '../components/ui';
+import { format } from "date-fns";
 import {
-  ClipboardList, Package, DollarSign, Users, AlertCircle,
-  TrendingUp, MapPin, Phone, Clock, Building2,
-  ChevronRight, ExternalLink
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { COMPANY } from '../config/company';
-import { formatCurrency } from '../lib/utils';
+  AlertCircle,
+  Building2,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  DollarSign,
+  ExternalLink,
+  MapPin,
+  Package,
+  Phone,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  Badge,
+  Card,
+  CardBody,
+  CardHeader,
+  LoadingSpinner,
+} from "../components/ui";
+import { COMPANY } from "../config/company";
+import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { DEMO_BURIALS, DEMO_STATS, DEMO_WORK_ORDERS } from "../lib/demo-data";
+import { formatCurrency } from "../lib/utils";
 
 export default function Dashboard() {
+  const { isDemo } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     workOrders: { total: 0, pending: 0, inProgress: 0, completed: 0 },
@@ -19,75 +37,152 @@ export default function Dashboard() {
     receivables: { total: 0, overdue: 0, amount: 0 },
     burials: { total: 0, thisMonth: 0 },
   });
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<
+    Record<string, unknown>[]
+  >([]);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [isDemo]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+
+      if (isDemo) {
+        setStats({
+          workOrders: {
+            total:
+              DEMO_STATS.activeWorkOrders +
+              DEMO_STATS.completedWorkOrders +
+              DEMO_STATS.pendingWorkOrders,
+            pending: DEMO_STATS.pendingWorkOrders,
+            inProgress: DEMO_STATS.activeWorkOrders,
+            completed: DEMO_STATS.completedWorkOrders,
+          },
+          inventory: { total: 45, lowStock: DEMO_STATS.lowStockItems },
+          receivables: {
+            total: 12,
+            overdue: 3,
+            amount: DEMO_STATS.outstandingReceivables,
+          },
+          burials: {
+            total: DEMO_STATS.burialsThisYear,
+            thisMonth: DEMO_STATS.burialsThisMonth,
+          },
+        });
+
+        const activities: Record<string, unknown>[] = [
+          ...DEMO_WORK_ORDERS.slice(0, 3).map((w) => ({
+            type: "work_order",
+            title: w.title,
+            status: w.status,
+            date: w.createdAt,
+          })),
+          ...DEMO_BURIALS.slice(0, 2).map((b) => ({
+            type: "burial",
+            title: `${b.deceasedFirstName} ${b.deceasedLastName}`,
+            date: b.burialDate,
+          })),
+        ].sort(
+          (a, b) =>
+            new Date(String(b.date)).getTime() -
+            new Date(String(a.date)).getTime(),
+        );
+
+        setRecentActivity(activities);
+        return;
+      }
+
       const [workOrders, inventory, receivables, burials] = await Promise.all([
-        api.get('/work-orders'),
-        api.get('/inventory'),
-        api.get('/financial/receivables'),
-        api.get('/burials'),
+        api.get("/work-orders"),
+        api.get("/inventory"),
+        api.get("/financial/receivables"),
+        api.get("/burials"),
       ]);
 
-      // Calculate work order stats
+      const woList = Array.isArray(workOrders) ? workOrders : [];
+      const invList = Array.isArray(inventory) ? inventory : [];
+      const arList = Array.isArray(receivables) ? receivables : [];
+      const burialList = Array.isArray(burials) ? burials : [];
+
       const woStats = {
-        total: (workOrders as any[]).length,
-        pending: (workOrders as any[]).filter((w: any) => w.status === 'pending').length,
-        inProgress: (workOrders as any[]).filter((w: any) => w.status === 'in_progress').length,
-        completed: (workOrders as any[]).filter((w: any) => w.status === 'completed').length,
+        total: woList.length,
+        pending: woList.filter(
+          (w: Record<string, unknown>) => w.status === "pending",
+        ).length,
+        inProgress: woList.filter(
+          (w: Record<string, unknown>) => w.status === "in_progress",
+        ).length,
+        completed: woList.filter(
+          (w: Record<string, unknown>) => w.status === "completed",
+        ).length,
       };
 
-      // Calculate inventory stats
       const invStats = {
-        total: (inventory as any[]).length,
-        lowStock: (inventory as any[]).filter((i: any) => i.quantity <= i.reorder_point).length,
+        total: invList.length,
+        lowStock: invList.filter(
+          (i: Record<string, unknown>) =>
+            Number(i.quantity) <= Number(i.reorder_point || i.reorderPoint),
+        ).length,
       };
 
-      // Calculate receivables stats
       const arStats = {
-        total: (receivables as any[]).length,
-        overdue: (receivables as any[]).filter((r: any) => r.status === 'overdue').length,
-        amount: (receivables as any[]).reduce((sum: number, r: any) => sum + (r.amount - (r.amount_paid || 0)), 0),
+        total: arList.length,
+        overdue: arList.filter(
+          (r: Record<string, unknown>) => r.status === "overdue",
+        ).length,
+        amount: arList.reduce(
+          (sum: number, r: Record<string, unknown>) =>
+            sum +
+            (Number(r.amount) - Number(r.amount_paid || r.amountPaid || 0)),
+          0,
+        ),
       };
 
-      // Calculate burial stats
       const now = new Date();
-      const thisMonth = (burials as any[]).filter((b: any) => {
-        const burialDate = new Date(b.burial_date);
-        return burialDate.getMonth() === now.getMonth() && burialDate.getFullYear() === now.getFullYear();
+      const thisMonth = burialList.filter((b: Record<string, unknown>) => {
+        try {
+          const burialDate = new Date(String(b.burial_date || b.burialDate));
+          return (
+            burialDate.getMonth() === now.getMonth() &&
+            burialDate.getFullYear() === now.getFullYear()
+          );
+        } catch {
+          return false;
+        }
       }).length;
 
       setStats({
         workOrders: woStats,
         inventory: invStats,
         receivables: arStats,
-        burials: { total: (burials as any[]).length, thisMonth },
+        burials: { total: burialList.length, thisMonth },
       });
 
-      // Create recent activity feed
-      const activities = [
-        ...(workOrders as any[]).slice(0, 3).map((w: any) => ({
-          type: 'work_order',
-          title: w.title,
-          status: w.status,
-          date: w.created_at,
+      const activities: Record<string, unknown>[] = [
+        ...woList.slice(0, 3).map((w: Record<string, unknown>) => ({
+          type: "work_order",
+          title: String(w.title || ""),
+          status: String(w.status || ""),
+          date: String(w.created_at || w.createdAt || ""),
         })),
-        ...(burials as any[]).slice(0, 2).map((b: any) => ({
-          type: 'burial',
-          title: `${b.deceased_first_name} ${b.deceased_last_name}`,
-          date: b.burial_date,
+        ...burialList.slice(0, 2).map((b: Record<string, unknown>) => ({
+          type: "burial",
+          title: `${String(b.deceased_first_name || b.deceasedFirstName || "")} ${String(b.deceased_last_name || b.deceasedLastName || "")}`,
+          date: String(b.burial_date || b.burialDate || ""),
         })),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+      ]
+        .sort(
+          (a, b) =>
+            new Date(String(b.date)).getTime() -
+            new Date(String(a.date)).getTime(),
+        )
+        .slice(0, 5);
 
       setRecentActivity(activities);
     } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+      console.error("Failed to load dashboard data:", error);
     } finally {
       setLoading(false);
     }
@@ -104,37 +199,40 @@ export default function Dashboard() {
   const statCards = [
     {
       icon: ClipboardList,
-      label: 'Work Orders',
+      label: "Work Orders",
       value: stats.workOrders.total,
       subtitle: `${stats.workOrders.inProgress} in progress`,
-      color: 'bg-info',
-      link: '/work-orders',
+      color: "bg-info",
+      link: "/work-orders",
     },
     {
       icon: Package,
-      label: 'Inventory Items',
+      label: "Inventory Items",
       value: stats.inventory.total,
-      subtitle: stats.inventory.lowStock > 0 ? `${stats.inventory.lowStock} low stock` : 'All items stocked',
-      color: stats.inventory.lowStock > 0 ? 'bg-warning' : 'bg-success',
+      subtitle:
+        stats.inventory.lowStock > 0
+          ? `${stats.inventory.lowStock} low stock`
+          : "All items stocked",
+      color: stats.inventory.lowStock > 0 ? "bg-warning" : "bg-success",
       alert: stats.inventory.lowStock > 0,
-      link: '/inventory',
+      link: "/inventory",
     },
     {
       icon: DollarSign,
-      label: 'Receivables',
+      label: "Receivables",
       value: formatCurrency(stats.receivables.amount),
       subtitle: `${stats.receivables.total} accounts`,
-      color: 'bg-warning',
+      color: "bg-warning",
       alert: stats.receivables.overdue > 0,
-      link: '/financial',
+      link: "/financial",
     },
     {
       icon: Users,
-      label: 'Burials (YTD)',
+      label: "Burials (YTD)",
       value: stats.burials.total,
       subtitle: `${stats.burials.thisMonth} this month`,
-      color: 'bg-primary',
-      link: '/burials',
+      color: "bg-primary",
+      link: "/burials",
     },
   ];
 
@@ -151,12 +249,12 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="text-sm text-foreground-muted">
-          {format(new Date(), 'EEEE, MMMM d, yyyy')}
+          {format(new Date(), "EEEE, MMMM d, yyyy")}
         </div>
       </div>
 
       {/* Company Overview Card */}
-      <Card className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-950 dark:to-slate-900 border-primary-200 dark:border-primary-800">
+      <Card className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-950 dark:to-background border-primary-200 dark:border-primary-800">
         <CardBody className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-6">
             <div className="flex-1">
@@ -165,8 +263,12 @@ export default function Dashboard() {
                   <Building2 className="text-white" size={24} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">{COMPANY.name}</h2>
-                  <p className="text-sm text-foreground-muted">{COMPANY.tagline}</p>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {COMPANY.name}
+                  </h2>
+                  <p className="text-sm text-foreground-muted">
+                    {COMPANY.tagline}
+                  </p>
                 </div>
               </div>
               <p className="text-sm text-foreground-muted max-w-2xl">
@@ -175,11 +277,13 @@ export default function Dashboard() {
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <a
-                href={`tel:${COMPANY.phone.main.replace(/[^\d]/g, '')}`}
+                href={`tel:${COMPANY.phone.main.replace(/[^\d]/g, "")}`}
                 className="flex items-center gap-2 px-4 py-2 bg-card rounded-lg border border-border hover:bg-accent transition-colors"
               >
                 <Phone size={16} className="text-primary" />
-                <span className="text-sm font-medium">{COMPANY.phone.main}</span>
+                <span className="text-sm font-medium">
+                  {COMPANY.phone.main}
+                </span>
               </a>
               <a
                 href={COMPANY.website}
@@ -201,13 +305,21 @@ export default function Dashboard() {
           <CardBody className="flex items-start space-x-3">
             <AlertCircle className="text-warning mt-0.5 shrink-0" size={20} />
             <div className="flex-1">
-              <h3 className="font-semibold text-foreground">Attention Required</h3>
+              <h3 className="font-semibold text-foreground">
+                Attention Required
+              </h3>
               <ul className="mt-2 space-y-1 text-sm text-foreground-muted">
                 {stats.inventory.lowStock > 0 && (
-                  <li>• {stats.inventory.lowStock} inventory items are low on stock</li>
+                  <li>
+                    • {stats.inventory.lowStock} inventory items are low on
+                    stock
+                  </li>
                 )}
                 {stats.receivables.overdue > 0 && (
-                  <li>• {stats.receivables.overdue} accounts receivable are overdue</li>
+                  <li>
+                    • {stats.receivables.overdue} accounts receivable are
+                    overdue
+                  </li>
                 )}
               </ul>
             </div>
@@ -223,9 +335,15 @@ export default function Dashboard() {
               <CardBody>
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-foreground-muted text-sm font-medium mb-1">{card.label}</p>
-                    <p className="text-3xl font-bold text-foreground mb-1">{card.value}</p>
-                    <p className="text-xs text-foreground-muted">{card.subtitle}</p>
+                    <p className="text-foreground-muted text-sm font-medium mb-1">
+                      {card.label}
+                    </p>
+                    <p className="text-3xl font-bold text-foreground mb-1">
+                      {card.value}
+                    </p>
+                    <p className="text-xs text-foreground-muted">
+                      {card.subtitle}
+                    </p>
                   </div>
                   <div className={`${card.color} p-4 rounded-xl`}>
                     <card.icon className="text-white" size={28} />
@@ -246,8 +364,15 @@ export default function Dashboard() {
         {/* Work Orders Status */}
         <Card>
           <CardHeader className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Work Orders Status</h3>
-            <Link to="/work-orders" className="text-sm text-primary hover:underline">View all</Link>
+            <h3 className="font-semibold text-foreground">
+              Work Orders Status
+            </h3>
+            <Link
+              to="/work-orders"
+              className="text-sm text-primary hover:underline"
+            >
+              View all
+            </Link>
           </CardHeader>
           <CardBody className="space-y-3">
             <div className="flex items-center justify-between">
@@ -255,21 +380,29 @@ export default function Dashboard() {
                 <div className="w-3 h-3 bg-warning rounded-full" />
                 <span className="text-sm text-foreground-muted">Pending</span>
               </div>
-              <span className="font-semibold text-foreground">{stats.workOrders.pending}</span>
+              <span className="font-semibold text-foreground">
+                {stats.workOrders.pending}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-info rounded-full" />
-                <span className="text-sm text-foreground-muted">In Progress</span>
+                <span className="text-sm text-foreground-muted">
+                  In Progress
+                </span>
               </div>
-              <span className="font-semibold text-foreground">{stats.workOrders.inProgress}</span>
+              <span className="font-semibold text-foreground">
+                {stats.workOrders.inProgress}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-success rounded-full" />
                 <span className="text-sm text-foreground-muted">Completed</span>
               </div>
-              <span className="font-semibold text-foreground">{stats.workOrders.completed}</span>
+              <span className="font-semibold text-foreground">
+                {stats.workOrders.completed}
+              </span>
             </div>
           </CardBody>
         </Card>
@@ -281,37 +414,62 @@ export default function Dashboard() {
           </CardHeader>
           <CardBody>
             {recentActivity.length === 0 ? (
-              <p className="text-foreground-muted text-sm text-center py-4">No recent activity</p>
+              <p className="text-foreground-muted text-sm text-center py-4">
+                No recent activity
+              </p>
             ) : (
               <div className="space-y-4">
-                {recentActivity.map((activity, idx) => (
-                  <div key={idx} className="flex items-start space-x-3 pb-4 border-b border-border last:border-0 last:pb-0">
-                    <div className={`p-2 rounded-lg ${activity.type === 'work_order' ? 'bg-info-100 dark:bg-info-950' : 'bg-primary-100 dark:bg-primary-950'}`}>
-                      {activity.type === 'work_order' ? (
-                        <ClipboardList size={16} className="text-info" />
-                      ) : (
-                        <Users size={16} className="text-primary" />
+                {recentActivity.map((activity, idx) => {
+                  const aType = String(activity.type || "");
+                  const aTitle = String(activity.title || "");
+                  const aDate = String(activity.date || "");
+                  const aStatus = String(activity.status || "");
+                  let formattedDate = "-";
+                  try {
+                    formattedDate = format(new Date(aDate), "MMM d, yyyy");
+                  } catch {
+                    /* skip */
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-start space-x-3 pb-4 border-b border-border last:border-0 last:pb-0"
+                    >
+                      <div
+                        className={`p-2 rounded-lg ${aType === "work_order" ? "bg-info-100 dark:bg-info-950" : "bg-primary-100 dark:bg-primary-950"}`}
+                      >
+                        {aType === "work_order" ? (
+                          <ClipboardList size={16} className="text-info" />
+                        ) : (
+                          <Users size={16} className="text-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {aTitle}
+                        </p>
+                        <p className="text-xs text-foreground-muted mt-0.5">
+                          {formattedDate}
+                        </p>
+                      </div>
+                      {aStatus && (
+                        <Badge
+                          variant={
+                            aStatus === "completed"
+                              ? "success"
+                              : aStatus === "in_progress"
+                                ? "info"
+                                : "warning"
+                          }
+                          size="sm"
+                        >
+                          {aStatus.replace("_", " ")}
+                        </Badge>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{activity.title}</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">
-                        {format(new Date(activity.date), 'MMM d, yyyy')}
-                      </p>
-                    </div>
-                    {activity.status && (
-                      <Badge
-                        variant={
-                          activity.status === 'completed' ? 'success' :
-                            activity.status === 'in_progress' ? 'info' : 'warning'
-                        }
-                        size="sm"
-                      >
-                        {activity.status.replace('_', ' ')}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardBody>
@@ -336,11 +494,17 @@ export default function Dashboard() {
                     <MapPin size={18} className="text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-foreground">{location.name}</h4>
-                    <p className="text-sm text-foreground-muted mt-1">{location.address}</p>
-                    <p className="text-sm text-foreground-muted">{location.city}, {location.state} {location.zip}</p>
+                    <h4 className="font-semibold text-foreground">
+                      {location.name}
+                    </h4>
+                    <p className="text-sm text-foreground-muted mt-1">
+                      {location.address}
+                    </p>
+                    <p className="text-sm text-foreground-muted">
+                      {location.city}, {location.state} {location.zip}
+                    </p>
                     <a
-                      href={`tel:${location.phone.replace(/[^\d]/g, '')}`}
+                      href={`tel:${location.phone.replace(/[^\d]/g, "")}`}
                       className="inline-flex items-center gap-1 mt-2 text-sm text-primary hover:underline"
                     >
                       <Phone size={12} />
@@ -365,29 +529,49 @@ export default function Dashboard() {
               to="/work-orders"
               className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
             >
-              <ClipboardList className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">New Work Order</span>
+              <ClipboardList
+                className="text-foreground-muted group-hover:text-primary mb-2"
+                size={24}
+              />
+              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">
+                New Work Order
+              </span>
             </Link>
             <Link
               to="/burials"
               className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
             >
-              <Users className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">Record Burial</span>
+              <Users
+                className="text-foreground-muted group-hover:text-primary mb-2"
+                size={24}
+              />
+              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">
+                Record Burial
+              </span>
             </Link>
             <Link
               to="/financial"
               className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
             >
-              <DollarSign className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">Add Deposit</span>
+              <DollarSign
+                className="text-foreground-muted group-hover:text-primary mb-2"
+                size={24}
+              />
+              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">
+                Add Deposit
+              </span>
             </Link>
             <Link
               to="/inventory"
               className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
             >
-              <Package className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">Update Inventory</span>
+              <Package
+                className="text-foreground-muted group-hover:text-primary mb-2"
+                size={24}
+              />
+              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">
+                Update Inventory
+              </span>
             </Link>
           </div>
         </CardBody>
@@ -403,15 +587,21 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-foreground-muted">Monday - Friday</span>
-                <span className="font-medium text-foreground">{COMPANY.hours.weekday.open} - {COMPANY.hours.weekday.close}</span>
+                <span className="font-medium text-foreground">
+                  {COMPANY.hours.weekday.open} - {COMPANY.hours.weekday.close}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-foreground-muted">Saturday</span>
-                <span className="font-medium text-foreground">{COMPANY.hours.saturday.open} - {COMPANY.hours.saturday.close}</span>
+                <span className="font-medium text-foreground">
+                  {COMPANY.hours.saturday.open} - {COMPANY.hours.saturday.close}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-foreground-muted">Sunday</span>
-                <span className="font-medium text-foreground">{COMPANY.hours.sunday}</span>
+                <span className="font-medium text-foreground">
+                  {COMPANY.hours.sunday}
+                </span>
               </div>
             </div>
           </CardBody>
