@@ -1,0 +1,61 @@
+---
+description: "Git workflow and commit message conventions"
+alwaysApply: false
+---
+
+# Git Conventions
+
+## Commit Message Format
+
+```
+<type>(<scope>): <short description>
+
+[optional body]
+
+[optional footer]
+```
+
+### Types
+
+- `feat` - New feature
+- `fix` - Bug fix
+- `docs` - Documentation only
+- `style` - Formatting, no code change
+- `refactor` - Code change that neither fixes nor adds
+- `test` - Adding or updating tests
+- `chore` - Maintenance, dependencies, config
+
+### Scope Examples
+
+- `api` - Backend API changes
+- `ui` - Frontend/UI changes
+- `db` - Database changes
+- `auth` - Authentication
+- `grants` - Grants module
+- `workorders` - Work orders module
+
+### Examples
+
+```
+feat(grants): add filtering by status and date range
+
+fix(api): handle null values in customer lookup
+
+docs(readme): update deployment instructions
+
+refactor(auth): extract token validation to middleware
+```
+
+## Branch Naming
+
+- `feature/<description>` - New features
+- `fix/<description>` - Bug fixes
+- `hotfix/<description>` - Urgent production fixes
+
+## Best Practices
+
+- Commit early, commit often
+- One logical change per commit
+- Write meaningful commit messages
+- Pull before push to avoid conflicts
+- Never force push to main/master

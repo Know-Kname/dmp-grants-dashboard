@@ -1,0 +1,48 @@
+---
+description: "Microsoft Power Platform and M365 integration patterns"
+alwaysApply: false
+---
+
+# Power Platform Guidelines
+
+## MCP Servers Available
+
+- `user-power-apps` - Power Apps/Dataverse
+- `user-sharepoint` - SharePoint integration
+
+## Power Apps Patterns
+
+### Dataverse Queries
+
+Use OData query syntax for filtering and selecting data.
+
+### Common Operations
+
+- List environments
+- Query Dataverse tables
+- Create/update records
+
+## SharePoint Integration
+
+### File Operations
+
+```
+sp_list_folder → Browse structure
+sp_read_file → Get content
+sp_write_file → Upload/update
+sp_search → Find content
+```
+
+### List Operations
+
+```
+sp_list_lists → Get all lists
+sp_query_list → Query list items
+```
+
+## Best Practices
+
+- Use minimal queries - request only needed fields
+- Paginate large result sets
+- Handle throttling gracefully
+- Cache repeated lookups when possible

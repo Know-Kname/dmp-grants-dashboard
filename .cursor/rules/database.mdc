@@ -1,0 +1,83 @@
+---
+description: "PostgreSQL database patterns and query guidelines"
+globs: "server/db/**/*.{js,ts}"
+alwaysApply: false
+---
+
+# Database Guidelines
+
+## Query Safety
+
+### ALWAYS Use Parameterized Queries
+
+```javascript
+// CORRECT - parameterized
+const result = await db.query(
+  'SELECT * FROM customers WHERE id = $1',
+  [customerId]
+);
+
+// WRONG - string concatenation (SQL injection risk!)
+// const result = await db.query(
+//   `SELECT * FROM customers WHERE id = '${customerId}'`
+// );
+```
+
+## Query Patterns
+
+### Single Record
+
+```javascript
+const customer = await db.query(
+  'SELECT * FROM customers WHERE id = $1',
+  [id]
+);
+return customer.rows[0];
+```
+
+### List with Pagination
+
+```javascript
+const { page = 1, limit = 20 } = req.query;
+const offset = (page - 1) * limit;
+
+const result = await db.query(
+  'SELECT * FROM customers ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+  [limit, offset]
+);
+```
+
+### Insert with Returning
+
+```javascript
+const result = await db.query(
+  `INSERT INTO customers (name, email) 
+   VALUES ($1, $2) 
+   RETURNING *`,
+  [name, email]
+);
+return result.rows[0];
+```
+
+## Transactions
+
+```javascript
+const client = await db.pool.connect();
+try {
+  await client.query('BEGIN');
+  // Multiple queries...
+  await client.query('COMMIT');
+} catch (error) {
+  await client.query('ROLLBACK');
+  throw error;
+} finally {
+  client.release();
+}
+```
+
+## Schema
+
+- Schema defined in `/server/db/schema.sql`
+- Migrations in `/server/db/migrate.js`
+- Use snake_case for column names
+- Always include created_at and updated_at timestamps

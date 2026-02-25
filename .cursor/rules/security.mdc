@@ -1,0 +1,48 @@
+---
+description: "Security guidelines and sensitive data handling"
+alwaysApply: true
+---
+
+# Security Guidelines
+
+## Sensitive Data
+
+- NEVER hardcode secrets, API keys, or passwords
+- NEVER commit .env files or credentials
+- Use environment variables for all sensitive config
+- Mask sensitive data in logs (use `[REDACTED]`)
+
+## Authentication
+
+- All API routes require auth middleware (except public endpoints)
+- Use JWT tokens with appropriate expiration
+- Validate tokens on every request
+- Hash passwords with bcrypt (never store plaintext)
+
+## Database Security
+
+- ALWAYS use parameterized queries
+- NEVER concatenate user input into SQL strings
+- Validate and sanitize all user inputs
+- Use the validation middleware for request bodies
+
+## API Security
+
+- Validate request bodies before processing
+- Return generic error messages to clients (no stack traces)
+- Log detailed errors server-side only
+- Use HTTPS in production
+
+## File Handling
+
+- Validate file types and sizes before upload
+- Never execute user-uploaded files
+- Store uploads outside web root
+
+## Code Review Checklist
+
+- [ ] No hardcoded secrets
+- [ ] Input validation present
+- [ ] Parameterized queries used
+- [ ] Auth middleware applied
+- [ ] Error messages don't leak internals

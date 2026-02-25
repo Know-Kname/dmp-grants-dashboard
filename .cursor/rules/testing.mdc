@@ -1,0 +1,46 @@
+---
+description: "Testing conventions and patterns for Vitest"
+globs: "**/*.test.{ts,tsx,js}"
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Framework
+
+- Use Vitest for all tests
+- Frontend tests use React Testing Library
+- Server tests use supertest for HTTP testing
+
+## File Naming
+
+- Unit tests: `ComponentName.test.tsx` or `module.test.ts`
+- Co-locate tests with source files
+
+## Test Structure
+
+```typescript
+describe('ComponentName', () => {
+  beforeEach(() => {
+    // Setup
+  });
+
+  it('should do expected behavior', () => {
+    // Arrange, Act, Assert
+  });
+});
+```
+
+## Best Practices
+
+- Test behavior, not implementation
+- Mock external dependencies, not internal modules
+- Use meaningful test descriptions
+- Keep tests focused and independent
+- Clean up after async operations
+
+## Running Tests
+
+- `npm run test` - Run all tests
+- `npm run test:server` - Server tests only
+- Tests run in CI on every PR

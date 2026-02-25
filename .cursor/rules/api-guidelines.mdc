@@ -1,0 +1,42 @@
+---
+description: "Backend API development standards for Express routes"
+globs: "server/**/*.{js,ts}"
+alwaysApply: false
+---
+
+# API Development Guidelines
+
+## Route Structure
+
+- Use RESTful conventions (GET, POST, PUT, DELETE)
+- Group routes by resource in `/server/routes/`
+- Use middleware for auth, validation, error handling
+
+## Request Handling
+
+- Always validate request bodies using the validation middleware
+- Use pagination utility for list endpoints
+- Return consistent error shapes via errorHandler middleware
+
+## Response Format
+
+```javascript
+// Success
+{ data: {...}, meta: { page, limit, total } }
+
+// Error
+{ error: { code, message, details } }
+```
+
+## Database
+
+- Use parameterized queries (never string concatenation)
+- Handle transactions for multi-step operations
+- Use the db utilities in `/server/db/`
+
+## Security
+
+- Never expose internal errors to clients
+- Validate all user inputs
+- Use auth middleware on protected routes
+- Never log sensitive data (passwords, tokens)

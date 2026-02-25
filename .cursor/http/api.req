@@ -1,0 +1,30 @@
+# @var BASE_URL=http://localhost:3000
+
+### Health Check
+GET {{BASE_URL}}/api/health
+
+### Login (get token first)
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+### Get All Grants
+# @var TOKEN={{@prompt("Enter your JWT token")}}
+GET {{BASE_URL}}/api/grants
+Authorization: Bearer {{TOKEN}}
+
+### Get All Work Orders
+GET {{BASE_URL}}/api/work-orders
+Authorization: Bearer {{TOKEN}}
+
+### Get All Customers
+GET {{BASE_URL}}/api/customers
+Authorization: Bearer {{TOKEN}}
+
+### Get Dashboard Financial Data
+GET {{BASE_URL}}/api/financial/summary
+Authorization: Bearer {{TOKEN}}

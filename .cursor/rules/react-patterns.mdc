@@ -1,0 +1,85 @@
+---
+description: "React component patterns and hooks best practices"
+globs: "src/**/*.tsx"
+alwaysApply: false
+---
+
+# React Patterns
+
+## Component Structure
+
+```typescript
+// 1. Imports (React, external, internal, types)
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui';
+import { useData } from '@/hooks/useData';
+import type { Customer } from '@/types';
+
+// 2. Types/Interfaces
+interface Props {
+  customerId: string;
+  onSave: (data: Customer) => void;
+}
+
+// 3. Component (named export)
+export function CustomerForm({ customerId, onSave }: Props) {
+  // 4. Hooks first
+  const [loading, setLoading] = useState(false);
+  const { data, error } = useData(`/customers/${customerId}`);
+
+  // 5. Effects
+  useEffect(() => {
+    // Effect logic
+  }, [customerId]);
+
+  // 6. Handlers
+  const handleSubmit = async () => {
+    // Handler logic
+  };
+
+  // 7. Early returns for loading/error states
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+
+  // 8. Main render
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* JSX */}
+    </form>
+  );
+}
+```
+
+## Hooks Best Practices
+
+- Extract reusable logic to custom hooks in `/src/hooks/`
+- Use existing hooks: `useData`, `useForm` from the project
+- Prefer `useMemo` and `useCallback` for expensive operations
+- Clean up subscriptions/timers in useEffect return
+
+## State Management
+
+- Local state for UI-only concerns
+- React Query (via `useData`) for server state
+- Lift state up only when needed by siblings
+
+## Error Handling
+
+- Wrap pages in `ErrorBoundary` component
+- Use try/catch in async handlers
+- Display user-friendly error messages
+
+## Performance
+
+- Lazy load pages with `React.lazy()`
+- Memoize expensive computations
+- Avoid inline function definitions in render
+- Use pagination for large lists (see `Pagination` component)
+
+## Existing UI Components
+
+Use components from `src/components/ui.tsx`:
+
+- Button, Input, Select, Card
+- Table, Modal, Toast
+- See @src/components/ui.tsx for full list

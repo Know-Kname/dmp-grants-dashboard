@@ -87,7 +87,7 @@ Detroit Memorial Park Cemetery Management System is a full-stack application des
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/dmpgrants.git
+git clone https://github.com/Know-Kname/dmpgrants.git
 cd dmpgrants
 
 # Install dependencies
@@ -285,26 +285,59 @@ curl -fsSL https://get.coolify.io | bash
 
 ---
 
-## 📖 Documentation
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [CLAUDE.md](./CLAUDE.md) | Project overview and module details |
-| [Deployment Guide](./docs/DEPLOYMENT.md) | Complete deployment instructions for all platforms |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Development guidelines and workflow |
+| [SECURITY.md](./SECURITY.md) | Security policy and vulnerability reporting |
+| [Deployment Guide](./docs/DEPLOYMENT.md) | Complete deployment instructions |
+| [Linear Setup](./docs/LINEAR-SETUP.md) | Linear + GitHub integration guide |
+| [Figma Workflow](./docs/FIGMA-WORKFLOW.md) | Design-to-code workflow |
+| [Notion Workspace](./docs/NOTION-WORKSPACE.md) | Documentation hub structure |
+| [n8n Workflows](./docs/N8N-WORKFLOWS.md) | Cross-platform automation |
 | [Import Guide](./server/db/IMPORT-GUIDE.md) | Data import documentation |
-| [API Reference](./docs/api.md) | API endpoint documentation |
+| [CLAUDE.md](./CLAUDE.md) | AI assistant project context |
 
 ---
 
-## 🤝 Contributing
+## Development Workflow
 
-This is a private project for Detroit Memorial Park. Development guidelines:
+### Branch Strategy (GitHub Flow)
 
-1. Create feature branches from `main`
-2. Follow TypeScript strict mode
-3. Include tests for new features
-4. Submit pull requests for review
-5. Maintain clean commit history
+- `main` -- production-ready code (protected)
+- `develop` -- integration branch for active development
+- `feature/LIN-XXX-description` -- feature branches from develop
+- `fix/LIN-XXX-description` -- bug fix branches
+
+### CI/CD Pipeline
+
+Every push triggers automated checks:
+1. Lint and type checking
+2. Test suite with coverage
+3. Production build verification
+4. Security scanning (CodeQL, Dependabot)
+
+Merging to `main` triggers automatic production deployment to Vercel.
+
+### Platform Integrations
+
+| Platform | Purpose | Status |
+|----------|---------|--------|
+| **GitHub** | Source control, CI/CD, code review | Configured |
+| **Vercel** | Frontend deployment, preview URLs | Configured |
+| **Linear** | Issue tracking, sprint management | [Setup Guide](./docs/LINEAR-SETUP.md) |
+| **Figma** | Design system, component specs | [Workflow Guide](./docs/FIGMA-WORKFLOW.md) |
+| **Notion** | Documentation hub, knowledge base | [Workspace Guide](./docs/NOTION-WORKSPACE.md) |
+| **n8n** | Cross-platform automation | [Workflow Guide](./docs/N8N-WORKFLOWS.md) |
+
+### Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on:
+- Branch naming conventions
+- Commit message format (Conventional Commits)
+- PR template and review process
+- Code standards and testing requirements
 
 ---
 

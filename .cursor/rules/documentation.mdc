@@ -1,0 +1,63 @@
+---
+description: "Documentation standards and JSDoc patterns"
+globs: "**/*.{ts,tsx,js}"
+alwaysApply: false
+---
+
+# Documentation Standards
+
+## JSDoc for Functions
+
+```typescript
+/**
+ * Brief description of what the function does.
+ * 
+ * @param paramName - Description of the parameter
+ * @returns Description of return value
+ * @throws {ErrorType} When this error occurs
+ * @example
+ * const result = functionName(arg);
+ */
+```
+
+## Component Documentation
+
+```typescript
+/**
+ * Component description and purpose.
+ * 
+ * @example
+ * <ComponentName prop="value" />
+ */
+interface ComponentNameProps {
+  /** Description of this prop */
+  propName: string;
+}
+```
+
+## When to Document
+
+- Public API functions and components
+- Complex business logic
+- Non-obvious implementations
+- Exported utilities and hooks
+
+## When NOT to Document
+
+- Self-explanatory code (good naming > comments)
+- Implementation details that may change
+- Obvious getters/setters
+
+## README Updates
+
+When adding new features:
+
+1. Update relevant section in README.md
+2. Add to QUICKSTART.md if affects setup
+3. Update API documentation if endpoints change
+
+## Code Comments
+
+- Explain WHY, not WHAT
+- Keep comments updated with code changes
+- Remove commented-out code before committing

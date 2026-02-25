@@ -1,0 +1,66 @@
+name: Design Token Sync
+
+on:
+  schedule:
+    - cron: '0 8 * * 1-5' # Weekdays at 8am UTC
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  sync-tokens:
+    name: Sync Design Tokens
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Extract Design Tokens
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          FIGMA_FILE_ID: ${{ secrets.FIGMA_FILE_ID }}
+        run: |
+          # Run token extraction (configure based on chosen tool)
+          npm run tokens:sync --if-present || echo "Token sync script not yet configured"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create PR for token updates
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          BRANCH="chore/design-token-update-$(date +%Y-%m-%d)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(design): sync design tokens from Figma"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --title "chore(design): sync design tokens from Figma" \
+            --body "Automated design token sync from Figma.
+
+          ## Changes
+          $(git diff --stat HEAD~1)
+
+          ## Review
+          - [ ] Visual regression check passed
+          - [ ] Design team approved
+          " \
+            --base develop \
+            --label "design,chore"
+        env:
+          GH_TOKEN: ${{ github.token }}

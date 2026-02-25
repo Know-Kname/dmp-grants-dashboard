@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Linear Board
+    url: https://linear.app
+    about: Track and manage issues in Linear
+  - name: Notion Wiki
+    url: https://notion.so
+    about: Check our documentation wiki for answers

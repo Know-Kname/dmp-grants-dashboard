@@ -1,0 +1,89 @@
+---
+description: "Error handling patterns for frontend and backend"
+alwaysApply: false
+---
+
+# Error Handling Patterns
+
+## Backend (Express)
+
+### Use Custom Error Classes
+
+```javascript
+// Import from server/utils/errors.js
+const { AppError, NotFoundError, ValidationError } = require('../utils/errors');
+
+// Throw typed errors
+throw new NotFoundError('Customer not found');
+throw new ValidationError('Invalid email format');
+```
+
+### Route Handler Pattern
+
+```javascript
+router.get('/:id', async (req, res, next) => {
+  try {
+    const result = await service.getById(req.params.id);
+    if (!result) {
+      throw new NotFoundError('Resource not found');
+    }
+    res.json({ data: result });
+  } catch (error) {
+    next(error); // Pass to errorHandler middleware
+  }
+});
+```
+
+### Error Response Format
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Customer not found",
+    "status": 404
+  }
+}
+```
+
+## Frontend (React)
+
+### Use Error Utilities
+
+```typescript
+// Import from src/lib/errors.ts
+import { ApiError, handleApiError } from '@/lib/errors';
+
+// In async functions
+try {
+  const data = await api.get('/endpoint');
+} catch (error) {
+  const handled = handleApiError(error);
+  toast.error(handled.message);
+}
+```
+
+### Component Error Boundaries
+
+```typescript
+// Wrap pages in ErrorBoundary
+<ErrorBoundary fallback={<ErrorPage />}>
+  <PageComponent />
+</ErrorBoundary>
+```
+
+### Loading and Error States
+
+```typescript
+const { data, error, isLoading } = useData('/endpoint');
+
+if (isLoading) return <LoadingSpinner />;
+if (error) return <ErrorMessage error={error} />;
+return <DataDisplay data={data} />;
+```
+
+## Logging
+
+- Server: Use console.error with context (never in production responses)
+- Client: Use error tracking service for production
+- Always include request ID for correlation

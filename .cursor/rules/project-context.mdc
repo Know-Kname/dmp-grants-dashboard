@@ -1,0 +1,51 @@
+---
+description: "Project overview and architecture for Detroit Memorial Park software"
+alwaysApply: true
+---
+
+# Detroit Memorial Park - Cemetery Business Software
+
+## Project Overview
+
+Cemetery business management software replacing/supplementing Cemetery Manager (cemsites).
+
+## Tech Stack
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: Node.js + Express
+- **Database**: PostgreSQL
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Auth**: JWT-based authentication
+
+## Core Modules
+
+1. **Work Orders** - Maintenance and service tracking
+2. **Inventory** - Caskets, urns, vaults, markers
+3. **Financial** - Deposits, AR/AP, invoicing, statements
+4. **Burials** - Plot management, permits, records
+5. **Contracts** - Pre-need/at-need, payment plans
+6. **Grants** - Benefits and funding opportunities
+
+## Directory Structure
+
+```
+/src           - React frontend (components, pages, hooks, lib)
+/server        - Express backend (routes, middleware, db)
+/docs          - Documentation
+/public        - Static assets
+```
+
+## Key Commands
+
+- `npm run dev` - Start dev server (frontend + backend)
+- `npm run build` - Production build
+- `npm run test` - Run all tests
+- `npm run db:setup` - Initialize database
+- `npm run db:migrate` - Run migrations
+
+## Important Notes
+
+- NEVER commit .env files
+- Use demo data for local development
+- All API routes require authentication
+- Database schema in `/server/db/schema.sql`

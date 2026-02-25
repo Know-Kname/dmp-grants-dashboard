@@ -1,0 +1,35 @@
+---
+description: "TypeScript and React coding standards for the DMP Grants project"
+globs: "src/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Code Style Standards
+
+## TypeScript
+
+- Use strict TypeScript, avoid `any` types
+- Prefer named exports over default exports
+- Use async/await over raw promises
+- Define interfaces for all data shapes
+
+## React
+
+- Use functional components with hooks
+- Prefer composition over inheritance
+- Co-locate component tests with source files
+- Use ErrorBoundary for error handling
+
+## Naming Conventions
+
+- Components: PascalCase (`UserProfile.tsx`)
+- Hooks: camelCase with `use` prefix (`useForm.ts`)
+- Utilities: camelCase (`formatDate.ts`)
+- Types/Interfaces: PascalCase (`CustomerData`)
+- Constants: SCREAMING_SNAKE_CASE
+
+## Imports
+
+- Group imports: React, external libs, internal modules, types
+- Use absolute imports from `src/`
+- Avoid circular dependencies

@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Beginner's Guide - Detroit Memorial Park Cemetery Management System</title>
+    <style>
+        :root {
+            --primary-color: #1a365d;
+            --secondary-color: #2c5282;
+            --accent-color: #3182ce;
+            --success-color: #38a169;
+            --warning-color: #d69e2e;
+            --error-color: #e53e3e;
+            --text-color: #2d3748;
+            --light-bg: #f7fafc;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            color: var(--text-color);
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                padding: 0;
+                font-size: 11pt;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+            .no-print {
+                display: none;
+            }
+            h1, h2, h3 {
+                page-break-after: avoid;
+            }
+            table, pre, .info-box {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.5em;
+            margin-bottom: 0.2em;
+            border-bottom: 4px solid var(--accent-color);
+            padding-bottom: 15px;
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            font-size: 1.8em;
+            margin-top: 2em;
+            padding-top: 1em;
+            border-top: 2px solid var(--border-color);
+        }
+
+        h3 {
+            color: var(--primary-color);
+            font-size: 1.4em;
+            margin-top: 1.5em;
+        }
+
+        h4 {
+            color: var(--secondary-color);
+            font-size: 1.15em;
+            margin-top: 1.2em;
+        }
+
+        .subtitle {
+            color: #718096;
+            font-size: 1.2em;
+            font-style: italic;
+            margin-bottom: 2em;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            font-size: 0.95em;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: var(--light-bg);
+        }
+
+        tr:hover {
+            background: #edf2f7;
+        }
+
+        /* Code */
+        code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            color: #c53030;
+        }
+
+        pre {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin: 1.5em 0;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .command {
+            background: #2d3748;
+            color: #68d391;
+        }
+
+        /* Info boxes */
+        .info-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 1.5em 0;
+        }
+
+        .info-box.tip {
+            background: #e6fffa;
+            border-left: 4px solid #38b2ac;
+        }
+
+        .info-box.warning {
+            background: #fffaf0;
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .info-box.important {
+            background: #fff5f5;
+            border-left: 4px solid var(--error-color);
+        }
+
+        .info-box.note {
+            background: #ebf8ff;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .info-box-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        /* Quick reference box */
+        .quick-ref {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 2em 0;
+        }
+
+        .quick-ref h3 {
+            color: white;
+            margin-top: 0;
+        }
+
+        .quick-ref table {
+            background: rgba(255,255,255,0.1);
+            border: none;
+        }
+
+        .quick-ref th {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .quick-ref td, .quick-ref th {
+            border-color: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .quick-ref code {
+            background: rgba(255,255,255,0.2);
+            color: #faf089;
+        }
+
+        /* Lists */
+        ul, ol {
+            padding-left: 1.5em;
+        }
+
+        li {
+            margin-bottom: 0.5em;
+        }
+
+        /* Diagram boxes */
+        .diagram {
+            background: var(--light-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 1.5em 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        /* Step sections */
+        .step {
+            background: var(--light-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 1em 0;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .step-number {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: var(--primary-color);
+        }
+
+        /* Checklist */
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .checklist li:before {
+            content: "☐ ";
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+
+        /* Table of contents */
+        .toc {
+            background: var(--light-bg);
+            padding: 25px;
+            border-radius: 8px;
+            margin: 2em 0;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .toc ol {
+            padding-left: 1.5em;
+        }
+
+        .toc a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        /* OS-specific sections */
+        .os-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 1em 0;
+        }
+
+        .os-box {
+            background: var(--light-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .os-box h5 {
+            margin: 0 0 10px 0;
+            color: var(--primary-color);
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 4em;
+            padding-top: 2em;
+            border-top: 2px solid var(--border-color);
+            text-align: center;
+            color: #718096;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            body {
+                padding: 20px 15px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            table {
+                font-size: 0.85em;
+            }
+            th, td {
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Complete Beginner's Guide</h1>
+<p class="subtitle">Detroit Memorial Park Cemetery Management System</p>
+<p><em>Everything you need to know to run and understand this application — no prior experience required.</em></p>
+
+<!-- Quick Reference -->
+<div class="quick-ref">
+    <h3>Quick Reference (For Returning Users)</h3>
+    <p>Already set up? Here's the daily startup sequence:</p>
+    <table>
+        <tr><th>Step</th><th>Command</th></tr>
+        <tr><td>1</td><td>Open <strong>PowerShell</strong></td></tr>
+        <tr><td>2</td><td><code>cd C:\Users\ChristianHug_hhxqjwq\dev\dmpgrants</code></td></tr>
+        <tr><td>3</td><td><code>docker-compose up -d</code></td></tr>
+        <tr><td>4</td><td><code>npm run server</code></td></tr>
+        <tr><td>5</td><td>Open <strong>new</strong> PowerShell window</td></tr>
+        <tr><td>6</td><td><code>cd C:\Users\ChristianHug_hhxqjwq\dev\dmpgrants</code></td></tr>
+        <tr><td>7</td><td><code>npm run dev</code></td></tr>
+        <tr><td>8</td><td>Open http://localhost:5173</td></tr>
+        <tr><td>9</td><td>Login: <code>admin@dmp.com</code> / <code>admin123</code></td></tr>
+    </table>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc">
+    <h3>Table of Contents</h3>
+    <ol>
+        <li><a href="#device">What Device Do I Need?</a></li>
+        <li><a href="#terminal">Which Terminal App Should I Use?</a></li>
+        <li><a href="#understanding">Understanding the Application</a></li>
+        <li><a href="#installing">Installing Required Software</a></li>
+        <li><a href="#first-time">First-Time Setup</a></li>
+        <li><a href="#daily">Daily Startup</a></li>
+        <li><a href="#using">Using the Application</a></li>
+        <li><a href="#how-it-works">How It All Works</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#commands">Command Reference</a></li>
+        <li><a href="#glossary">Glossary</a></li>
+    </ol>
+</div>
+
+<!-- Section 1: Device Requirements -->
+<h2 id="device">1. What Device Do I Need?</h2>
+
+<h3>Supported Operating Systems</h3>
+<table>
+    <tr><th>Operating System</th><th>Supported?</th><th>Notes</th></tr>
+    <tr><td><strong>Windows 10/11</strong></td><td style="color: #38a169;">✓ Yes</td><td>Primary development environment</td></tr>
+    <tr><td><strong>macOS</strong></td><td style="color: #38a169;">✓ Yes</td><td>Works with minor command differences</td></tr>
+    <tr><td><strong>Linux (Ubuntu, etc.)</strong></td><td style="color: #38a169;">✓ Yes</td><td>Works with minor command differences</td></tr>
+    <tr><td>Chromebook</td><td style="color: #e53e3e;">✗ No</td><td>Cannot run Docker</td></tr>
+    <tr><td>iPad/Tablet</td><td style="color: #e53e3e;">✗ No</td><td>Cannot run development tools</td></tr>
+    <tr><td>Phone</td><td style="color: #e53e3e;">✗ No</td><td>Cannot run development tools</td></tr>
+</table>
+
+<h3>Minimum Computer Requirements</h3>
+<table>
+    <tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr>
+    <tr><td><strong>RAM</strong></td><td>8 GB</td><td>16 GB</td></tr>
+    <tr><td><strong>Storage</strong></td><td>10 GB free</td><td>20 GB free</td></tr>
+    <tr><td><strong>Processor</strong></td><td>Any modern CPU</td><td>Intel i5/AMD Ryzen 5 or better</td></tr>
+    <tr><td><strong>Internet</strong></td><td>Required for setup</td><td>Required for setup</td></tr>
+</table>
+
+<div class="info-box note">
+    <div class="info-box-title">Which Device Is This Guide Written For?</div>
+    <p><strong>This guide is written for Windows 10/11</strong> because that's what the development computer uses.</p>
+    <p>If you're using macOS or Linux, most commands are the same, but differences are noted throughout with callout boxes.</p>
+</div>
+
+<!-- Section 2: Terminal -->
+<h2 id="terminal" class="page-break">2. Which Terminal App Should I Use?</h2>
+
+<h3>What Is a Terminal?</h3>
+<p>A <strong>terminal</strong> (also called command line, console, or shell) is a text-based way to control your computer. Instead of clicking icons, you type commands.</p>
+
+<h3>Terminal Options on Windows</h3>
+<table>
+    <tr><th>Terminal App</th><th>What It Is</th><th>Should You Use It?</th></tr>
+    <tr><td><strong>PowerShell</strong></td><td>Modern Windows command line</td><td style="color: #38a169;"><strong>YES - Use this one</strong></td></tr>
+    <tr><td><strong>Windows Terminal</strong></td><td>Newer app that can run PowerShell</td><td style="color: #38a169;"><strong>YES - This is also good</strong></td></tr>
+    <tr><td>Command Prompt (cmd)</td><td>Old Windows command line</td><td style="color: #e53e3e;">No - outdated</td></tr>
+    <tr><td>Git Bash</td><td>Unix-like terminal from Git</td><td style="color: #e53e3e;">No - not needed</td></tr>
+    <tr><td>WSL/Ubuntu</td><td>Linux inside Windows</td><td style="color: #e53e3e;">No - adds complexity</td></tr>
+</table>
+
+<div class="info-box tip">
+    <div class="info-box-title">Recommendation: Use PowerShell</div>
+    <p><strong>For this guide, use PowerShell.</strong> It comes pre-installed on Windows 10 and 11.</p>
+    <p><strong>Why not WSL or Git Bash?</strong> While these work, they use different file paths (like <code>/mnt/c/</code> instead of <code>C:\</code>) and can cause confusion.</p>
+</div>
+
+<h3>How to Open PowerShell</h3>
+
+<h4>Method 1: Keyboard Shortcut (Fastest)</h4>
+<ol>
+    <li>Press <code>Windows key + X</code> (hold Windows key, tap X)</li>
+    <li>Click <strong>Windows Terminal</strong> or <strong>Windows PowerShell</strong></li>
+</ol>
+
+<h4>Method 2: Start Menu</h4>
+<ol>
+    <li>Click the <strong>Start button</strong> (Windows icon, bottom-left)</li>
+    <li>Type <code>powershell</code></li>
+    <li>Click <strong>Windows PowerShell</strong></li>
+</ol>
+
+<h4>Method 3: Right-Click in File Explorer</h4>
+<ol>
+    <li>Open File Explorer</li>
+    <li>Navigate to any folder</li>
+    <li>Right-click in empty space</li>
+    <li>Click <strong>Open in Terminal</strong> or <strong>Open PowerShell window here</strong></li>
+</ol>
+
+<h3>What PowerShell Looks Like</h3>
+<pre>Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\Users\YourName></pre>
+
+<p>The <code>PS C:\Users\YourName></code> part is called the <strong>prompt</strong>:</p>
+<ul>
+    <li><code>PS</code> = You're in PowerShell</li>
+    <li><code>C:\Users\YourName</code> = Your current folder location</li>
+    <li><code>></code> = Where you type commands</li>
+</ul>
+
+<div class="os-section">
+    <div class="os-box">
+        <h5>macOS Terminal</h5>
+        <p>Press <code>Cmd + Space</code>, type <code>terminal</code>, press Enter</p>
+    </div>
+    <div class="os-box">
+        <h5>Linux Terminal</h5>
+        <p>Press <code>Ctrl + Alt + T</code>, or search for "Terminal" in applications</p>
+    </div>
+</div>
+
+<!-- Section 3: Understanding -->
+<h2 id="understanding" class="page-break">3. Understanding the Application</h2>
+
+<h3>What Is This Application?</h3>
+<p>This is a <strong>web application</strong> — software that runs in your web browser (Chrome, Edge, Firefox, Safari). It helps Detroit Memorial Park manage cemetery operations:</p>
+
+<ul>
+    <li><strong>Work Orders</strong> — Track maintenance tasks and staff assignments</li>
+    <li><strong>Burials</strong> — Record and search burial information</li>
+    <li><strong>Inventory</strong> — Manage caskets, urns, markers, and supplies</li>
+    <li><strong>Customers</strong> — Maintain contact information and relationships</li>
+    <li><strong>Contracts</strong> — Handle pre-need and at-need agreements</li>
+    <li><strong>Financials</strong> — Deposits, invoicing, accounts receivable/payable</li>
+</ul>
+
+<h3>How Web Applications Work</h3>
+<p>Think of it like a restaurant:</p>
+
+<div class="diagram">┌───────────────────────────────────────────────────────────────────────┐
+│                                                                       │
+│    YOU                    WAITER                   KITCHEN            │
+│   (Browser)              (Server)                (Database)           │
+│                                                                       │
+│   ┌─────────┐           ┌─────────┐             ┌─────────┐          │
+│   │         │  Request  │         │   Query     │         │          │
+│   │ Chrome  │ ────────► │ Backend │ ──────────► │PostgreSQL│         │
+│   │  Edge   │           │ Server  │             │         │          │
+│   │ Firefox │ ◄──────── │         │ ◄────────── │  Data   │          │
+│   │         │  Response │         │    Results  │ Storage │          │
+│   └─────────┘           └─────────┘             └─────────┘          │
+│                                                                       │
+│   FRONTEND               BACKEND                  DATABASE            │
+│   What you see           The brain               Where data lives     │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘</div>
+
+<p><strong>The three parts:</strong></p>
+<ul>
+    <li><strong>Frontend</strong> — The visual interface (buttons, forms, tables)</li>
+    <li><strong>Backend</strong> — The logic that processes requests and enforces rules</li>
+    <li><strong>Database</strong> — Permanent storage for all your data</li>
+</ul>
+
+<!-- Section 4: Installing Software -->
+<h2 id="installing" class="page-break">4. Installing Required Software</h2>
+
+<p>Before running the application, you need to install some software. This is a one-time process.</p>
+
+<h3>Required Software Checklist</h3>
+<ul class="checklist">
+    <li><strong>Node.js</strong> — Runs JavaScript code</li>
+    <li><strong>Docker Desktop</strong> — Runs the database</li>
+    <li><strong>Git</strong> (optional) — Version control</li>
+</ul>
+
+<h3>Installing Node.js</h3>
+<p><strong>What is Node.js?</strong> Node.js lets your computer run JavaScript code outside of a web browser. It's required to run this application.</p>
+
+<div class="os-section">
+    <div class="os-box">
+        <h5>Windows</h5>
+        <ol>
+            <li>Go to: <strong>https://nodejs.org</strong></li>
+            <li>Click the <strong>LTS</strong> button</li>
+            <li>Run the downloaded installer</li>
+            <li>Click Next through the prompts</li>
+            <li>Click Install</li>
+        </ol>
+    </div>
+    <div class="os-box">
+        <h5>macOS</h5>
+        <ol>
+            <li>Go to: <strong>https://nodejs.org</strong></li>
+            <li>Click the <strong>LTS</strong> button</li>
+            <li>Run the downloaded .pkg file</li>
+            <li>Follow the installer prompts</li>
+        </ol>
+    </div>
+</div>
+
+<h4>Verify Installation</h4>
+<p>Open a <strong>new</strong> terminal window and type:</p>
+<pre class="command">node --version</pre>
+<p>You should see something like: <code>v20.11.0</code></p>
+
+<h3>Installing Docker Desktop</h3>
+<p><strong>What is Docker?</strong> Docker runs the PostgreSQL database in an isolated "container". Think of it as a virtual computer inside your computer that runs the database.</p>
+
+<div class="os-section">
+    <div class="os-box">
+        <h5>Windows</h5>
+        <ol>
+            <li>Go to: <strong>https://docker.com</strong></li>
+            <li>Click <strong>Download for Windows</strong></li>
+            <li>Run the installer</li>
+            <li><strong>Restart your computer</strong></li>
+            <li>Accept the terms of service</li>
+        </ol>
+    </div>
+    <div class="os-box">
+        <h5>macOS</h5>
+        <ol>
+            <li>Go to: <strong>https://docker.com</strong></li>
+            <li>Click <strong>Download for Mac</strong></li>
+            <li>Choose Apple Chip or Intel Chip</li>
+            <li>Drag Docker to Applications</li>
+            <li>Open Docker from Applications</li>
+        </ol>
+    </div>
+</div>
+
+<h4>Verify Docker Installation</h4>
+<p>Look for the <strong>Docker whale icon</strong> in your system tray:</p>
+<ul>
+    <li><strong>Windows:</strong> Bottom-right corner of screen, near the clock</li>
+    <li><strong>macOS:</strong> Top-right corner of screen, in the menu bar</li>
+</ul>
+<p>The whale should be <strong>still</strong> (not animating). If it's animating, Docker is still starting up — wait for it to finish.</p>
+
+<!-- Section 5: First-Time Setup -->
+<h2 id="first-time" class="page-break">5. First-Time Setup</h2>
+
+<div class="info-box important">
+    <div class="info-box-title">Prerequisites</div>
+    <p>Complete Section 4 first. You need Node.js and Docker installed.</p>
+</div>
+
+<div class="step">
+    <span class="step-number">1</span>
+    <span class="step-title">Open PowerShell</span>
+    <p><strong>Windows:</strong> Press <code>Windows + X</code> → Click <strong>Windows Terminal</strong></p>
+    <p><strong>macOS/Linux:</strong> Open <strong>Terminal</strong></p>
+</div>
+
+<div class="step">
+    <span class="step-number">2</span>
+    <span class="step-title">Navigate to the Project Folder</span>
+    <p><strong>Windows:</strong></p>
+    <pre class="command">cd C:\Users\ChristianHug_hhxqjwq\dev\dmpgrants</pre>
+    <p><strong>macOS/Linux:</strong></p>
+    <pre class="command">cd ~/dev/dmpgrants</pre>
+</div>
+
+<div class="step">
+    <span class="step-number">3</span>
+    <span class="step-title">Ensure Docker is Running</span>
+    <p>Look for the Docker whale icon in your system tray. It should be still, not animating.</p>
+    <p><strong>If Docker isn't running:</strong> Open Start menu → search "Docker Desktop" → click to open it</p>
+</div>
+
+<div class="step">
+    <span class="step-number">4</span>
+    <span class="step-title">Start the Database</span>
+    <pre class="command">docker-compose up -d</pre>
+    <p>First time takes longer because Docker downloads the PostgreSQL image (~400MB).</p>
+    <p><strong>Verify it's running:</strong></p>
+    <pre class="command">docker ps</pre>
+    <p>Look for <code>Up</code> in the STATUS column.</p>
+</div>
+
+<div class="step">
+    <span class="step-number">5</span>
+    <span class="step-title">Install Dependencies</span>
+    <pre class="command">npm install</pre>
+    <p>This downloads all code libraries. Takes 1-3 minutes.</p>
+</div>
+
+<div class="step">
+    <span class="step-number">6</span>
+    <span class="step-title">Create Environment File</span>
+    <p><strong>Windows:</strong></p>
+    <pre class="command">copy .env.example .env</pre>
+    <p><strong>macOS/Linux:</strong></p>
+    <pre class="command">cp .env.example .env</pre>
+</div>
+
+<div class="step">
+    <span class="step-number">7</span>
+    <span class="step-title">Set Up Database Tables</span>
+    <pre class="command">npm run db:migrate</pre>
+</div>
+
+<div class="step">
+    <span class="step-number">8</span>
+    <span class="step-title">Start the Backend Server</span>
+    <pre class="command">npm run server</pre>
+    <p>You should see: <code>Server running on port 3000</code></p>
+    <p><strong>Leave this terminal window open!</strong></p>
+</div>
+
+<div class="step">
+    <span class="step-number">9</span>
+    <span class="step-title">Open a Second Terminal Window</span>
+    <p><strong>Windows:</strong> Press <code>Windows + X</code> → Click <strong>Windows Terminal</strong></p>
+    <p><strong>macOS:</strong> Press <code>Cmd + N</code> in Terminal</p>
+    <p><strong>Linux:</strong> Press <code>Ctrl + Shift + N</code></p>
+</div>
+
+<div class="step">
+    <span class="step-number">10</span>
+    <span class="step-title">Navigate and Start the Frontend</span>
+    <p>In the <strong>new</strong> terminal window:</p>
+    <p><strong>Windows:</strong></p>
+    <pre class="command">cd C:\Users\ChristianHug_hhxqjwq\dev\dmpgrants
+npm run dev</pre>
+    <p><strong>macOS/Linux:</strong></p>
+    <pre class="command">cd ~/dev/dmpgrants
+npm run dev</pre>
+</div>
+
+<div class="step">
+    <span class="step-number">11</span>
+    <span class="step-title">Open the Application</span>
+    <p>Open your web browser and go to: <strong>http://localhost:5173</strong></p>
+</div>
+
+<div class="step">
+    <span class="step-number">12</span>
+    <span class="step-title">Log In</span>
+    <p><strong>Demo credentials:</strong></p>
+    <ul>
+        <li><strong>Email:</strong> admin@dmp.com</li>
+        <li><strong>Password:</strong> admin123</li>
+    </ul>
+</div>
+
+<div class="info-box tip">
+    <div class="info-box-title">Congratulations!</div>
+    <p>The application is now running!</p>
+</div>
+
+<!-- Section 6: Daily Startup -->
+<h2 id="daily" class="page-break">6. Daily Startup</h2>
+
+<p>Each time you want to use the application, follow these steps.</p>
+
+<h3>Quick Version (Copy-Paste Commands)</h3>
+
+<p><strong>Terminal 1:</strong></p>
+<pre class="command">cd C:\Users\ChristianHug_hhxqjwq\dev\dmpgrants
+docker-compose up -d
+npm run server</pre>
+
+<p><strong>Terminal 2 (new window):</strong></p>
+<pre class="command">cd C:\Users\ChristianHug_hhxqjwq\dev\dmpgrants
+npm run dev</pre>
+
+<p><strong>Browser:</strong> http://localhost:5173</p>
+
+<h3>Shutting Down</h3>
+<ol>
+    <li>Go to the terminal running the frontend (<code>npm run dev</code>)</li>
+    <li>Press <code>Ctrl + C</code> to stop it</li>
+    <li>Go to the terminal running the backend (<code>npm run server</code>)</li>
+    <li>Press <code>Ctrl + C</code> to stop it</li>
+    <li>(Optional) Stop the database: <code>docker-compose down</code></li>
+</ol>
+
+<!-- Section 7: Using the App -->
+<h2 id="using">7. Using the Application</h2>
+
+<h3>Logging In</h3>
+<p><strong>Default demo account:</strong></p>
+<ul>
+    <li><strong>Email:</strong> admin@dmp.com</li>
+    <li><strong>Password:</strong> admin123</li>
+</ul>
+
+<h3>Common Tasks</h3>
+
+<h4>Creating a Work Order</h4>
+<ol>
+    <li>Click <strong>Work Orders</strong> in the sidebar</li>
+    <li>Click <strong>+ New Work Order</strong> button</li>
+    <li>Fill in: title, description, priority, assigned staff</li>
+    <li>Click <strong>Save</strong></li>
+</ol>
+
+<h4>Recording a Burial</h4>
+<ol>
+    <li>Click <strong>Burials</strong> in the sidebar</li>
+    <li>Click <strong>+ New Burial</strong></li>
+    <li>Enter: deceased information, plot location, date</li>
+    <li>Link to customer/contract if applicable</li>
+    <li>Click <strong>Save</strong></li>
+</ol>
+
+<!-- Section 8: How It Works -->
+<h2 id="how-it-works" class="page-break">8. How It All Works</h2>
+
+<h3>The Three Servers</h3>
+<p>When the application is running, three things are active:</p>
+<table>
+    <tr><th>Server</th><th>Port</th><th>Started By</th><th>Purpose</th></tr>
+    <tr><td><strong>PostgreSQL</strong></td><td>5432</td><td><code>docker-compose up -d</code></td><td>Database storage</td></tr>
+    <tr><td><strong>Backend</strong></td><td>3000</td><td><code>npm run server</code></td><td>API and business logic</td></tr>
+    <tr><td><strong>Frontend</strong></td><td>5173</td><td><code>npm run dev</code></td><td>User interface</td></tr>
+</table>
+
+<h3>What Are Ports?</h3>
+<p>Ports are like apartment numbers in a building. Your computer (the building) can run many services, and each gets a unique port number.</p>
+
+<!-- Section 9: Troubleshooting -->
+<h2 id="troubleshooting" class="page-break">9. Troubleshooting</h2>
+
+<h3>Quick Fixes</h3>
+<table>
+    <tr><th>Problem</th><th>Solution</th></tr>
+    <tr><td>Page won't load</td><td>Make sure both servers are running</td></tr>
+    <tr><td>"Connection refused"</td><td>Run <code>docker-compose up -d</code></td></tr>
+    <tr><td>Login doesn't work</td><td>Use <code>admin@dmp.com</code> / <code>admin123</code></td></tr>
+    <tr><td>Blank white screen</td><td>Press F12, check Console for errors</td></tr>
+</table>
+
+<h3>"npm: command not found"</h3>
+<p><strong>Cause:</strong> Node.js isn't installed or terminal wasn't restarted</p>
+<p><strong>Fix:</strong></p>
+<ol>
+    <li>Install Node.js from https://nodejs.org</li>
+    <li><strong>Close and reopen your terminal</strong> (important!)</li>
+    <li>Test: <code>node --version</code></li>
+</ol>
+
+<h3>"docker-compose: command not found"</h3>
+<p><strong>Cause:</strong> Docker Desktop isn't installed or running</p>
+<p><strong>Fix:</strong></p>
+<ol>
+    <li>Install Docker Desktop from https://docker.com</li>
+    <li>Start Docker Desktop</li>
+    <li>Wait for whale icon to stop animating</li>
+    <li>Test: <code>docker --version</code></li>
+</ol>
+
+<h3>"Connection refused" / "ECONNREFUSED"</h3>
+<p><strong>Cause:</strong> Database isn't running</p>
+<p><strong>Fix:</strong></p>
+<pre class="command">docker-compose up -d</pre>
+<p>Wait 10 seconds, then try again.</p>
+
+<h3>"Cannot find module"</h3>
+<p><strong>Cause:</strong> Dependencies need reinstalling</p>
+<p><strong>Fix (Windows):</strong></p>
+<pre class="command">Remove-Item -Recurse -Force node_modules
+Remove-Item package-lock.json
+npm install</pre>
+<p><strong>Fix (macOS/Linux):</strong></p>
+<pre class="command">rm -rf node_modules package-lock.json
+npm install</pre>
+
+<!-- Section 10: Commands -->
+<h2 id="commands" class="page-break">10. Command Reference</h2>
+
+<h3>Startup Commands</h3>
+<table>
+    <tr><th>Command</th><th>What It Does</th></tr>
+    <tr><td><code>docker-compose up -d</code></td><td>Start database</td></tr>
+    <tr><td><code>npm run server</code></td><td>Start backend (port 3000)</td></tr>
+    <tr><td><code>npm run dev</code></td><td>Start frontend (port 5173)</td></tr>
+</table>
+
+<h3>First-Time Setup Commands</h3>
+<table>
+    <tr><th>Command</th><th>What It Does</th></tr>
+    <tr><td><code>npm install</code></td><td>Download dependencies</td></tr>
+    <tr><td><code>copy .env.example .env</code></td><td>Create config file (Windows)</td></tr>
+    <tr><td><code>cp .env.example .env</code></td><td>Create config file (Mac/Linux)</td></tr>
+    <tr><td><code>npm run db:migrate</code></td><td>Create database tables</td></tr>
+</table>
+
+<h3>Utility Commands</h3>
+<table>
+    <tr><th>Command</th><th>What It Does</th></tr>
+    <tr><td><code>docker ps</code></td><td>List running containers</td></tr>
+    <tr><td><code>docker-compose down</code></td><td>Stop database</td></tr>
+    <tr><td><code>Ctrl + C</code></td><td>Stop running command</td></tr>
+</table>
+
+<!-- Section 11: Glossary -->
+<h2 id="glossary">11. Glossary</h2>
+
+<table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td><strong>API</strong></td><td>Application Programming Interface — how frontend talks to backend</td></tr>
+    <tr><td><strong>Backend</strong></td><td>Server code that handles logic and database operations</td></tr>
+    <tr><td><strong>Container</strong></td><td>Isolated environment running an application (like the database)</td></tr>
+    <tr><td><strong>Database</strong></td><td>Permanent storage for all application data</td></tr>
+    <tr><td><strong>Docker</strong></td><td>Tool that runs applications in containers</td></tr>
+    <tr><td><strong>Frontend</strong></td><td>The visual interface you see in the browser</td></tr>
+    <tr><td><strong>Node.js</strong></td><td>Lets you run JavaScript outside a browser</td></tr>
+    <tr><td><strong>npm</strong></td><td>Node Package Manager — downloads code libraries</td></tr>
+    <tr><td><strong>Port</strong></td><td>Number identifying a service (like apartment numbers)</td></tr>
+    <tr><td><strong>PostgreSQL</strong></td><td>The database system storing all data</td></tr>
+    <tr><td><strong>PowerShell</strong></td><td>Windows command-line terminal</td></tr>
+    <tr><td><strong>Terminal</strong></td><td>Text-based interface to control your computer</td></tr>
+</table>
+
+<!-- Footer -->
+<div class="footer">
+    <p><strong>Detroit Memorial Park Cemetery Management System</strong></p>
+    <p>Complete Beginner's Guide</p>
+    <p>Last updated: February 2026</p>
+    <p class="no-print" style="margin-top: 20px; padding: 15px; background: #ebf8ff; border-radius: 8px;">
+        <strong>To save as PDF:</strong> Press <code>Ctrl + P</code> (Windows) or <code>Cmd + P</code> (Mac), then select "Save as PDF" as the destination.
+    </p>
+</div>
+
+</body>
+</html>

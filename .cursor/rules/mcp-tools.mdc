@@ -1,0 +1,71 @@
+---
+description: "MCP server usage guidelines and tool patterns"
+alwaysApply: false
+---
+
+# MCP Tool Guidelines
+
+## Available MCP Servers
+
+### Browser Automation (`cursor-ide-browser`)
+
+Use for frontend testing and verification.
+
+**Workflow:**
+
+1. `browser_navigate` → Open URL
+2. `browser_lock` → Lock for interactions
+3. `browser_snapshot` → Get page state before interacting
+4. Perform actions (click, type, fill)
+5. `browser_unlock` → Release when done
+
+**Tips:**
+
+- Always snapshot before clicking/typing
+- Use short waits (2-3s) with snapshot checks, not long waits
+- `browser_fill` clears field, `browser_type` appends
+- Iframes are not accessible
+
+### GitHub (`user-github-official`)
+
+**Use `list_*`** for broad retrieval with pagination
+**Use `search_*`** for targeted queries with filters
+
+Always call `get_me` first to understand permissions.
+
+### SharePoint (`user-sharepoint`)
+
+- `sp_list_folder` - Browse files
+- `sp_read_file` - Get file content
+- `sp_write_file` - Upload/update files
+- `sp_search` - Find content
+
+### Notion (`user-notion`)
+
+- `API-post-search` - Find pages/databases
+- `API-post-database-query` - Query database
+- `API-retrieve-a-page` - Get page content
+
+### Documentation (`user-context7`)
+
+- `resolve-library-id` - Find library ID first
+- `query-docs` - Get up-to-date docs for any library
+
+### File System (`user-filesystem`)
+
+For operations outside workspace directory.
+
+### Git (`user-git`)
+
+Direct git operations without shell.
+
+### Memory (`user-memory`)
+
+Persistent memory across sessions.
+
+## Best Practices
+
+- Check tool schema before first use
+- Use pagination (batches of 5-10 items)
+- Set `minimal_output: true` when full data not needed
+- Prefer MCP tools over shell commands when available

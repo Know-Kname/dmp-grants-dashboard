@@ -1,0 +1,33 @@
+# Code Owners for Detroit Memorial Park - Cemetery Management Software
+# Each line is a file pattern followed by one or more owners.
+# Owners are automatically requested for review when the specified files are changed.
+
+# Default owner for everything
+* @Know-Kname
+
+# Backend - API routes and middleware
+server/routes/** @Know-Kname
+server/middleware/** @Know-Kname
+
+# Backend - Security-sensitive areas
+server/middleware/auth.js @Know-Kname
+server/db/** @Know-Kname
+
+# Frontend - React components
+src/components/** @Know-Kname
+src/pages/** @Know-Kname
+
+# Configuration and infrastructure
+.github/workflows/** @Know-Kname
+vercel.json @Know-Kname
+docker-compose.yml @Know-Kname
+Dockerfile @Know-Kname
+
+# Environment and secrets (extra review)
+.env.example @Know-Kname
+.gitignore @Know-Kname
+
+# Documentation
+README.md @Know-Kname
+CONTRIBUTING.md @Know-Kname
+docs/** @Know-Kname

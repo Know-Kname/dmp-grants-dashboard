@@ -1,0 +1,15 @@
+{
+  "setup-worktree-unix": [
+    "npm ci",
+    "cp $ROOT_WORKTREE_PATH/.env .env 2>/dev/null || true",
+    "cp $ROOT_WORKTREE_PATH/.env.local .env.local 2>/dev/null || true"
+  ],
+  "setup-worktree-windows": [
+    "npm ci",
+    "if exist %ROOT_WORKTREE_PATH%\\.env copy %ROOT_WORKTREE_PATH%\\.env .env",
+    "if exist %ROOT_WORKTREE_PATH%\\.env.local copy %ROOT_WORKTREE_PATH%\\.env.local .env.local"
+  ],
+  "setup-worktree": [
+    "npm install"
+  ]
+}
