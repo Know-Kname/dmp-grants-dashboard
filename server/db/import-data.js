@@ -533,112 +533,121 @@ async function findOrCreateCustomer(firstName, lastName, email, phone) {
   return newCustomer.rows[0].id;
 }
 
-// Import accounts receivable from sales data
+// Import accounts receivable from retail sales and financial package
 async function importAccountsReceivable(adminId) {
   console.log('\n=== Importing Accounts Receivable ===');
   
-  const data = readExcel(DATA_FILES.accountsReceivable) || 
-               readExcel(DATA_FILES.salesApp) ||
-               readExcel(DATA_FILES.retailSales);
+  let totalImported = 0;
+  let errors = 0;
   
-  if (!data) {
-    console.log('  Accounts receivable files not found, skipping...');
-    return;
-  }
-  
-  console.log(`  Found sheets: ${data.sheetNames.join(', ')}`);
-  
-  let imported = 0;
-  
-  for (const sheetName of data.sheetNames) {
-    const rows = data.sheets[sheetName];
-    if (!rows || rows.length === 0) continue;
+  // Source 1: retail_sales_west_2020.xlsx - has clean transaction data
+  // Columns: Date, Batch #, Dept - Sale #, Receipt #, Customer, Payment Type, Check/CC #, Amount, Status
+  const retailData = readExcel(DATA_FILES.retailSales);
+  if (retailData) {
+    console.log('  Processing retail_sales_west_2020.xlsx...');
     
-    const lowerName = sheetName.toLowerCase();
-    if (!lowerName.includes('sale') && !lowerName.includes('receivable') && 
-        !lowerName.includes('ar') && !lowerName.includes('retail')) {
-      continue;
-    }
-    
-    console.log(`  Processing sheet: ${sheetName} (${rows.length} rows)`);
-    console.log(`    Columns: ${Object.keys(rows[0]).slice(0, 10).join(', ')}`);
+    // Use Sheet1_Prepared which has cleaner data
+    const sheetName = retailData.sheetNames.includes('Sheet1_Prepared') ? 'Sheet1_Prepared' : retailData.sheetNames[0];
+    const rows = retailData.sheets[sheetName] || [];
+    console.log(`    Sheet: ${sheetName} (${rows.length} rows)`);
     
     for (const row of rows) {
       try {
-        const amount = parseFloat(
-          row['Amount'] || row['amount'] || row['Total'] || row['total'] || 
-          row['Sale Amount'] || row['Sale'] || row['Net Amount'] || 0
-        );
+        // Skip cancelled transactions or those already paid (they're deposits, not AR)
+        const status = (row['Status'] || '').toLowerCase().trim();
+        if (status === 'cancelled') continue;
         
-        if (!amount || amount <= 0) continue;
+        const amount = parseFloat(row['Amount']) || 0;
+        if (amount <= 0) continue;
         
-        // Try to extract customer info
-        const customerName = cleanString(
-          row['Customer'] || row['Customer Name'] || row['Name'] || 
-          row['Client'] || row['Buyer'] || null
-        );
+        // Create/get customer (DMP WEST is internal)
+        const customerName = row['Customer'] || 'Walk-in Customer';
+        let customerId;
         
-        let customerId = null;
-        
-        if (customerName) {
-          const nameParts = customerName.trim().split(/\s+/);
-          const firstName = nameParts[0] || 'Unknown';
-          const lastName = nameParts.slice(1).join(' ') || 'Unknown';
-          
-          customerId = await findOrCreateCustomer(
-            firstName,
-            lastName,
-            cleanString(row['Email'] || row['email'] || null),
-            cleanString(row['Phone'] || row['phone'] || null, 50)
-          );
-        } else {
-          // Use default sales customer
-          const defaultCustomer = await query(
-            `SELECT id FROM customers WHERE first_name = 'Sales' AND last_name = 'Customer' LIMIT 1`
-          );
-          if (defaultCustomer.rows.length > 0) {
-            customerId = defaultCustomer.rows[0].id;
+        if (customerName === 'DMP WEST' || customerName === 'DMP EAST') {
+          // These are retail sales - create generic customer
+          const existing = await query(`SELECT id FROM customers WHERE first_name = 'Retail' AND last_name = 'Customer' LIMIT 1`);
+          if (existing.rows.length > 0) {
+            customerId = existing.rows[0].id;
           } else {
-            const newCustomer = await query(
-              `INSERT INTO customers (first_name, last_name) VALUES ('Sales', 'Customer') RETURNING id`
-            );
-            customerId = newCustomer.rows[0].id;
+            const newCust = await query(`INSERT INTO customers (first_name, last_name) VALUES ('Retail', 'Customer') RETURNING id`);
+            customerId = newCust.rows[0].id;
           }
+        } else {
+          customerId = await findOrCreateCustomer(customerName.split(' ')[0] || 'Customer', customerName.split(' ').slice(1).join(' ') || 'Unknown', null, null);
         }
         
-        const invoiceNumber = cleanString(
-          row['Invoice'] || row['Invoice #'] || row['Invoice Number'] ||
-          row['Sale #'] || row['Transaction'] || row['Receipt'] ||
-          `AR-${Date.now()}-${imported}`, 100
-        );
-        
-        const saleDate = parseExcelDate(
-          row['Date'] || row['Sale Date'] || row['Transaction Date'] || 
-          row['Invoice Date'] || row['Post Date'] || new Date()
-        );
-        
-        // Calculate due date (30 days from sale)
+        const receiptNum = row['Receipt #'] || row['Dept - Sale #'] || `RET-${Date.now()}-${totalImported}`;
+        const saleDate = parseExcelDate(row['Date']) || new Date().toISOString().split('T')[0];
         const dueDate = new Date(saleDate);
         dueDate.setDate(dueDate.getDate() + 30);
         
+        // If status is 'Paid', it's already collected. AR should track unpaid.
+        // But we'll import as 'paid' to have historical record
+        const arStatus = status === 'paid' ? 'paid' : 'pending';
+        
         await query(
           `INSERT INTO accounts_receivable (customer_id, invoice_number, amount, due_date, status)
-           VALUES ($1, $2, $3, $4, 'pending')
-           ON CONFLICT (invoice_number) DO NOTHING`,
-          [customerId, invoiceNumber, amount, dueDate.toISOString().split('T')[0]]
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT DO NOTHING`,
+          [customerId, receiptNum, amount, dueDate.toISOString().split('T')[0], arStatus]
         );
         
-        imported++;
-        if (imported % 100 === 0) {
-          console.log(`    Imported ${imported} accounts receivable...`);
-        }
+        totalImported++;
       } catch (err) {
-        // Skip errors
+        errors++;
       }
     }
   }
   
-  console.log(`  Imported ${imported} accounts receivable records`);
+  // Source 2: ULTIMATE_FINANCIAL_PACKAGE.xlsx - "Accounts Payable Data" sheet (actually contains contracts/AR data)
+  // Columns: Contract, Date, Trans.Type, Product, amounts, customer names
+  const finData = readExcel(DATA_FILES.financialPackage);
+  if (finData && finData.sheets['Accounts Payable Data']) {
+    console.log('  Processing ULTIMATE_FINANCIAL_PACKAGE - Accounts Payable Data...');
+    const rows = finData.sheets['Accounts Payable Data'] || [];
+    console.log(`    Found ${rows.length} rows`);
+    
+    for (const row of rows) {
+      try {
+        // Look for customer name in various columns
+        const customerName = row['Customer'] || row['Name'] || '';
+        if (!customerName || typeof customerName !== 'string') continue;
+        
+        // Get amount from Undeposited Funds or A/R columns
+        const amount = Math.abs(parseFloat(row['Undeposited Funds']) || parseFloat(row['A/R']) || 0);
+        if (amount <= 0) continue;
+        
+        // Parse customer name (format: "LAST, FIRST")
+        const nameParts = customerName.split(',').map(s => s.trim());
+        const lastName = nameParts[0] || 'Unknown';
+        const firstName = nameParts[1] || 'Customer';
+        
+        const customerId = await findOrCreateCustomer(firstName, lastName, null, null);
+        
+        const contractNum = row['Contract'] || `CON-${Date.now()}-${totalImported}`;
+        const transDate = parseExcelDate(row['Date']) || new Date().toISOString().split('T')[0];
+        const dueDate = new Date(transDate);
+        dueDate.setDate(dueDate.getDate() + 30);
+        
+        const transType = (row['Trans.Type'] || '').toLowerCase();
+        const arStatus = transType.includes('paid') ? 'paid' : 'pending';
+        
+        await query(
+          `INSERT INTO accounts_receivable (customer_id, invoice_number, amount, due_date, status)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT DO NOTHING`,
+          [customerId, contractNum, amount, dueDate.toISOString().split('T')[0], arStatus]
+        );
+        
+        totalImported++;
+      } catch (err) {
+        errors++;
+      }
+    }
+  }
+  
+  console.log(`  Imported ${totalImported} accounts receivable records (${errors} errors)`);
 }
 
 // Helper to find or create vendor
@@ -756,74 +765,98 @@ async function importAccountsPayable() {
   console.log(`  Created ${vendorsCreated} new vendors, imported ${apImported} AP records (${errors} errors)`);
 }
 
-// Import deposits from bank statements
+// Import deposits from retail sales and financial package
 async function importDeposits(adminId) {
   console.log('\n=== Importing Deposits ===');
   
-  const data = readExcel(DATA_FILES.bankStatement) ||
-               readExcel(DATA_FILES.financialPackage);
+  let totalImported = 0;
+  let errors = 0;
   
-  if (!data) {
-    console.log('  Bank statement files not found, skipping...');
-    return;
-  }
-  
-  console.log(`  Found sheets: ${data.sheetNames.join(', ')}`);
-  
-  let imported = 0;
-  
-  for (const sheetName of data.sheetNames) {
-    const rows = data.sheets[sheetName];
-    if (!rows || rows.length === 0) continue;
+  // Source 1: retail_sales_west_2020.xlsx - Paid transactions are deposits
+  const retailData = readExcel(DATA_FILES.retailSales);
+  if (retailData) {
+    console.log('  Processing retail_sales_west_2020.xlsx (paid transactions)...');
     
-    const lowerName = sheetName.toLowerCase();
-    if (!lowerName.includes('deposit') && !lowerName.includes('transaction') && 
-        !lowerName.includes('bank') && !lowerName.includes('statement')) {
-      continue;
-    }
-    
-    console.log(`  Processing sheet: ${sheetName} (${rows.length} rows)`);
-    console.log(`    Columns: ${Object.keys(rows[0]).slice(0, 10).join(', ')}`);
+    const sheetName = retailData.sheetNames.includes('Sheet1_Prepared') ? 'Sheet1_Prepared' : retailData.sheetNames[0];
+    const rows = retailData.sheets[sheetName] || [];
     
     for (const row of rows) {
       try {
-        const amount = parseFloat(
-          row['Amount'] || row['amount'] || row['Credit'] || row['Deposit'] || 0
-        );
+        // Only import paid transactions as deposits
+        const status = (row['Status'] || '').toLowerCase().trim();
+        if (status !== 'paid') continue;
         
-        // Only import positive amounts (deposits)
-        if (!amount || amount <= 0) continue;
+        const amount = parseFloat(row['Amount']) || 0;
+        if (amount <= 0) continue;
         
-        const date = parseExcelDate(
-          row['Date'] || row['Transaction Date'] || row['Post Date'] || new Date()
-        );
+        const depositDate = parseExcelDate(row['Date']) || new Date().toISOString().split('T')[0];
         
-        const method = cleanString(
-          row['Method'] || row['Type'] || row['Payment Method'] || 'other', 50
-        )?.toLowerCase();
+        // Determine payment method
+        const paymentType = (row['Payment Type'] || '').toLowerCase();
+        let method = 'other';
+        if (paymentType.includes('credit') || paymentType.includes('card') || paymentType.includes('cc')) method = 'credit_card';
+        else if (paymentType.includes('check')) method = 'check';
+        else if (paymentType.includes('cash')) method = 'cash';
+        else if (paymentType.includes('money order') || paymentType.includes('m/o')) method = 'check';
         
-        const validMethods = ['cash', 'check', 'credit_card', 'wire', 'other'];
-        const paymentMethod = validMethods.includes(method) ? method : 'other';
-        
-        const reference = cleanString(
-          row['Reference'] || row['Check Number'] || row['Transaction ID'] || null, 255
-        );
+        const reference = row['Receipt #'] || row['Batch #'] || row['Check/CC #'] || null;
         
         await query(
           `INSERT INTO deposits (amount, date, method, reference, created_by)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT DO NOTHING`,
-          [amount, date, paymentMethod, reference, adminId]
+           VALUES ($1, $2, $3, $4, $5)`,
+          [amount, depositDate, method, reference, adminId]
         );
         
-        imported++;
+        totalImported++;
       } catch (err) {
-        // Skip errors
+        errors++;
       }
     }
   }
   
-  console.log(`  Imported ${imported} deposit records`);
+  // Source 2: ULTIMATE_FINANCIAL_PACKAGE - Deposits Data sheet
+  const finData = readExcel(DATA_FILES.financialPackage);
+  if (finData && finData.sheets['Deposits Data']) {
+    console.log('  Processing ULTIMATE_FINANCIAL_PACKAGE - Deposits Data...');
+    const rows = finData.sheets['Deposits Data'] || [];
+    console.log(`    Found ${rows.length} rows`);
+    
+    for (const row of rows) {
+      try {
+        // Get deposit amount from Bank Deposit column or sum of payment types
+        const bankDeposit = parseFloat(row['Bank Deposit'] || row['Bank'] || row['Huntg'] || row['Beta'] || 0);
+        const ccAmt = parseFloat(row['CC'] || row['Credit Card'] || 0);
+        const checkAmt = parseFloat(row['Check Amt'] || row['Check'] || 0);
+        const moAmt = parseFloat(row['M/O'] || row['Money Order'] || 0);
+        const cashAmt = parseFloat(row['Cash Amt'] || row['Cash'] || row['Cash '] || 0);
+        
+        const amount = bankDeposit > 0 ? bankDeposit : (ccAmt + checkAmt + moAmt + cashAmt);
+        if (amount <= 0) continue;
+        
+        const depositDate = parseExcelDate(row['Report Date'] || row['Date'] || row['Report']) || new Date().toISOString().split('T')[0];
+        
+        // Determine method based on which amount was used
+        let method = 'other';
+        if (ccAmt > 0) method = 'credit_card';
+        else if (checkAmt > 0 || moAmt > 0) method = 'check';
+        else if (cashAmt > 0) method = 'cash';
+        
+        const reference = row['Batch#'] || row['Type'] || null;
+        
+        await query(
+          `INSERT INTO deposits (amount, date, method, reference, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [amount, depositDate, method, reference, adminId]
+        );
+        
+        totalImported++;
+      } catch (err) {
+        errors++;
+      }
+    }
+  }
+  
+  console.log(`  Imported ${totalImported} deposit records (${errors} errors)`);
 }
 
 // Import inventory from sales/retail data
