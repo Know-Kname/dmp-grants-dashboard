@@ -1,10 +1,16 @@
 /**
  * Custom React Query Hooks for Data Fetching
- * Provides type-safe data fetching with caching, loading states, and mutations
+ * Provides type-safe data fetching with caching, loading states, and mutations.
+ *
+ * Pagination strategy:
+ *   • All list hooks accept optional pagination/filter/search params
+ *   • When params are provided → server-side pagination (returns PaginatedResponse)
+ *   • When no params are provided → backward-compatible flat array (capped at 500)
+ *   • useBurialsPaginated() always uses server-side pagination (39K+ rows)
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getErrorMessage, ApiRequestError } from '../lib/api';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { api, getErrorMessage, PaginatedResponse } from '../lib/api';
 import { queryKeys } from '../lib/query';
 import type {
   WorkOrder,
@@ -27,14 +33,49 @@ interface MutationCallbacks<T> {
   onError?: (error: Error) => void;
 }
 
+interface PaginationParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sort?: string;
+  order?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+// ============================================
+// DASHBOARD STATS
+// ============================================
+
+interface DashboardStats {
+  workOrders: { total: number; pending: number; inProgress: number; completed: number };
+  inventory: { total: number; lowStock: number };
+  receivables: { total: number; overdue: number; outstandingAmount: number };
+  burials: { total: number; thisMonth: number };
+  recentWorkOrders: Array<{ id: string; title: string; status: string; createdAt: string }>;
+  recentBurials: Array<{ id: string; deceasedFirstName: string; deceasedLastName: string; burialDate: string }>;
+}
+
+export function useStats() {
+  return useQuery({
+    queryKey: queryKeys.stats.dashboard(),
+    queryFn: () => api.get<DashboardStats>('/stats'),
+    staleTime: 30_000, // 30 seconds — dashboard data can be slightly stale
+  });
+}
+
 // ============================================
 // WORK ORDERS
 // ============================================
 
-export function useWorkOrders() {
+export function useWorkOrders(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.workOrders.list(),
-    queryFn: () => api.get<WorkOrder[]>('/work-orders'),
+    queryKey: queryKeys.workOrders.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<WorkOrder>>('/work-orders', { params })
+        : api.get<WorkOrder[]>('/work-orders') as Promise<PaginatedResponse<WorkOrder>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -54,6 +95,7 @@ export function useCreateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
       api.post<WorkOrder>('/work-orders', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -70,6 +112,7 @@ export function useUpdateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
       api.put<WorkOrder>(`/work-orders/${id}`, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -85,6 +128,7 @@ export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: bool
     mutationFn: (id: string) => api.delete<{ success: boolean }>(`/work-orders/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -97,10 +141,15 @@ export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: bool
 // GRANTS
 // ============================================
 
-export function useGrants() {
+export function useGrants(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.grants.list(),
-    queryFn: () => api.get<Grant[]>('/grants'),
+    queryKey: queryKeys.grants.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<Grant>>('/grants', { params })
+        : api.get<Grant[]>('/grants') as Promise<PaginatedResponse<Grant>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -163,10 +212,15 @@ export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean 
 // INVENTORY
 // ============================================
 
-export function useInventory() {
+export function useInventory(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.inventory.list(),
-    queryFn: () => api.get<InventoryItem[]>('/inventory'),
+    queryKey: queryKeys.inventory.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<InventoryItem>>('/inventory', { params })
+        : api.get<InventoryItem[]>('/inventory') as Promise<PaginatedResponse<InventoryItem>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -186,6 +240,7 @@ export function useCreateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
       api.post<InventoryItem>('/inventory', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -202,6 +257,7 @@ export function useUpdateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
       api.put<InventoryItem>(`/inventory/${id}`, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -217,6 +273,7 @@ export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: 
     mutationFn: (id: string) => api.delete<{ success: boolean }>(`/inventory/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -229,10 +286,15 @@ export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: 
 // CUSTOMERS
 // ============================================
 
-export function useCustomers() {
+export function useCustomers(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.customers.list(),
-    queryFn: () => api.get<Customer[]>('/customers'),
+    queryKey: queryKeys.customers.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<Customer>>('/customers', { params })
+        : api.get<Customer[]>('/customers') as Promise<PaginatedResponse<Customer>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -295,10 +357,31 @@ export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boole
 // BURIALS
 // ============================================
 
-export function useBurials() {
+/**
+ * Backward-compatible hook — returns flat array (capped at 500 by backend).
+ * Use useBurialsPaginated() for proper server-side pagination.
+ */
+export function useBurials(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.burials.list(),
-    queryFn: () => api.get<Burial[]>('/burials'),
+    queryKey: queryKeys.burials.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<Burial>>('/burials', { params })
+        : api.get<Burial[]>('/burials') as Promise<PaginatedResponse<Burial>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
+  });
+}
+
+/**
+ * Always-paginated hook for burials (39K+ rows).
+ * Returns { data: Burial[], pagination: PaginationMeta }.
+ */
+export function useBurialsPaginated(params: PaginationParams = { page: 1, limit: 50 }) {
+  return useQuery({
+    queryKey: queryKeys.burials.list(params),
+    queryFn: () => api.get<PaginatedResponse<Burial>>('/burials', { params }),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -318,6 +401,7 @@ export function useCreateBurial(callbacks?: MutationCallbacks<Burial>) {
       api.post<Burial>('/burials', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -334,6 +418,7 @@ export function useUpdateBurial(callbacks?: MutationCallbacks<Burial>) {
       api.put<Burial>(`/burials/${id}`, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -349,6 +434,7 @@ export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean
     mutationFn: (id: string) => api.delete<{ success: boolean }>(`/burials/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -361,10 +447,15 @@ export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean
 // CONTRACTS
 // ============================================
 
-export function useContracts() {
+export function useContracts(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.contracts.list(),
-    queryFn: () => api.get<Contract[]>('/contracts'),
+    queryKey: queryKeys.contracts.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<Contract>>('/contracts', { params })
+        : api.get<Contract[]>('/contracts') as Promise<PaginatedResponse<Contract>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -427,10 +518,15 @@ export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boole
 // FINANCIAL - DEPOSITS
 // ============================================
 
-export function useDeposits() {
+export function useDeposits(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.financial.deposits.list(),
-    queryFn: () => api.get<Deposit[]>('/financial/deposits'),
+    queryKey: queryKeys.financial.deposits.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<Deposit>>('/financial/deposits', { params })
+        : api.get<Deposit[]>('/financial/deposits') as Promise<PaginatedResponse<Deposit>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -442,6 +538,7 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
       api.post<Deposit>('/financial/deposits', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.deposits.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -454,10 +551,15 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
 // FINANCIAL - ACCOUNTS RECEIVABLE
 // ============================================
 
-export function useReceivables() {
+export function useReceivables(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.financial.receivables.list(),
-    queryFn: () => api.get<AccountsReceivable[]>('/financial/receivables'),
+    queryKey: queryKeys.financial.receivables.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<AccountsReceivable>>('/financial/receivables', { params })
+        : api.get<AccountsReceivable[]>('/financial/receivables') as Promise<PaginatedResponse<AccountsReceivable>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -469,6 +571,7 @@ export function useCreateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
       api.post<AccountsReceivable>('/financial/receivables', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.receivables.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -485,6 +588,7 @@ export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
       api.put<AccountsReceivable>(`/financial/receivables/${id}`, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.receivables.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -497,10 +601,15 @@ export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
 // FINANCIAL - ACCOUNTS PAYABLE
 // ============================================
 
-export function usePayables() {
+export function usePayables(params?: PaginationParams) {
+  const hasParams = params && (params.page || params.search);
   return useQuery({
-    queryKey: queryKeys.financial.payables.list(),
-    queryFn: () => api.get<AccountsPayable[]>('/financial/payables'),
+    queryKey: queryKeys.financial.payables.list(params),
+    queryFn: () =>
+      hasParams
+        ? api.get<PaginatedResponse<AccountsPayable>>('/financial/payables', { params })
+        : api.get<AccountsPayable[]>('/financial/payables') as Promise<PaginatedResponse<AccountsPayable>>,
+    placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
 
@@ -512,6 +621,7 @@ export function useCreatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
       api.post<AccountsPayable>('/financial/payables', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.payables.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {
@@ -528,6 +638,7 @@ export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
       api.put<AccountsPayable>(`/financial/payables/${id}`, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.payables.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => {

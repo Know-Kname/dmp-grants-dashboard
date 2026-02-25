@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
   isDemo: boolean;
 }
 
@@ -18,6 +19,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isDemo, setIsDemo] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check for demo mode first
@@ -25,9 +27,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken('demo-token');
       setUser(DEMO_USER);
       setIsDemo(true);
+      setIsLoading(false);
       return;
     }
-    
+
     // Then check for regular auth
     const storedToken = localStorage.getItem('token') || localStorage.getItem('dmp-token');
     const storedUser = localStorage.getItem('user') || localStorage.getItem('dmp-user');
@@ -39,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Invalid user data
       }
     }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -86,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isDemo }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isLoading, isDemo }}>
       {children}
     </AuthContext.Provider>
   );

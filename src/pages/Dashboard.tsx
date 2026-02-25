@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import { useStats } from '../hooks/useData';
 import { Card, CardHeader, CardBody, LoadingSpinner, Badge } from '../components/ui';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
@@ -12,86 +12,50 @@ import { COMPANY } from '../config/company';
 import { formatCurrency } from '../lib/utils';
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    workOrders: { total: 0, pending: 0, inProgress: 0, completed: 0 },
-    inventory: { total: 0, lowStock: 0 },
-    receivables: { total: 0, overdue: 0, amount: 0 },
-    burials: { total: 0, thisMonth: 0 },
-  });
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  // Single lightweight API call — uses SQL aggregates instead of fetching all rows.
+  // Previously loaded ALL work orders + ALL inventory + ALL receivables + ALL burials (39K!)
+  // just to count them. Now uses /api/stats which runs one CTE query.
+  const { data: apiStats, isLoading: loading } = useStats();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  const stats = useMemo(() => ({
+    workOrders: {
+      total: apiStats?.workOrders?.total ?? 0,
+      pending: apiStats?.workOrders?.pending ?? 0,
+      inProgress: apiStats?.workOrders?.inProgress ?? 0,
+      completed: apiStats?.workOrders?.completed ?? 0,
+    },
+    inventory: {
+      total: apiStats?.inventory?.total ?? 0,
+      lowStock: apiStats?.inventory?.lowStock ?? 0,
+    },
+    receivables: {
+      total: apiStats?.receivables?.total ?? 0,
+      overdue: apiStats?.receivables?.overdue ?? 0,
+      amount: apiStats?.receivables?.outstandingAmount ?? 0,
+    },
+    burials: {
+      total: apiStats?.burials?.total ?? 0,
+      thisMonth: apiStats?.burials?.thisMonth ?? 0,
+    },
+  }), [apiStats]);
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [workOrders, inventory, receivables, burials] = await Promise.all([
-        api.get('/work-orders'),
-        api.get('/inventory'),
-        api.get('/financial/receivables'),
-        api.get('/burials'),
-      ]);
-
-      // Calculate work order stats
-      const woStats = {
-        total: (workOrders as any[]).length,
-        pending: (workOrders as any[]).filter((w: any) => w.status === 'pending').length,
-        inProgress: (workOrders as any[]).filter((w: any) => w.status === 'in_progress').length,
-        completed: (workOrders as any[]).filter((w: any) => w.status === 'completed').length,
-      };
-
-      // Calculate inventory stats
-      const invStats = {
-        total: (inventory as any[]).length,
-        lowStock: (inventory as any[]).filter((i: any) => i.quantity <= i.reorder_point).length,
-      };
-
-      // Calculate receivables stats
-      const arStats = {
-        total: (receivables as any[]).length,
-        overdue: (receivables as any[]).filter((r: any) => r.status === 'overdue').length,
-        amount: (receivables as any[]).reduce((sum: number, r: any) => sum + (r.amount - (r.amount_paid || 0)), 0),
-      };
-
-      // Calculate burial stats
-      const now = new Date();
-      const thisMonth = (burials as any[]).filter((b: any) => {
-        const burialDate = new Date(b.burial_date);
-        return burialDate.getMonth() === now.getMonth() && burialDate.getFullYear() === now.getFullYear();
-      }).length;
-
-      setStats({
-        workOrders: woStats,
-        inventory: invStats,
-        receivables: arStats,
-        burials: { total: (burials as any[]).length, thisMonth },
-      });
-
-      // Create recent activity feed
-      const activities = [
-        ...(workOrders as any[]).slice(0, 3).map((w: any) => ({
-          type: 'work_order',
-          title: w.title,
-          status: w.status,
-          date: w.created_at,
-        })),
-        ...(burials as any[]).slice(0, 2).map((b: any) => ({
-          type: 'burial',
-          title: `${b.deceased_first_name} ${b.deceased_last_name}`,
-          date: b.burial_date,
-        })),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-
-      setRecentActivity(activities);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const recentActivity = useMemo(() => {
+    if (!apiStats) return [];
+    const activities = [
+      ...(apiStats.recentWorkOrders || []).map((w: Record<string, unknown>) => ({
+        type: 'work_order',
+        title: String(w.title || ''),
+        status: String(w.status || ''),
+        date: String(w.createdAt || w.created_at || ''),
+      })),
+      ...(apiStats.recentBurials || []).map((b: Record<string, unknown>) => ({
+        type: 'burial',
+        title: `${String(b.deceasedFirstName || b.deceased_first_name || '')} ${String(b.deceasedLastName || b.deceased_last_name || '')}`,
+        date: String(b.burialDate || b.burial_date || ''),
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+    return activities;
+  }, [apiStats]);
 
   if (loading) {
     return (

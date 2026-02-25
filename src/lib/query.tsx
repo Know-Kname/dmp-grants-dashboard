@@ -94,25 +94,41 @@ export function QueryProvider({ children }: QueryProviderProps) {
 /**
  * Centralized query keys for consistent caching
  */
+/**
+ * Query parameter type for paginated list queries
+ */
+interface ListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
 export const queryKeys = {
+  // Dashboard Stats (lightweight aggregate endpoint)
+  stats: {
+    all: ['stats'] as const,
+    dashboard: () => [...queryKeys.stats.all, 'dashboard'] as const,
+  },
+
   // Work Orders
   workOrders: {
     all: ['work-orders'] as const,
-    list: () => [...queryKeys.workOrders.all, 'list'] as const,
+    list: (params?: ListParams) => [...queryKeys.workOrders.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.workOrders.all, 'detail', id] as const,
   },
 
   // Grants
   grants: {
     all: ['grants'] as const,
-    list: () => [...queryKeys.grants.all, 'list'] as const,
+    list: (params?: ListParams) => [...queryKeys.grants.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.grants.all, 'detail', id] as const,
   },
 
   // Inventory
   inventory: {
     all: ['inventory'] as const,
-    list: () => [...queryKeys.inventory.all, 'list'] as const,
+    list: (params?: ListParams) => [...queryKeys.inventory.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.inventory.all, 'detail', id] as const,
     lowStock: () => [...queryKeys.inventory.all, 'low-stock'] as const,
   },
@@ -120,21 +136,21 @@ export const queryKeys = {
   // Customers
   customers: {
     all: ['customers'] as const,
-    list: () => [...queryKeys.customers.all, 'list'] as const,
+    list: (params?: ListParams) => [...queryKeys.customers.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.customers.all, 'detail', id] as const,
   },
 
   // Burials
   burials: {
     all: ['burials'] as const,
-    list: () => [...queryKeys.burials.all, 'list'] as const,
+    list: (params?: ListParams) => [...queryKeys.burials.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.burials.all, 'detail', id] as const,
   },
 
   // Contracts
   contracts: {
     all: ['contracts'] as const,
-    list: () => [...queryKeys.contracts.all, 'list'] as const,
+    list: (params?: ListParams) => [...queryKeys.contracts.all, 'list', params ?? {}] as const,
     detail: (id: string) => [...queryKeys.contracts.all, 'detail', id] as const,
   },
 
@@ -142,15 +158,15 @@ export const queryKeys = {
   financial: {
     deposits: {
       all: ['financial', 'deposits'] as const,
-      list: () => [...queryKeys.financial.deposits.all, 'list'] as const,
+      list: (params?: ListParams) => [...queryKeys.financial.deposits.all, 'list', params ?? {}] as const,
     },
     receivables: {
       all: ['financial', 'receivables'] as const,
-      list: () => [...queryKeys.financial.receivables.all, 'list'] as const,
+      list: (params?: ListParams) => [...queryKeys.financial.receivables.all, 'list', params ?? {}] as const,
     },
     payables: {
       all: ['financial', 'payables'] as const,
-      list: () => [...queryKeys.financial.payables.all, 'list'] as const,
+      list: (params?: ListParams) => [...queryKeys.financial.payables.all, 'list', params ?? {}] as const,
     },
   },
 
