@@ -9,6 +9,7 @@ import {
   parseFilterParams,
   parseSortParams,
   parseSearchParam,
+  buildFullTextSearch,
   buildSearchClause,
   createPaginatedResponse,
 } from '../utils/pagination.js';
@@ -19,15 +20,21 @@ router.use(authenticateToken);
 // Allowed filter and sort fields
 const ALLOWED_FILTERS = ['status', 'type'];
 const ALLOWED_SORT_FIELDS = ['created_at', 'title', 'amount', 'deadline', 'status'];
-const SEARCH_FIELDS = ['title', 'description', 'source'];
 
+// --------------------------------------------------------------------------
+// GET / — List grants with pagination, search, and filtering
+//
+// Uses full-text search (tsvector) for title/description/source when the
+// search_vector column is available, with ILIKE fallback for compatibility.
+//
+// Backward compatible: returns all if no page/limit params (capped at 500).
+// --------------------------------------------------------------------------
 router.get('/', asyncHandler(async (req, res) => {
-  // Check if pagination is requested
   const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
   if (!isPaginated) {
-    // Backward compatible: return all results
-    const result = await query('SELECT * FROM grants ORDER BY created_at DESC');
+    const result = await query('SELECT * FROM grants ORDER BY created_at DESC LIMIT 500');
+    res.set('Cache-Control', 'private, max-age=10');
     return res.json(result.rows);
   }
 
@@ -41,18 +48,20 @@ router.get('/', asyncHandler(async (req, res) => {
   const whereClauses = [];
   const params = [];
   let paramIndex = 1;
+  let searchOrderExpr = '';
 
-  // Add search clause
+  // Search — prefer full-text search if search_vector column exists
   if (search) {
-    const searchResult = buildSearchClause(search, SEARCH_FIELDS, paramIndex);
-    if (searchResult.clause) {
-      whereClauses.push(searchResult.clause);
-      params.push(...searchResult.params);
-      paramIndex = searchResult.nextParam;
+    const fts = buildFullTextSearch(search, 'search_vector', paramIndex);
+    if (fts.clause) {
+      whereClauses.push(fts.clause);
+      params.push(...fts.params);
+      paramIndex = fts.nextParam;
+      searchOrderExpr = fts.orderExpr;
     }
   }
 
-  // Add filter clauses
+  // Filters
   for (const [key, value] of Object.entries(filters)) {
     whereClauses.push(`${key} = $${paramIndex}`);
     params.push(value);
@@ -67,18 +76,24 @@ router.get('/', asyncHandler(async (req, res) => {
   const total = parseInt(countResult.rows[0].count, 10);
 
   // Get paginated data
+  const orderBy = searchOrderExpr || `${sort} ${order}`;
   const dataQuery = `
-    SELECT * FROM grants
+    SELECT id, title, description, type, source, amount, deadline,
+           status, application_date, notes, created_at, updated_at
+    FROM grants
     ${whereClause}
-    ORDER BY ${sort} ${order}
+    ORDER BY ${orderBy}
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
   const dataResult = await query(dataQuery, [...params, limit, offset]);
 
-  // Return paginated response
+  res.set('Cache-Control', 'private, max-age=10');
   res.json(createPaginatedResponse(dataResult.rows, total, page, limit));
 }));
 
+// --------------------------------------------------------------------------
+// POST / — Create grant
+// --------------------------------------------------------------------------
 router.post('/', validateGrant, asyncHandler(async (req, res) => {
   const { title, description, type, source, amount, deadline, status, applicationDate, notes } = req.body;
   const result = await query(
@@ -89,13 +104,16 @@ router.post('/', validateGrant, asyncHandler(async (req, res) => {
   res.status(201).json(result.rows[0]);
 }));
 
+// --------------------------------------------------------------------------
+// PUT /:id — Update grant
+// --------------------------------------------------------------------------
 router.put('/:id', validateUUIDParam, validateGrant, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { title, description, type, source, amount, deadline, status, applicationDate, notes } = req.body;
   const result = await query(
     `UPDATE grants SET title = $1, description = $2, type = $3, source = $4,
-     amount = $5, deadline = $6, status = $7, application_date = $8, notes = $9,
-     updated_at = CURRENT_TIMESTAMP WHERE id = $10 RETURNING *`,
+     amount = $5, deadline = $6, status = $7, application_date = $8, notes = $9
+     WHERE id = $10 RETURNING *`,
     [title, description, type, source, amount, deadline, status, applicationDate, notes, id]
   );
   if (result.rows.length === 0) {
@@ -104,6 +122,9 @@ router.put('/:id', validateUUIDParam, validateGrant, asyncHandler(async (req, re
   res.json(result.rows[0]);
 }));
 
+// --------------------------------------------------------------------------
+// DELETE /:id — Delete grant
+// --------------------------------------------------------------------------
 router.delete('/:id', validateUUIDParam, asyncHandler(async (req, res) => {
   const result = await query('DELETE FROM grants WHERE id = $1 RETURNING id', [req.params.id]);
   if (result.rows.length === 0) {
