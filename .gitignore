@@ -7,3 +7,8 @@ dist
 coverage
 .vscode
 .idea
+
+# AI tool personal preferences (not shared)
+CLAUDE.local.md
+
+.vercel
