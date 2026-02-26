@@ -9,10 +9,11 @@ import WorkOrders from './pages/WorkOrders';
 import Grants from './pages/Grants';
 import ErrorBoundary from './components/ErrorBoundary';
 
+// ProtectedRoute now consumes the stable `isAuthenticated` field
+// instead of re-deriving truthiness from `user` at the call site.
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Show loading spinner while checking auth status
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -21,7 +22,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function AppRoutes() {
@@ -45,6 +46,8 @@ function AppRoutes() {
         <Route path="grants" element={<Grants />} />
         <Route path="customers" element={<div className="text-2xl text-foreground">Customers (Coming Soon)</div>} />
       </Route>
+      {/* Fallback: redirect any unknown path to home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

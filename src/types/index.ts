@@ -1,13 +1,27 @@
-// User and Auth Types
+/**
+ * DMP Domain Types
+ *
+ * CANONICAL RULE: All date/timestamp fields use ISO 8601 strings (not Date objects).
+ * This keeps the type model consistent with:
+ *   - Supabase row definitions (src/lib/supabase.ts) which return strings
+ *   - Demo data (src/lib/demo-data.ts) which uses .toISOString()
+ *   - JSON serialisation over the wire
+ *
+ * To work with actual Date objects in components, use:
+ *   import { parseISO, format } from 'date-fns';
+ *   const d = parseISO(burial.burialDate);
+ */
+
+// ── User & Auth ──────────────────────────────────────────────────────────────
 export interface User {
   id: string;
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'staff';
-  createdAt: Date;
+  createdAt: string; // ISO 8601
 }
 
-// Work Order Types
+// ── Work Orders ───────────────────────────────────────────────────────────────
 export interface WorkOrder {
   id: string;
   title: string;
@@ -16,14 +30,14 @@ export interface WorkOrder {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo?: string;
-  dueDate?: Date;
-  completedDate?: Date;
+  dueDate?: string;        // ISO 8601
+  completedDate?: string;  // ISO 8601
   createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;       // ISO 8601
+  updatedAt: string;       // ISO 8601
 }
 
-// Inventory Types
+// ── Inventory ─────────────────────────────────────────────────────────────────
 export interface InventoryItem {
   id: string;
   name: string;
@@ -34,21 +48,21 @@ export interface InventoryItem {
   unitPrice: number;
   vendorId?: string;
   location?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;  // ISO 8601
+  updatedAt: string;  // ISO 8601
 }
 
-// Financial Types
+// ── Financial ─────────────────────────────────────────────────────────────────
 export interface Deposit {
   id: string;
   amount: number;
-  date: Date;
+  date: string;      // ISO 8601
   method: 'cash' | 'check' | 'credit_card' | 'wire' | 'other';
   reference?: string;
   customerId?: string;
   notes?: string;
   createdBy: string;
-  createdAt: Date;
+  createdAt: string; // ISO 8601
 }
 
 export interface AccountsReceivable {
@@ -57,10 +71,10 @@ export interface AccountsReceivable {
   invoiceNumber: string;
   amount: number;
   amountPaid: number;
-  dueDate: Date;
+  dueDate: string;   // ISO 8601
   status: 'pending' | 'partial' | 'paid' | 'overdue';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }
 
 export interface AccountsPayable {
@@ -69,21 +83,21 @@ export interface AccountsPayable {
   invoiceNumber: string;
   amount: number;
   amountPaid: number;
-  dueDate: Date;
+  dueDate: string;   // ISO 8601
   status: 'pending' | 'partial' | 'paid' | 'overdue';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }
 
-// Burial Types
+// ── Burial ────────────────────────────────────────────────────────────────────
 export interface Burial {
   id: string;
   deceasedFirstName: string;
   deceasedLastName: string;
   deceasedMiddleName?: string;
-  dateOfBirth?: Date;
-  dateOfDeath?: Date;
-  burialDate: Date;
+  dateOfBirth?: string;  // ISO 8601
+  dateOfDeath?: string;  // ISO 8601
+  burialDate: string;    // ISO 8601  (required)
   plotLocation: string;
   section: string;
   lot: string;
@@ -93,11 +107,11 @@ export interface Burial {
   contactEmail?: string;
   permitNumber?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;     // ISO 8601
+  updatedAt: string;     // ISO 8601
 }
 
-// Contract Types
+// ── Contracts ─────────────────────────────────────────────────────────────────
 export interface Contract {
   id: string;
   contractNumber: string;
@@ -106,11 +120,11 @@ export interface Contract {
   totalAmount: number;
   amountPaid: number;
   status: 'active' | 'paid' | 'cancelled' | 'transferred';
-  signedDate: Date;
+  signedDate: string;  // ISO 8601
   items: ContractItem[];
   paymentPlan?: PaymentPlan;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;   // ISO 8601
+  updatedAt: string;   // ISO 8601
 }
 
 export interface ContractItem {
@@ -122,11 +136,11 @@ export interface ContractItem {
 export interface PaymentPlan {
   frequency: 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly';
   installmentAmount: number;
-  startDate: Date;
-  endDate?: Date;
+  startDate: string;   // ISO 8601
+  endDate?: string;    // ISO 8601
 }
 
-// Grant Types
+// ── Grants ────────────────────────────────────────────────────────────────────
 export interface Grant {
   id: string;
   title: string;
@@ -134,15 +148,15 @@ export interface Grant {
   type: 'grant' | 'benefit' | 'opportunity';
   source: string;
   amount?: number;
-  deadline?: Date;
+  deadline?: string;          // ISO 8601
   status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
-  applicationDate?: Date;
+  applicationDate?: string;   // ISO 8601
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;          // ISO 8601
+  updatedAt: string;          // ISO 8601
 }
 
-// Customer/Contact Types
+// ── Customer / Vendor ─────────────────────────────────────────────────────────
 export interface Customer {
   id: string;
   firstName: string;
@@ -154,8 +168,8 @@ export interface Customer {
   state?: string;
   zipCode?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }
 
 export interface Vendor {
@@ -166,6 +180,6 @@ export interface Vendor {
   phone?: string;
   address?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }

@@ -11,6 +11,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    // ── Relaxed dev settings (allows fast iteration) ──
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
