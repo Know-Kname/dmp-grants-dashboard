@@ -9,7 +9,8 @@ const { Pool } = pg;
 // Connection Pool Configuration (optimized for production workloads)
 // ---------------------------------------------------------------------------
 const poolConfig = {
-  connectionString: process.env.DATABASE_URL,
+  // Support both DATABASE_URL (our convention) and POSTGRES_URL (Vercel Postgres integration)
+  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
 
   // Pool sizing — sized for a single-server Node process.
   // max should roughly equal the expected concurrent queries; 20 is a safe
