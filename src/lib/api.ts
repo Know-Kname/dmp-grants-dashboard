@@ -18,7 +18,7 @@ export interface ApiError {
   message: string;
   code: string;
   statusCode: number;
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown> | unknown[];
   requestId?: string;
 }
 
@@ -69,7 +69,7 @@ export interface RequestConfig {
 export class ApiRequestError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
-  public readonly details?: Record<string, unknown>;
+  public readonly details?: Record<string, unknown> | unknown[];
   public readonly requestId?: string;
   public readonly isApiError = true;
 
@@ -354,7 +354,8 @@ export interface LoginResponse {
     id: string;
     email: string;
     name: string;
-    role: string;
+    role: 'admin' | 'manager' | 'staff';
+    createdAt: string;
   };
 }
 

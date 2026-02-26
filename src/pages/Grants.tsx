@@ -33,7 +33,8 @@ const initialFormData: GrantFormData = {
 
 export default function Grants() {
   // React Query hooks
-  const { data: grants = [], isLoading, error, refetch } = useGrants();
+  const { data: grantsData, isLoading, error, refetch } = useGrants();
+  const grants: Grant[] = Array.isArray(grantsData) ? grantsData : (grantsData?.data ?? []);
 
   const createMutation = useCreateGrant({
     onSuccess: () => {

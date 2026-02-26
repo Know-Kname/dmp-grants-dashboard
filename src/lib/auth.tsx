@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { authApi } from './api';
-import { isDemoMode, disableDemoMode, DEMO_USER } from './demo-data';
+import { isDemoMode, enableDemoMode, disableDemoMode, DEMO_USER } from './demo-data';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginAsDemo: () => void;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -78,6 +79,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loginAsDemo = () => {
+    // Sets localStorage AND updates React state so ProtectedRoute lets us through
+    enableDemoMode();
+    setToken('demo-token');
+    setUser(DEMO_USER);
+    setIsDemo(true);
+  };
+
   const logout = () => {
     if (isDemo) {
       disableDemoMode();
@@ -90,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, isLoading, isDemo }}>
+    <AuthContext.Provider value={{ user, token, login, loginAsDemo, logout, isAuthenticated: !!token, isLoading, isDemo }}>
       {children}
     </AuthContext.Provider>
   );

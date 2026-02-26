@@ -4,8 +4,8 @@ import { useStats } from '../hooks/useData';
 import { Card, CardHeader, CardBody, LoadingSpinner, Badge } from '../components/ui';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  TrendingUp, MapPin, Phone, Clock, Building2,
-  ChevronRight, ExternalLink
+  MapPin, Phone, Building2,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { COMPANY } from '../config/company';
@@ -51,6 +51,7 @@ export default function Dashboard() {
       ...(apiStats.recentBurials || []).map((b: Record<string, unknown>) => ({
         type: 'burial',
         title: `${String(b.deceasedFirstName || b.deceased_first_name || '')} ${String(b.deceasedLastName || b.deceased_last_name || '')}`,
+        status: undefined as string | undefined,
         date: String(b.burialDate || b.burial_date || ''),
       })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);

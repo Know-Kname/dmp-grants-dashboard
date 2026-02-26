@@ -66,6 +66,7 @@ describe('Login page', () => {
         email: 'admin@dmp.com',
         name: 'Admin',
         role: 'admin',
+        createdAt: new Date(0).toISOString(),
       },
     });
 

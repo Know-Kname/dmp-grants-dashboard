@@ -88,7 +88,8 @@ export function useForm<T extends Record<string, unknown>>({
   const validateField = useCallback((field: keyof T): boolean => {
     try {
       // Create a partial schema for just this field
-      const fieldSchema = (schema as z.ZodObject<z.ZodRawShape>).shape[field as string];
+      const shape = (schema as z.ZodObject<z.ZodRawShape>).shape;
+      const fieldSchema = shape?.[field as string] as z.ZodTypeAny | undefined;
       if (fieldSchema) {
         fieldSchema.parse(values[field]);
         setErrors((prev) => {
@@ -103,7 +104,7 @@ export function useForm<T extends Record<string, unknown>>({
       if (error instanceof z.ZodError) {
         setErrors((prev) => ({
           ...prev,
-          [field]: error.errors[0]?.message || 'Invalid value',
+          [field]: error.issues[0]?.message || 'Invalid value',
         }));
         return false;
       }
@@ -120,10 +121,10 @@ export function useForm<T extends Record<string, unknown>>({
     }
 
     const newErrors: Partial<Record<keyof T, string>> = {};
-    for (const error of result.error.errors) {
-      const field = error.path[0] as keyof T;
+    for (const issue of result.error.issues) {
+      const field = issue.path[0] as keyof T;
       if (!newErrors[field]) {
-        newErrors[field] = error.message;
+        newErrors[field] = issue.message;
       }
     }
     setErrors(newErrors);
@@ -195,10 +196,10 @@ export function useForm<T extends Record<string, unknown>>({
     const result = schema.safeParse(values);
     if (!result.success) {
       const newErrors: Partial<Record<keyof T, string>> = {};
-      for (const error of result.error.errors) {
-        const field = error.path[0] as keyof T;
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof T;
         if (!newErrors[field]) {
-          newErrors[field] = error.message;
+          newErrors[field] = issue.message;
         }
       }
       setErrors(newErrors);

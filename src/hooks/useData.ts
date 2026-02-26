@@ -71,10 +71,10 @@ export function useWorkOrders(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.workOrders.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<WorkOrder[] | PaginatedResponse<WorkOrder>> =>
       hasParams
         ? api.get<PaginatedResponse<WorkOrder>>('/work-orders', { params })
-        : api.get<WorkOrder[]>('/work-orders') as Promise<PaginatedResponse<WorkOrder>>,
+        : api.get<WorkOrder[]>('/work-orders'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -145,10 +145,10 @@ export function useGrants(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.grants.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<Grant[] | PaginatedResponse<Grant>> =>
       hasParams
         ? api.get<PaginatedResponse<Grant>>('/grants', { params })
-        : api.get<Grant[]>('/grants') as Promise<PaginatedResponse<Grant>>,
+        : api.get<Grant[]>('/grants'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -216,10 +216,10 @@ export function useInventory(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.inventory.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<InventoryItem[] | PaginatedResponse<InventoryItem>> =>
       hasParams
         ? api.get<PaginatedResponse<InventoryItem>>('/inventory', { params })
-        : api.get<InventoryItem[]>('/inventory') as Promise<PaginatedResponse<InventoryItem>>,
+        : api.get<InventoryItem[]>('/inventory'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -290,10 +290,10 @@ export function useCustomers(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.customers.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<Customer[] | PaginatedResponse<Customer>> =>
       hasParams
         ? api.get<PaginatedResponse<Customer>>('/customers', { params })
-        : api.get<Customer[]>('/customers') as Promise<PaginatedResponse<Customer>>,
+        : api.get<Customer[]>('/customers'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -365,10 +365,10 @@ export function useBurials(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.burials.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<Burial[] | PaginatedResponse<Burial>> =>
       hasParams
         ? api.get<PaginatedResponse<Burial>>('/burials', { params })
-        : api.get<Burial[]>('/burials') as Promise<PaginatedResponse<Burial>>,
+        : api.get<Burial[]>('/burials'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -451,10 +451,10 @@ export function useContracts(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.contracts.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<Contract[] | PaginatedResponse<Contract>> =>
       hasParams
         ? api.get<PaginatedResponse<Contract>>('/contracts', { params })
-        : api.get<Contract[]>('/contracts') as Promise<PaginatedResponse<Contract>>,
+        : api.get<Contract[]>('/contracts'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -522,10 +522,10 @@ export function useDeposits(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.financial.deposits.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<Deposit[] | PaginatedResponse<Deposit>> =>
       hasParams
         ? api.get<PaginatedResponse<Deposit>>('/financial/deposits', { params })
-        : api.get<Deposit[]>('/financial/deposits') as Promise<PaginatedResponse<Deposit>>,
+        : api.get<Deposit[]>('/financial/deposits'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -555,10 +555,10 @@ export function useReceivables(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.financial.receivables.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<AccountsReceivable[] | PaginatedResponse<AccountsReceivable>> =>
       hasParams
         ? api.get<PaginatedResponse<AccountsReceivable>>('/financial/receivables', { params })
-        : api.get<AccountsReceivable[]>('/financial/receivables') as Promise<PaginatedResponse<AccountsReceivable>>,
+        : api.get<AccountsReceivable[]>('/financial/receivables'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }
@@ -605,10 +605,10 @@ export function usePayables(params?: PaginationParams) {
   const hasParams = params && (params.page || params.search);
   return useQuery({
     queryKey: queryKeys.financial.payables.list(params),
-    queryFn: () =>
+    queryFn: (): Promise<AccountsPayable[] | PaginatedResponse<AccountsPayable>> =>
       hasParams
         ? api.get<PaginatedResponse<AccountsPayable>>('/financial/payables', { params })
-        : api.get<AccountsPayable[]>('/financial/payables') as Promise<PaginatedResponse<AccountsPayable>>,
+        : api.get<AccountsPayable[]>('/financial/payables'),
     placeholderData: hasParams ? keepPreviousData : undefined,
   });
 }

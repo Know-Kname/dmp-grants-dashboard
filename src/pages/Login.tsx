@@ -4,8 +4,8 @@ import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { Button, Input, Card, Alert } from '../components/ui';
 import { getErrorMessage, getErrorRequestId } from '../lib/errors';
-import { enableDemoMode } from '../lib/demo-data';
-import { Mail, Lock, Sun, Moon, Phone, ExternalLink, Play, Monitor } from 'lucide-react';
+
+import { Mail, Lock, Sun, Moon, Phone, ExternalLink, Play } from 'lucide-react';
 import { COMPANY } from '../config/company';
 
 export default function Login() {
@@ -14,7 +14,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginAsDemo } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -127,7 +127,7 @@ export default function Login() {
                 variant="outline"
                 className="w-full group"
                 onClick={() => {
-                  enableDemoMode();
+                  loginAsDemo();
                   navigate('/');
                 }}
               >
@@ -136,13 +136,13 @@ export default function Login() {
                 <span className="ml-2 text-xs text-foreground-muted">(No login required)</span>
               </Button>
             </div>
-            
+
             <div className="flex items-center gap-2 my-4">
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-foreground-muted">or sign in</span>
               <div className="flex-1 h-px bg-border" />
             </div>
-            
+
             <p className="text-xs text-foreground-muted text-center">
               Demo credentials: <span className="font-medium text-foreground">admin@dmp.com</span> / <span className="font-medium text-foreground">admin123</span>
             </p>

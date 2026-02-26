@@ -45,15 +45,15 @@ export const nonNegativeIntSchema = z.number()
 // ============================================
 
 export const workOrderTypeSchema = z.enum(['maintenance', 'burial_prep', 'grounds', 'repair', 'other'], {
-  errorMap: () => ({ message: 'Invalid work order type' }),
+  error: 'Invalid work order type',
 });
 
 export const workOrderPrioritySchema = z.enum(['low', 'medium', 'high', 'urgent'], {
-  errorMap: () => ({ message: 'Invalid priority level' }),
+  error: 'Invalid priority level',
 });
 
 export const workOrderStatusSchema = z.enum(['pending', 'in_progress', 'completed', 'cancelled'], {
-  errorMap: () => ({ message: 'Invalid status' }),
+  error: 'Invalid status',
 });
 
 export const workOrderFormSchema = z.object({
@@ -79,11 +79,11 @@ export type WorkOrderFormData = z.infer<typeof workOrderFormSchema>;
 // ============================================
 
 export const grantTypeSchema = z.enum(['grant', 'benefit', 'opportunity'], {
-  errorMap: () => ({ message: 'Invalid grant type' }),
+  error: 'Invalid grant type',
 });
 
 export const grantStatusSchema = z.enum(['available', 'applied', 'approved', 'denied', 'received'], {
-  errorMap: () => ({ message: 'Invalid status' }),
+  error: 'Invalid status',
 });
 
 export const grantFormSchema = z.object({
@@ -115,7 +115,7 @@ export type GrantFormData = z.infer<typeof grantFormSchema>;
 // ============================================
 
 export const inventoryCategorySchema = z.enum(['casket', 'urn', 'vault', 'marker', 'supplies', 'other'], {
-  errorMap: () => ({ message: 'Invalid category' }),
+  error: 'Invalid category',
 });
 
 export const inventoryFormSchema = z.object({
@@ -197,11 +197,11 @@ export type BurialFormData = z.infer<typeof burialFormSchema>;
 // ============================================
 
 export const contractTypeSchema = z.enum(['pre_need', 'at_need'], {
-  errorMap: () => ({ message: 'Invalid contract type' }),
+  error: 'Invalid contract type',
 });
 
 export const contractStatusSchema = z.enum(['active', 'paid', 'cancelled', 'transferred'], {
-  errorMap: () => ({ message: 'Invalid status' }),
+  error: 'Invalid status',
 });
 
 export const contractItemSchema = z.object({
@@ -239,11 +239,11 @@ export type ContractFormData = z.infer<typeof contractFormSchema>;
 // ============================================
 
 export const paymentMethodSchema = z.enum(['cash', 'check', 'credit_card', 'wire', 'other'], {
-  errorMap: () => ({ message: 'Invalid payment method' }),
+  error: 'Invalid payment method',
 });
 
 export const financialStatusSchema = z.enum(['pending', 'partial', 'paid', 'overdue'], {
-  errorMap: () => ({ message: 'Invalid status' }),
+  error: 'Invalid status',
 });
 
 export const depositFormSchema = z.object({
@@ -325,10 +325,10 @@ export function validateForm<T>(
   }
 
   const errors: Record<string, string> = {};
-  for (const error of result.error.errors) {
-    const path = error.path.join('.');
+  for (const issue of result.error.issues) {
+    const path = issue.path.join('.');
     if (!errors[path]) {
-      errors[path] = error.message;
+      errors[path] = issue.message;
     }
   }
 
@@ -339,7 +339,7 @@ export function validateForm<T>(
  * Get first error message from Zod error
  */
 export function getFirstError(error: z.ZodError): string {
-  return error.errors[0]?.message || 'Validation failed';
+  return error.issues[0]?.message || 'Validation failed';
 }
 
 /**
@@ -347,10 +347,10 @@ export function getFirstError(error: z.ZodError): string {
  */
 export function formatZodErrors(error: z.ZodError): Record<string, string> {
   const errors: Record<string, string> = {};
-  for (const err of error.errors) {
-    const path = err.path.join('.');
+  for (const issue of error.issues) {
+    const path = issue.path.join('.');
     if (!errors[path]) {
-      errors[path] = err.message;
+      errors[path] = issue.message;
     }
   }
   return errors;

@@ -11,6 +11,7 @@ export const DEMO_USER: User = {
   email: 'demo@detroitmemorialpark.org',
   name: 'Demo User',
   role: 'admin',
+  createdAt: new Date(0).toISOString(),
 };
 
 // Demo work orders
