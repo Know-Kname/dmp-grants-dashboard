@@ -1,32 +1,45 @@
-Review the current staged changes or recent commit for quality issues.
+Review staged changes or a specific commit for quality issues.
+
+Usage: `/review` or `/review HEAD~3` or `/review abc1234`
+- With no arguments: reviews staged changes (`git diff --cached`), falls back to last commit
+- With `$ARGUMENTS`: reviews that specific commit SHA or range
+
+Rules applied in this review:
+@.claude/rules/typescript.md
+@.claude/rules/react.md
+@.claude/rules/security.md
 
 Steps:
-1. Run `git diff --cached` (staged) or `git diff HEAD~1` (last commit) to get changes
-2. Review against this checklist and report findings:
+1. Get the diff:
+   - If `$ARGUMENTS` is provided: `git diff $ARGUMENTS`
+   - If staged changes exist: `git diff --cached`
+   - Otherwise: `git diff HEAD~1`
+2. Review against the checklist below and report findings
 
 **TypeScript**
 - [ ] No `any` types — use proper types or Zod schemas
 - [ ] No unchecked type assertions (`as Foo` without guard)
-- [ ] All async functions have proper error handling
+- [ ] All async functions have explicit error handling
 
 **React**
 - [ ] Hooks called only at top level (no hooks in conditions/loops)
-- [ ] `useEffect` deps array is correct (no missing deps)
+- [ ] `useEffect` deps array is complete and correct
 - [ ] No direct DOM manipulation — use React state/refs
-- [ ] Keys on list items are stable (not array index)
+- [ ] List keys are stable unique IDs (never array index)
 
 **Security**
 - [ ] No secrets or API keys in source code
-- [ ] User input validated with Zod before use
-- [ ] No `dangerouslySetInnerHTML` without sanitization
+- [ ] All user input validated with Zod before use
+- [ ] No `dangerouslySetInnerHTML` without DOMPurify sanitization
 - [ ] SQL queries use parameterized inputs (no string interpolation)
+- [ ] New Supabase tables have RLS policies
 
 **Performance**
 - [ ] Heavy computations wrapped in `useMemo`
-- [ ] Stable callbacks wrapped in `useCallback` where passed as props
+- [ ] Callbacks passed as props wrapped in `useCallback`
 
 **Style**
-- [ ] Tailwind classes in logical order (layout → box → text → color)
-- [ ] No inline styles unless dynamic values required
+- [ ] Tailwind classes in logical order (layout → sizing → spacing → text → color)
+- [ ] No inline styles unless computing dynamic values
 
-Report as: PASS / WARN / FAIL per category with specific line references.
+Report format: **PASS** / **WARN** / **FAIL** per category with specific file:line references.

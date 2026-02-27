@@ -39,3 +39,15 @@ server/
 
 ## Modules
 Cemetery mgmt: Work Orders, Inventory, Financials (AR/AP/invoices), Burials, Contracts, Grants/Benefits
+
+## Compact Instructions
+When context compaction occurs, preserve:
+- Active git branch and last 3 commit messages
+- In-progress and pending todos
+- Files being actively edited or investigated
+- Any open errors, test failures, or unresolved blockers
+- The exact user request currently in progress
+
+Compact proactively at ~70% context (don't wait for auto-compact at 95% — it fires too late and degrades output quality). Use `/compact focus on <task>` to guide the summary.
+
+See project rules: @.claude/rules/typescript.md | @.claude/rules/react.md | @.claude/rules/security.md
