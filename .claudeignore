@@ -1,0 +1,13 @@
+# Ignore these to avoid wasting tokens on irrelevant content
+node_modules/
+dist/
+coverage/
+.git/
+*.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.env
+.env.*
+*.min.js
+*.min.css
