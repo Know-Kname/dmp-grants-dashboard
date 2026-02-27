@@ -1,7 +1,6 @@
 #!/bin/bash
 # SessionStart hook — Detroit Memorial Park
 # Runs on: startup | resume | clear | compact
-# Scope: remote web sessions only (CLAUDE_CODE_REMOTE=true)
 
 set -euo pipefail
 
@@ -9,26 +8,26 @@ set -euo pipefail
 input=$(cat)
 source=$(echo "$input" | jq -r '.source // "startup"')
 
-# Only run in Claude Code on the web / remote environments
-if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
-  exit 0
-fi
-
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 STATE_FILE="$HOME/.claude/session-state.md"
 
-# ── 1. Install dependencies ────────────────────────────────────────────────
-# Always ensure node_modules is present; npm install is idempotent
-cd "$PROJECT_DIR"
-if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules/.package-lock.json" ]; then
-  echo "Installing npm dependencies..." >&2
-  npm install --prefer-offline --no-audit --no-fund 2>&1 | tail -5 >&2
+# ── 1. Install dependencies (remote web sessions only) ─────────────────────
+# npm install is expensive — only auto-run in remote/web environments where
+# node_modules may not exist at session start. CLI has a persistent filesystem.
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+  cd "$PROJECT_DIR"
+  if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules/.package-lock.json" ]; then
+    echo "Installing npm dependencies..." >&2
+    npm install --prefer-offline --no-audit --no-fund 2>&1 | tail -5 >&2
+  fi
 fi
 
 # ── 2. Source-aware context hints ──────────────────────────────────────────
 case "$source" in
   compact)
-    # After context compaction — surface saved state so Claude can pick up where it left off
+    # After context compaction — restore saved state so Claude picks up where it left off.
+    # Runs in ALL session types (remote + CLI): the PreCompact hook saves state regardless
+    # of environment, but without restoring it here, CLI sessions lose that state entirely.
     if [ -f "$STATE_FILE" ]; then
       echo "" >&2
       echo "=== Session state restored after compaction ===" >&2
@@ -49,7 +48,7 @@ case "$source" in
     echo "" >&2
     echo "=== DMP Session Ready | Branch: $branch ===" >&2
 
-    # Warn about missing env vars
+    # Warn about missing env vars (check for template, not the actual .env)
     if [ ! -f "$PROJECT_DIR/.env" ] && [ ! -f "$PROJECT_DIR/.env.local" ]; then
       echo "  WARN: No .env or .env.local found. Copy .env.example and fill in values." >&2
     fi

@@ -4,11 +4,6 @@ Usage: `/review` or `/review HEAD~3` or `/review abc1234`
 - With no arguments: reviews staged changes (`git diff --cached`), falls back to last commit
 - With `$ARGUMENTS`: reviews that specific commit SHA or range
 
-Rules applied in this review:
-@.claude/rules/typescript.md
-@.claude/rules/react.md
-@.claude/rules/security.md
-
 Steps:
 1. Get the diff:
    - If `$ARGUMENTS` is provided: `git diff $ARGUMENTS`
