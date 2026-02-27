@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { demoGrants } from '../lib/demo-data';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState } from '../components/ui';
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '../components/Toast';
 
 export default function Grants() {
   const [grants, setGrants] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function Grants() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const { success } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -25,17 +27,13 @@ export default function Grants() {
   });
 
   useEffect(() => {
-    loadGrants();
+    // Load demo data on mount
+    setGrants(demoGrants);
   }, []);
 
   useEffect(() => {
     filterGrants();
   }, [grants, searchTerm, statusFilter, typeFilter]);
-
-  const loadGrants = async () => {
-    const data = await api.get('/grants');
-    setGrants(data);
-  };
 
   const filterGrants = () => {
     let filtered = grants;
@@ -59,26 +57,34 @@ export default function Grants() {
     setFilteredGrants(filtered);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const payload = {
-        ...formData,
-        amount: formData.amount ? parseFloat(formData.amount) : null,
-      };
 
-      if (editingGrant) {
-        await api.put(`/grants/${editingGrant.id}`, payload);
-      } else {
-        await api.post('/grants', payload);
-      }
-      setShowModal(false);
-      setEditingGrant(null);
-      resetForm();
-      loadGrants();
-    } catch (error) {
-      console.error('Failed to save grant:', error);
+    const payload = {
+      ...formData,
+      amount: formData.amount ? parseFloat(formData.amount) : null,
+      deadline: formData.deadline || null,
+      application_date: formData.applicationDate || null,
+    };
+
+    if (editingGrant) {
+      setGrants(prev => prev.map(g =>
+        g.id === editingGrant.id ? { ...g, ...payload } : g
+      ));
+      success('Grant updated', 'Changes saved successfully');
+    } else {
+      const newGrant = {
+        id: Date.now().toString(),
+        ...payload,
+        created_at: new Date().toISOString(),
+      };
+      setGrants(prev => [newGrant, ...prev]);
+      success('Grant added', 'New grant added successfully');
     }
+
+    setShowModal(false);
+    setEditingGrant(null);
+    resetForm();
   };
 
   const handleEdit = (grant: any) => {
@@ -97,11 +103,18 @@ export default function Grants() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this grant/opportunity?')) {
-      await api.delete(`/grants/${id}`);
-      loadGrants();
+      setGrants(prev => prev.filter(g => g.id !== id));
+      success('Grant deleted', 'Grant removed successfully');
     }
+  };
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    setGrants(prev => prev.map(g =>
+      g.id === id ? { ...g, status: newStatus } : g
+    ));
+    success('Status updated', `Grant marked as ${newStatus}`);
   };
 
   const resetForm = () => {
@@ -116,17 +129,6 @@ export default function Grants() {
       applicationDate: '',
       notes: '',
     });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      available: 'info',
-      applied: 'warning',
-      approved: 'success',
-      denied: 'danger',
-      received: 'primary',
-    };
-    return <Badge variant={variants[status]}>{status.replace('_', ' ')}</Badge>;
   };
 
   const getTypeBadge = (type: string) => {
@@ -146,13 +148,13 @@ export default function Grants() {
     .filter(g => g.amount && g.status === 'applied')
     .reduce((sum, g) => sum + parseFloat(g.amount), 0);
   const totalReceived = filteredGrants
-    .filter(g => g.amount && g.status === 'received')
+    .filter(g => g.amount && (g.status === 'received' || g.status === 'approved'))
     .reduce((sum, g) => sum + parseFloat(g.amount), 0);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Grants & Opportunities</h1>
           <p className="text-gray-500 mt-1">Track funding opportunities and veteran benefits</p>
@@ -275,9 +277,9 @@ export default function Grants() {
           {filteredGrants.map((grant) => (
             <Card key={grant.id} hoverable>
               <CardBody>
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
+                    <div className="flex items-center flex-wrap gap-2 mb-2">
                       <h3 className="text-xl font-bold text-gray-900">{grant.title}</h3>
                       {getTypeBadge(grant.type)}
                     </div>
@@ -315,18 +317,30 @@ export default function Grants() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-start space-x-3 ml-4">
-                    {getStatusBadge(grant.status)}
+                  <div className="flex items-start space-x-3">
+                    <select
+                      value={grant.status}
+                      onChange={(e) => handleStatusChange(grant.id, e.target.value)}
+                      className="text-sm border border-gray-200 rounded-lg px-2 py-1 cursor-pointer focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="available">Available</option>
+                      <option value="applied">Applied</option>
+                      <option value="approved">Approved</option>
+                      <option value="denied">Denied</option>
+                      <option value="received">Received</option>
+                    </select>
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleEdit(grant)}
-                        className="text-primary-600 hover:text-primary-800"
+                        className="text-primary-600 hover:text-primary-800 p-1"
+                        title="Edit"
                       >
                         <Edit size={18} />
                       </button>
                       <button
                         onClick={() => handleDelete(grant.id)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600 hover:text-red-800 p-1"
+                        title="Delete"
                       >
                         <Trash2 size={18} />
                       </button>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { demoWorkOrders } from '../lib/demo-data';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState } from '../components/ui';
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '../components/Toast';
 
 export default function WorkOrders() {
   const [workOrders, setWorkOrders] = useState<any[]>([]);
@@ -11,6 +12,7 @@ export default function WorkOrders() {
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { success } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -21,17 +23,13 @@ export default function WorkOrders() {
   });
 
   useEffect(() => {
-    loadWorkOrders();
+    // Load demo data on mount
+    setWorkOrders(demoWorkOrders);
   }, []);
 
   useEffect(() => {
     filterOrders();
   }, [workOrders, searchTerm, statusFilter]);
-
-  const loadWorkOrders = async () => {
-    const data = await api.get('/work-orders');
-    setWorkOrders(data);
-  };
 
   const filterOrders = () => {
     let filtered = workOrders;
@@ -50,21 +48,34 @@ export default function WorkOrders() {
     setFilteredOrders(filtered);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (editingOrder) {
-        await api.put(`/work-orders/${editingOrder.id}`, formData);
-      } else {
-        await api.post('/work-orders', formData);
-      }
-      setShowModal(false);
-      setEditingOrder(null);
-      resetForm();
-      loadWorkOrders();
-    } catch (error) {
-      console.error('Failed to save work order:', error);
+
+    if (editingOrder) {
+      // Update existing order
+      setWorkOrders(prev => prev.map(wo =>
+        wo.id === editingOrder.id
+          ? { ...wo, ...formData, due_date: formData.dueDate, assigned_to_name: formData.assignedTo }
+          : wo
+      ));
+      success('Work order updated', 'Changes saved successfully');
+    } else {
+      // Create new order
+      const newOrder = {
+        id: Date.now().toString(),
+        ...formData,
+        due_date: formData.dueDate,
+        assigned_to_name: formData.assignedTo || 'Unassigned',
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+      setWorkOrders(prev => [newOrder, ...prev]);
+      success('Work order created', 'New work order added successfully');
     }
+
+    setShowModal(false);
+    setEditingOrder(null);
+    resetForm();
   };
 
   const handleEdit = (order: any) => {
@@ -74,17 +85,24 @@ export default function WorkOrders() {
       description: order.description || '',
       type: order.type,
       priority: order.priority,
-      assignedTo: order.assigned_to || '',
+      assignedTo: order.assigned_to_name || '',
       dueDate: order.due_date ? format(new Date(order.due_date), 'yyyy-MM-dd') : '',
     });
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this work order?')) {
-      await api.delete(`/work-orders/${id}`);
-      loadWorkOrders();
+      setWorkOrders(prev => prev.filter(wo => wo.id !== id));
+      success('Work order deleted', 'Work order removed successfully');
     }
+  };
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    setWorkOrders(prev => prev.map(wo =>
+      wo.id === id ? { ...wo, status: newStatus } : wo
+    ));
+    success('Status updated', `Work order marked as ${newStatus.replace('_', ' ')}`);
   };
 
   const resetForm = () => {
@@ -106,15 +124,6 @@ export default function WorkOrders() {
     { value: 'cancelled', label: 'Cancelled' },
   ];
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      pending: 'warning',
-      in_progress: 'info',
-      completed: 'success',
-      cancelled: 'danger',
-    };
-    return <Badge variant={variants[status]}>{status.replace('_', ' ')}</Badge>;
-  };
 
   const getPriorityBadge = (priority: string) => {
     const variants: Record<string, any> = {
@@ -129,7 +138,7 @@ export default function WorkOrders() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Work Orders</h1>
           <p className="text-gray-500 mt-1">Manage and track all maintenance and service tasks</p>
@@ -236,7 +245,16 @@ export default function WorkOrders() {
                       {getPriorityBadge(wo.priority)}
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(wo.status)}
+                      <select
+                        value={wo.status}
+                        onChange={(e) => handleStatusChange(wo.id, e.target.value)}
+                        className="text-sm border-0 bg-transparent cursor-pointer focus:ring-0 p-0"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {wo.assigned_to_name || 'Unassigned'}
@@ -254,13 +272,15 @@ export default function WorkOrders() {
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
                         onClick={() => handleEdit(wo)}
-                        className="text-primary-600 hover:text-primary-800"
+                        className="text-primary-600 hover:text-primary-800 p-1"
+                        title="Edit"
                       >
                         <Edit size={18} />
                       </button>
                       <button
                         onClick={() => handleDelete(wo.id)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600 hover:text-red-800 p-1"
+                        title="Delete"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -329,6 +349,12 @@ export default function WorkOrders() {
               ]}
             />
           </div>
+          <Input
+            label="Assigned To"
+            value={formData.assignedTo}
+            onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+            placeholder="Enter name or leave blank"
+          />
           <Input
             label="Due Date"
             type="date"
