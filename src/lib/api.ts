@@ -2,19 +2,8 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 const API_URL = '/api';
 
-const getAuthHeader = (): Record<string, string> => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 const handleResponse = async (res: Response) => {
   if (!res.ok) {
-    if (res.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-      throw new Error('Unauthorized');
-    }
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.message || `API Error: ${res.status} ${res.statusText}`);
   }
@@ -31,14 +20,13 @@ const supabaseApi = {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return data || [];
     },
     create: async (workOrder: any) => {
       if (!supabase) throw new Error('Supabase not configured');
-      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from('work_orders')
-        .insert({ ...workOrder, created_by: user?.id })
+        .insert(workOrder)
         .select()
         .single();
       if (error) throw error;
@@ -72,14 +60,13 @@ const supabaseApi = {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return data || [];
     },
     create: async (grant: any) => {
       if (!supabase) throw new Error('Supabase not configured');
-      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from('grants')
-        .insert({ ...grant, created_by: user?.id })
+        .insert(grant)
         .select()
         .single();
       if (error) throw error;
@@ -107,31 +94,17 @@ const supabaseApi = {
   },
 };
 
-// Express API (fallback)
+// Express API (fallback for local development)
 const expressApi = {
-  login: async (email: string, password: string) => {
-    const res = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    return handleResponse(res);
-  },
-
   get: async (endpoint: string) => {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      headers: getAuthHeader(),
-    });
+    const res = await fetch(`${API_URL}${endpoint}`);
     return handleResponse(res);
   },
 
   post: async (endpoint: string, data: any) => {
     const res = await fetch(`${API_URL}${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeader(),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -140,10 +113,7 @@ const expressApi = {
   put: async (endpoint: string, data: any) => {
     const res = await fetch(`${API_URL}${endpoint}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeader(),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     return handleResponse(res);
@@ -152,16 +122,13 @@ const expressApi = {
   delete: async (endpoint: string) => {
     const res = await fetch(`${API_URL}${endpoint}`, {
       method: 'DELETE',
-      headers: getAuthHeader(),
     });
     return handleResponse(res);
   },
 };
 
-// Unified API that uses Supabase when configured, else Express
+// Unified API - uses Supabase when configured, else Express
 export const api = {
-  login: expressApi.login,
-
   get: async (endpoint: string) => {
     if (isSupabaseConfigured()) {
       if (endpoint === '/work-orders') return supabaseApi.workOrders.list();

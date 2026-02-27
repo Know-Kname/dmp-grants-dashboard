@@ -1,22 +1,20 @@
-import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Home, FileText, Package, DollarSign, Users,
-  FileSignature, Gift, ClipboardList, LogOut, User,
+  FileSignature, Gift, ClipboardList, User,
   ChevronRight, Menu, X
 } from 'lucide-react';
 import { useState } from 'react';
 
+// Default user for demo mode (no authentication)
+const defaultUser = {
+  name: 'DMP Admin',
+  role: 'Administrator'
+};
+
 export default function Layout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const navItems = [
     { icon: Home, label: 'Dashboard', path: '/' },
@@ -40,16 +38,16 @@ export default function Layout() {
     <div className="min-h-screen bg-secondary-50 flex">
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-secondary-900/50 z-40 lg:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`
-          fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white border-r border-secondary-200 
+          fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white border-r border-secondary-200
           transform transition-transform duration-300 ease-in-out lg:transform-none flex flex-col
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
@@ -65,7 +63,7 @@ export default function Layout() {
               <p className="text-xs text-secondary-500 font-medium tracking-wide">MANAGEMENT SYSTEM</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => setIsMobileMenuOpen(false)}
             className="ml-auto lg:hidden text-secondary-400 hover:text-secondary-600"
           >
@@ -87,15 +85,15 @@ export default function Layout() {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`
                   group flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200
-                  ${active 
-                    ? 'bg-primary-50 text-primary-700 shadow-sm' 
+                  ${active
+                    ? 'bg-primary-50 text-primary-700 shadow-sm'
                     : 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900'
                   }
                 `}
               >
-                <item.icon 
-                  size={20} 
-                  className={`transition-colors duration-200 ${active ? 'text-primary-600' : 'text-secondary-400 group-hover:text-secondary-600'}`} 
+                <item.icon
+                  size={20}
+                  className={`transition-colors duration-200 ${active ? 'text-primary-600' : 'text-secondary-400 group-hover:text-secondary-600'}`}
                 />
                 <span className="font-medium">{item.label}</span>
                 {active && (
@@ -109,20 +107,13 @@ export default function Layout() {
         {/* User Profile */}
         <div className="p-4 border-t border-secondary-100 bg-secondary-50/30">
           <div className="flex items-center space-x-3 p-2 rounded-xl bg-white border border-secondary-100 shadow-sm">
-            <div className="w-10 h-10 bg-gradient-to-br from-secondary-100 to-secondary-200 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-              <User size={20} className="text-secondary-600" />
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+              <User size={20} className="text-primary-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm text-secondary-900 truncate">{user?.name}</div>
-              <div className="text-xs text-secondary-500 capitalize truncate">{user?.role}</div>
+              <div className="font-semibold text-sm text-secondary-900 truncate">{defaultUser.name}</div>
+              <div className="text-xs text-secondary-500 truncate">{defaultUser.role}</div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-secondary-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Logout"
-            >
-              <LogOut size={18} />
-            </button>
           </div>
           <div className="mt-4 flex justify-between items-center px-2 text-xs text-secondary-400">
             <span>v1.0.0</span>
@@ -136,7 +127,7 @@ export default function Layout() {
         {/* Mobile Header */}
         <header className="lg:hidden h-16 bg-white border-b border-secondary-200 flex items-center justify-between px-4 sticky top-0 z-30">
           <div className="flex items-center space-x-3">
-            <button 
+            <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="p-2 -ml-2 text-secondary-600 hover:bg-secondary-50 rounded-lg"
             >
@@ -145,7 +136,7 @@ export default function Layout() {
             <span className="font-bold text-secondary-900">DMP System</span>
           </div>
           <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-sm">
-            {user?.name?.[0]}
+            {defaultUser.name[0]}
           </div>
         </header>
 

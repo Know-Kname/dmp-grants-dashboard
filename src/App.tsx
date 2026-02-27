@@ -1,42 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './lib/auth';
 import { ToastProvider } from './components/Toast';
 import Layout from './components/Layout';
-import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import WorkOrders from './pages/WorkOrders';
 import Grants from './pages/Grants';
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-      </div>
-    );
-  }
-
-  return isAuthenticated ? <Navigate to="/" /> : <>{children}</>;
-}
 
 function ComingSoon({ title }: { title: string }) {
   return (
@@ -50,47 +17,24 @@ function ComingSoon({ title }: { title: string }) {
   );
 }
 
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Dashboard />} />
-        <Route path="work-orders" element={<WorkOrders />} />
-        <Route path="inventory" element={<ComingSoon title="Inventory Management" />} />
-        <Route path="financial" element={<ComingSoon title="Financial Management" />} />
-        <Route path="burials" element={<ComingSoon title="Burial Records" />} />
-        <Route path="contracts" element={<ComingSoon title="Contracts" />} />
-        <Route path="grants" element={<Grants />} />
-        <Route path="customers" element={<ComingSoon title="Customer Management" />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
-  );
-}
-
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-        </ToastProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="work-orders" element={<WorkOrders />} />
+            <Route path="inventory" element={<ComingSoon title="Inventory Management" />} />
+            <Route path="financial" element={<ComingSoon title="Financial Management" />} />
+            <Route path="burials" element={<ComingSoon title="Burial Records" />} />
+            <Route path="contracts" element={<ComingSoon title="Contracts" />} />
+            <Route path="grants" element={<Grants />} />
+            <Route path="customers" element={<ComingSoon title="Customer Management" />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </ToastProvider>
     </BrowserRouter>
   );
 }
