@@ -147,7 +147,6 @@ export default function Financial() {
         reference: depositForm.reference || undefined,
         customerId: depositForm.customerId || undefined,
         notes: depositForm.notes || undefined,
-        createdBy: 'current-user',
       });
     } else if (activeTab === 'receivables') {
       createReceivable.mutate({

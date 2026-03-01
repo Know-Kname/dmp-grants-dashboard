@@ -4,7 +4,7 @@ import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/erro
 import { formatStatus, formatDateForInput } from '../lib/utils';
 import type { WorkOrder } from '../types';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner } from '../components/ui';
-import { Plus, Search, ClipboardList, Calendar, Edit, Trash2, AlertCircle, RefreshCw, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Search, ClipboardList, Calendar, Edit, Trash2, AlertCircle, RefreshCw, Clock, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 type WorkOrderFormData = {
