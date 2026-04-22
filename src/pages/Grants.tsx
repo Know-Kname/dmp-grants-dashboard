@@ -175,7 +175,7 @@ export default function Grants() {
   const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -227,8 +227,8 @@ export default function Grants() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up delay-100">
+        <Card hoverable glass>
           <CardBody>
             <div className="flex items-center justify-between">
               <div>
@@ -270,7 +270,8 @@ export default function Grants() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <div className="animate-slide-up delay-200">
+      <Card glass>
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Input
@@ -307,6 +308,7 @@ export default function Grants() {
           </div>
         </CardBody>
       </Card>
+      </div>
 
       {/* Loading state */}
       {isLoading && (
@@ -321,8 +323,9 @@ export default function Grants() {
       )}
 
       {/* Grants List */}
+      <div className="animate-slide-up delay-300">
       {!isLoading && filteredGrants.length === 0 && (
-        <Card>
+        <Card glass>
           <CardBody>
             <EmptyState
               icon={<Gift size={48} />}
@@ -343,9 +346,9 @@ export default function Grants() {
       {!isLoading && filteredGrants.length > 0 && (
         <div className="grid gap-4">
           {filteredGrants.map((grant) => (
-            <Card key={grant.id} hoverable className="animate-fade-in">
+            <Card key={grant.id} hoverable glass className="animate-fade-in group">
               <CardBody>
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start transition-transform duration-300 group-hover:translate-x-1">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h3 className="text-lg font-semibold text-foreground">{grant.title}</h3>
@@ -411,6 +414,7 @@ export default function Grants() {
           ))}
         </div>
       )}
+      </div>
 
       {/* Modal */}
       <Modal

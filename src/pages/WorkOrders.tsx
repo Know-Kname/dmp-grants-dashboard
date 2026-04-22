@@ -151,7 +151,7 @@ export default function WorkOrders() {
   const combinedError = error || mutationError;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -182,6 +182,7 @@ export default function WorkOrders() {
       </div>
 
       {/* Error display */}
+      <div className="animate-slide-up">
       {combinedError && (
         <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
@@ -205,10 +206,11 @@ export default function WorkOrders() {
           </div>
         </div>
       )}
+      </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up delay-100">
+        <Card hoverable glass>
           <CardBody>
             <div className="flex items-center justify-between">
               <div>
@@ -263,8 +265,9 @@ export default function WorkOrders() {
       </div>
 
       {/* Urgent Alert */}
+      <div className="animate-slide-up delay-200">
       {stats.urgent > 0 && (
-        <Card className="border-l-4 border-l-danger">
+        <Card glass className="border-l-4 border-l-danger">
           <CardBody className="flex items-center gap-3">
             <AlertCircle className="text-danger shrink-0" size={20} />
             <p className="text-sm text-foreground">
@@ -273,9 +276,11 @@ export default function WorkOrders() {
           </CardBody>
         </Card>
       )}
+      </div>
 
       {/* Filters */}
-      <Card>
+      <div className="animate-slide-up delay-200">
+      <Card glass>
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Input
@@ -312,6 +317,7 @@ export default function WorkOrders() {
           </div>
         </CardBody>
       </Card>
+      </div>
 
       {/* Loading state */}
       {isLoading && (
@@ -324,10 +330,12 @@ export default function WorkOrders() {
           </CardBody>
         </Card>
       )}
+      </div>
 
       {/* Empty state */}
+      <div className="animate-fade-in delay-300">
       {!isLoading && filteredOrders.length === 0 && (
-        <Card>
+        <Card glass>
           <CardBody>
             <EmptyState
               icon={<ClipboardList size={48} />}
@@ -344,12 +352,13 @@ export default function WorkOrders() {
           </CardBody>
         </Card>
       )}
+      </div>
 
       {/* Desktop Table View */}
       {!isLoading && filteredOrders.length > 0 && (
-        <>
+        <div className="animate-slide-up delay-300">
           {/* Table for lg+ screens */}
-          <Card className="hidden lg:block">
+          <Card className="hidden lg:block" glass hoverable>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-background-subtle border-b border-border">
@@ -433,9 +442,9 @@ export default function WorkOrders() {
           {/* Card view for mobile/tablet */}
           <div className="grid gap-4 lg:hidden">
             {filteredOrders.map((wo) => (
-              <Card key={wo.id} hoverable className="animate-fade-in">
+              <Card key={wo.id} hoverable glass className="animate-fade-in group">
                 <CardBody>
-                  <div className="flex justify-between items-start gap-3">
+                  <div className="flex justify-between items-start gap-3 transition-transform duration-300 group-hover:translate-x-1">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <h3 className="text-lg font-semibold text-foreground">{wo.title}</h3>
@@ -479,7 +488,7 @@ export default function WorkOrders() {
               </Card>
             ))}
           </div>
-        </>
+        </div>
       )}
 
       {/* Modal */}

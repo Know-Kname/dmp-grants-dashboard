@@ -56,7 +56,7 @@ export default function Login() {
       </button>
 
       <div className="relative w-full max-w-md animate-slide-up">
-        <Card className="p-8">
+        <Card glass className="p-8">
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">

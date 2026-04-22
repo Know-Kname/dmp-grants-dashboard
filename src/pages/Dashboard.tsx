@@ -106,7 +106,7 @@ export default function Dashboard() {
   const locations = Object.entries(COMPANY.locations);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -121,7 +121,12 @@ export default function Dashboard() {
       </div>
 
       {/* Company Overview Card */}
+<<<<<<< Updated upstream
       <Card className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-950 dark:to-slate-900 border-primary-200 dark:border-primary-800">
+=======
+      <div className="animate-slide-up delay-100">
+      <Card glass className="bg-gradient-to-br from-primary-50/80 to-primary-100/80 dark:from-primary-950/80 dark:to-slate-900/80 border-primary-200/50 dark:border-primary-800/50">
+>>>>>>> Stashed changes
         <CardBody className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-6">
             <div className="flex-1">
@@ -159,6 +164,7 @@ export default function Dashboard() {
           </div>
         </CardBody>
       </Card>
+      </div>
 
       {/* Alerts */}
       {(stats.inventory.lowStock > 0 || stats.receivables.overdue > 0) && (
@@ -181,12 +187,16 @@ export default function Dashboard() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-up delay-200">
         {statCards.map((card) => (
           <Link key={card.label} to={card.link}>
+<<<<<<< Updated upstream
             <Card hoverable className="relative overflow-hidden h-full">
+=======
+            <Card hoverable glass className="relative overflow-hidden h-full group">
+>>>>>>> Stashed changes
               <CardBody>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between transition-transform duration-300 group-hover:scale-105">
                   <div className="flex-1">
                     <p className="text-foreground-muted text-sm font-medium mb-1">{card.label}</p>
                     <p className="text-3xl font-bold text-foreground mb-1">{card.value}</p>
@@ -207,7 +217,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-slide-up delay-300">
         {/* Work Orders Status */}
         <Card>
           <CardHeader className="flex items-center justify-between">
@@ -284,7 +294,12 @@ export default function Dashboard() {
       </div>
 
       {/* Cemetery Locations */}
+<<<<<<< Updated upstream
       <Card>
+=======
+      <div className="animate-slide-up delay-400">
+      <Card glass>
+>>>>>>> Stashed changes
         <CardHeader className="flex items-center justify-between">
           <h3 className="font-semibold text-foreground">Cemetery Locations</h3>
           <Badge variant="secondary">{locations.length} Locations</Badge>
@@ -318,9 +333,15 @@ export default function Dashboard() {
           </div>
         </CardBody>
       </Card>
+      </div>
 
       {/* Quick Actions */}
+<<<<<<< Updated upstream
       <Card>
+=======
+      <div className="animate-slide-up delay-500">
+      <Card glass>
+>>>>>>> Stashed changes
         <CardHeader>
           <h3 className="font-semibold text-foreground">Quick Actions</h3>
         </CardHeader>
@@ -357,10 +378,16 @@ export default function Dashboard() {
           </div>
         </CardBody>
       </Card>
+      </div>
 
       {/* Business Hours */}
+<<<<<<< Updated upstream
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
+=======
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-up delay-500">
+        <Card glass>
+>>>>>>> Stashed changes
           <CardHeader>
             <h3 className="font-semibold text-foreground">Business Hours</h3>
           </CardHeader>

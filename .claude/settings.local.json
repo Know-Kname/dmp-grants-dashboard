@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem-dmp__list_directory",
+      "mcp__filesystem-dmp__read_text_file",
+      "mcp__filesystem-dmp__directory_tree",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh run:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

@@ -199,7 +199,7 @@ export default function Financial() {
   const addLabel = activeTab === 'deposits' ? 'Add Deposit' : activeTab === 'receivables' ? 'Add Receivable' : 'Add Payable';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -226,8 +226,8 @@ export default function Financial() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-up delay-100">
+        <Card hoverable glass>
           <CardBody>
             <div className="flex items-center justify-between">
               <div>
@@ -284,7 +284,7 @@ export default function Financial() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-background-subtle rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-background-subtle rounded-lg p-1 w-fit animate-slide-up delay-200">
         {tabs.map(tab => (
           <button key={tab.key}
             onClick={() => { setActiveTab(tab.key); setSearchTerm(''); setStatusFilter('all'); }}
@@ -304,7 +304,8 @@ export default function Financial() {
       </div>
 
       {/* Filters */}
-      <Card>
+      <div className="animate-slide-up delay-200">
+      <Card glass>
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input placeholder={`Search ${activeTab}...`} icon={<Search size={18} />}
@@ -324,6 +325,7 @@ export default function Financial() {
           </div>
         </CardBody>
       </Card>
+      </div>
 
       {/* Loading */}
       {isLoading && (
@@ -333,9 +335,10 @@ export default function Financial() {
       )}
 
       {/* ── DEPOSITS TAB ── */}
+      <div className="animate-slide-up delay-300">
       {!isLoading && activeTab === 'deposits' && (
         filteredDeposits.length === 0 ? (
-          <Card><CardBody>
+          <Card glass><CardBody>
             <EmptyState icon={<DollarSign size={48} />} title="No deposits found"
               description={searchTerm ? "Try adjusting your search" : "Record your first deposit"}
               action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Deposit</Button>} />
@@ -343,9 +346,9 @@ export default function Financial() {
         ) : (
           <div className="grid gap-4">
             {filteredDeposits.map(dep => (
-              <Card key={dep.id} hoverable className="animate-fade-in">
+              <Card key={dep.id} hoverable glass className="animate-fade-in group">
                 <CardBody>
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start transition-transform duration-300 group-hover:translate-x-1">
                     <div className="flex items-start gap-4">
                       <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg shrink-0">
                         <CreditCard className="text-success" size={20} />
@@ -372,11 +375,13 @@ export default function Financial() {
           </div>
         )
       )}
+      </div>
 
       {/* ── RECEIVABLES TAB ── */}
+      <div className="animate-slide-up delay-300">
       {!isLoading && activeTab === 'receivables' && (
         filteredReceivables.length === 0 ? (
-          <Card><CardBody>
+          <Card glass><CardBody>
             <EmptyState icon={<TrendingUp size={48} />} title="No receivables found"
               description={searchTerm || statusFilter !== 'all' ? "Try adjusting your filters" : "Add your first receivable"}
               action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Receivable</Button>} />
@@ -387,9 +392,9 @@ export default function Financial() {
               const paidPct = ar.amount > 0 ? Math.min((ar.amountPaid / ar.amount) * 100, 100) : 0;
               const isOverdue = ar.status === 'overdue';
               return (
-                <Card key={ar.id} hoverable className={`animate-fade-in ${isOverdue ? 'border-l-4 border-l-danger' : ''}`}>
+                <Card key={ar.id} hoverable glass className={`animate-fade-in group ${isOverdue ? 'border-l-4 border-l-danger' : ''}`}>
                   <CardBody>
-                    <div className="flex justify-between items-start gap-4">
+                    <div className="flex justify-between items-start gap-4 transition-transform duration-300 group-hover:translate-x-1">
                       <div className="flex items-start gap-4 flex-1 min-w-0">
                         <div className="p-3 bg-warning-100 dark:bg-warning-950 rounded-lg shrink-0">
                           <Receipt className="text-warning" size={20} />
@@ -432,11 +437,13 @@ export default function Financial() {
           </div>
         )
       )}
+      </div>
 
       {/* ── PAYABLES TAB ── */}
+      <div className="animate-slide-up delay-300">
       {!isLoading && activeTab === 'payables' && (
         filteredPayables.length === 0 ? (
-          <Card><CardBody>
+          <Card glass><CardBody>
             <EmptyState icon={<TrendingDown size={48} />} title="No payables found"
               description={searchTerm || statusFilter !== 'all' ? "Try adjusting your filters" : "Add your first payable"}
               action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Payable</Button>} />
@@ -447,9 +454,9 @@ export default function Financial() {
               const paidPct = ap.amount > 0 ? Math.min((ap.amountPaid / ap.amount) * 100, 100) : 0;
               const isOverdue = ap.status === 'overdue';
               return (
-                <Card key={ap.id} hoverable className={`animate-fade-in ${isOverdue ? 'border-l-4 border-l-danger' : ''}`}>
+                <Card key={ap.id} hoverable glass className={`animate-fade-in group ${isOverdue ? 'border-l-4 border-l-danger' : ''}`}>
                   <CardBody>
-                    <div className="flex justify-between items-start gap-4">
+                    <div className="flex justify-between items-start gap-4 transition-transform duration-300 group-hover:translate-x-1">
                       <div className="flex items-start gap-4 flex-1 min-w-0">
                         <div className="p-3 bg-danger-100 dark:bg-danger-950 rounded-lg shrink-0">
                           <FileText className="text-danger" size={20} />
@@ -491,6 +498,7 @@ export default function Financial() {
           </div>
         )
       )}
+      </div>
 
       {/* ── CREATE MODAL ── */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)}
