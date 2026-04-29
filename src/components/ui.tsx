@@ -265,7 +265,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({ label, error, hint, icon, className = '', id, ...props }: InputProps) {
-  const inputId = id ?? useId();
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   return (
     <div className="w-full">
       {label && (
@@ -311,7 +312,8 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export function Select({ label, error, hint, options, placeholder, className = '', id, ...props }: SelectProps) {
-  const selectId = id ?? useId();
+  const generatedId = useId();
+  const selectId = id ?? generatedId;
   return (
     <div className="w-full">
       {label && (
@@ -361,7 +363,8 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export function Textarea({ label, error, hint, className = '', id, ...props }: TextareaProps) {
-  const textareaId = id ?? useId();
+  const generatedId = useId();
+  const textareaId = id ?? generatedId;
   return (
     <div className="w-full">
       {label && (

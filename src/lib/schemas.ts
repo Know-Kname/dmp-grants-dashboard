@@ -17,7 +17,7 @@ export const emailSchema = z.string().email('Invalid email address');
 
 /** Phone number validation (flexible) */
 export const phoneSchema = z.string()
-  .regex(/^[\d\s\-\+\(\)]+$/, 'Invalid phone number format')
+  .regex(/^[\d\s+\-()]+$/, 'Invalid phone number format')
   .optional()
   .or(z.literal(''));
 

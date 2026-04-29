@@ -4,7 +4,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getErrorMessage, ApiRequestError } from '../lib/api';
+import { api, getErrorMessage } from '../lib/api';
 import { queryKeys } from '../lib/query';
 import type {
   WorkOrder,

@@ -4,8 +4,8 @@ import { api } from '../lib/api';
 import { Card, CardHeader, CardBody, LoadingSpinner, Badge } from '../components/ui';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  TrendingUp, MapPin, Phone, Clock, Building2,
-  ChevronRight, ExternalLink
+  MapPin, Phone, Building2,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { COMPANY } from '../config/company';

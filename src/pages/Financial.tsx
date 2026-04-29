@@ -5,7 +5,7 @@ import {
   usePayables, useCreatePayable, useUpdatePayable,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
-import { formatCurrency, formatDate, formatDateForInput, formatStatus, cn } from '../lib/utils';
+import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
