@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
-import { Button, Input, Card, Alert } from '../components/ui';
+import { Button, Input, Alert } from '../components/ui';
 import { getErrorMessage, getErrorRequestId } from '../lib/errors';
 import { enableDemoMode } from '../lib/demo-data';
-import { Mail, Lock, Sun, Moon, Phone, ExternalLink, Play } from 'lucide-react';
+import { Mail, Lock, Sun, Moon, Phone, MapPin, Play } from 'lucide-react';
 import { COMPANY } from '../config/company';
 
 export default function Login() {
@@ -23,7 +23,6 @@ export default function Login() {
     setError(null);
     setErrorDetails([]);
     setLoading(true);
-
     try {
       await login(email, password);
       navigate('/');
@@ -37,141 +36,158 @@ export default function Login() {
     }
   };
 
-  const toggleTheme = () => {
-    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-  };
-
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 transition-colors">
-      {/* Background pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-background to-primary-100 dark:from-slate-950 dark:via-background dark:to-slate-900" />
-
-      {/* Theme toggle */}
-      <button
-        onClick={toggleTheme}
-        className="absolute top-4 right-4 p-2 rounded-lg bg-card border border-border text-foreground-muted hover:text-foreground hover:bg-accent transition-colors"
-        aria-label="Toggle theme"
+    <div className="min-h-screen flex">
+      {/* ── Left brand panel ── */}
+      <div
+        className="hidden lg:flex lg:w-[55%] relative flex-col justify-between p-12 text-white overflow-hidden"
+        style={{
+          backgroundImage: 'url(/hero-bg.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: '#1a3d2b',
+        }}
       >
-        {resolvedTheme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-      </button>
+        {/* Deep green overlay — shows alone when no image, darkens image when present */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0f2419]/90 via-[#1a3d2b]/80 to-[#2d5a3d]/70" />
 
-      <div className="relative w-full max-w-md animate-slide-up">
-        <Card className="p-8">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-white font-bold text-2xl">{COMPANY.abbreviation}</span>
+        {/* Content sits above overlay */}
+        <div className="relative z-10">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-3 mb-12">
+            <div className="w-12 h-12 rounded-xl bg-[#c49a2c] flex items-center justify-center shadow-lg">
+              <span className="font-bold text-[#1a3d2b] text-lg">{COMPANY.abbreviation}</span>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">{COMPANY.shortName}</h1>
-            <p className="text-foreground-muted mt-1">{COMPANY.system.name}</p>
-            <p className="text-xs text-foreground-muted mt-2">{COMPANY.tagline}</p>
+            <div>
+              <p className="font-semibold text-white leading-tight">{COMPANY.shortName}</p>
+              <p className="text-xs text-white/60">{COMPANY.system.name}</p>
+            </div>
           </div>
 
-          {/* Error message */}
-          {error && (
-            <div className="mb-6 animate-fade-in">
-              <Alert
-                title="Unable to sign in"
-                message={error}
-                details={errorDetails}
-                onDismiss={() => {
-                  setError(null);
-                  setErrorDetails([]);
-                }}
-              />
+          {/* Hero text */}
+          <h1 className="text-5xl font-bold leading-tight tracking-tight mb-4">
+            Preserving<br />Memories
+          </h1>
+          <p className="text-xl text-white/80 font-light mb-2">Since {COMPANY.established}</p>
+          <div className="w-16 h-0.5 bg-[#c49a2c] mb-8" />
+          <p className="text-base text-white/70 max-w-sm leading-relaxed">
+            {COMPANY.description.split('.')[0]}.
+          </p>
+        </div>
+
+        {/* Bottom location cards */}
+        <div className="relative z-10">
+          <p className="text-xs text-white/50 uppercase tracking-widest mb-4 font-medium">
+            Three Locations · Over 170 Acres
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {Object.values(COMPANY.locations).map((loc) => (
+              <div
+                key={loc.name}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3"
+              >
+                <MapPin size={12} className="text-[#c49a2c] mb-1.5" />
+                <p className="text-xs font-semibold text-white leading-tight">{loc.city}, {loc.state}</p>
+                <p className="text-[10px] text-white/50 mt-0.5 flex items-center gap-1">
+                  <Phone size={9} />{loc.phone}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-white/30 mt-4">{COMPANY.legal.copyright}</p>
+        </div>
+      </div>
+
+      {/* ── Right form panel ── */}
+      <div className="flex-1 flex flex-col bg-background transition-colors">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-8 py-5 border-b border-border">
+          {/* Mobile only: compact logo */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <div className="w-8 h-8 rounded-lg bg-[#1a3d2b] flex items-center justify-center">
+              <span className="text-white font-bold text-xs">{COMPANY.abbreviation}</span>
             </div>
-          )}
+            <span className="font-semibold text-foreground text-sm">{COMPANY.shortName}</span>
+          </div>
+          <div className="hidden lg:block" />
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              type="email"
-              label="Email address"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              icon={<Mail size={18} />}
-              required
-              autoComplete="email"
-            />
+          <button
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            className="p-2 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-accent transition-colors"
+            aria-label="Toggle theme"
+          >
+            {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
 
-            <Input
-              type="password"
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              icon={<Lock size={18} />}
-              required
-              autoComplete="current-password"
-            />
+        {/* Form area */}
+        <div className="flex-1 flex items-center justify-center px-8 py-12">
+          <div className="w-full max-w-sm">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
+              <p className="text-foreground-muted mt-1 text-sm">Sign in to the management system</p>
+            </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              loading={loading}
-            >
-              Sign in
-            </Button>
-          </form>
+            {error && (
+              <div className="mb-6">
+                <Alert
+                  title="Unable to sign in"
+                  message={error}
+                  details={errorDetails}
+                  onDismiss={() => { setError(null); setErrorDetails([]); }}
+                />
+              </div>
+            )}
 
-          {/* Preview Demo Section */}
-          <div className="mt-6 pt-6 border-t border-border">
-            <div className="text-center mb-4">
-              <p className="text-sm text-foreground-muted mb-3">
-                Want to explore the system first?
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                type="email"
+                label="Email address"
+                placeholder="you@dmp.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                icon={<Mail size={16} />}
+                required
+                autoComplete="email"
+              />
+              <Input
+                type="password"
+                label="Password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                icon={<Lock size={16} />}
+                required
+                autoComplete="current-password"
+              />
+              <Button type="submit" className="w-full mt-2" size="lg" loading={loading}>
+                Sign in
+              </Button>
+            </form>
+
+            {/* Demo */}
+            <div className="mt-8 pt-6 border-t border-border">
+              <p className="text-sm text-foreground-muted text-center mb-3">
+                Want to explore first?
               </p>
               <Button
                 type="button"
                 variant="outline"
-                className="w-full group"
-                onClick={() => {
-                  enableDemoMode();
-                  navigate('/');
-                }}
+                className="w-full"
+                onClick={() => { enableDemoMode(); navigate('/'); }}
               >
-                <Play size={16} className="mr-2 group-hover:text-primary transition-colors" />
+                <Play size={15} className="mr-2" />
                 Preview Demo
                 <span className="ml-2 text-xs text-foreground-muted">(No login required)</span>
               </Button>
             </div>
-            
-            <div className="flex items-center gap-2 my-4">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-foreground-muted">or sign in</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-            
-            <p className="text-xs text-foreground-muted text-center">
-              Demo credentials: <span className="font-medium text-foreground">admin@dmp.com</span> / <span className="font-medium text-foreground">admin123</span>
-            </p>
           </div>
-        </Card>
+        </div>
 
-        {/* Company Contact Info */}
-        <div className="mt-6 space-y-3">
-          <div className="flex items-center justify-center gap-4 text-xs text-foreground-muted">
-            <a
-              href={`tel:${COMPANY.phone.main.replace(/[^\d]/g, '')}`}
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-            >
-              <Phone size={12} />
-              {COMPANY.phone.main}
-            </a>
-            <a
-              href={COMPANY.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-            >
-              <ExternalLink size={12} />
-              Website
-            </a>
-          </div>
-
+        {/* Footer */}
+        <div className="px-8 py-4 border-t border-border">
           <p className="text-xs text-foreground-muted text-center">
-            {COMPANY.legal.copyright} {COMPANY.legal.allRightsReserved}
+            {COMPANY.legal.copyright} · {COMPANY.phone.main}
           </p>
         </div>
       </div>
