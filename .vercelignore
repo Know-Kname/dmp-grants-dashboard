@@ -1,4 +1,4 @@
-# Development
+# Development tooling
 .cursor/
 .git/
 .github/
@@ -7,29 +7,24 @@ node_modules/
 # Build artifacts
 dist/
 build/
+coverage/
+.nyc_output/
 
-# Documentation (keep only essential)
+# Documentation (not needed at runtime)
 docs/
 *.md
 !README.md
 
-# Environment files (except example)
+# Environment files (never deploy secrets; example is fine)
 .env*
 !.env.example
 
-# Server files (not needed for frontend)
-server/
-Dockerfile*
-docker-compose.yml
-railway.toml
-render.yaml
-Procfile
+# Test and lint config
+vitest.config.*
+.eslintrc.*
+tsconfig.node.json
 
-# Testing and coverage
-coverage/
-.nyc_output/
-
-# Logs and OS files
+# Logs and OS noise
 *.log
 .DS_Store
 Thumbs.db
