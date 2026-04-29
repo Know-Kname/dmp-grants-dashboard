@@ -4,7 +4,8 @@ import { useTheme } from '../lib/theme';
 import {
   Home, FileText, Package, DollarSign, Users,
   FileSignature, Gift, ClipboardList, LogOut,
-  Sun, Moon, Monitor, ChevronDown, Phone, ExternalLink, Eye, X
+  Sun, Moon, Monitor, ChevronDown, Phone, ExternalLink, Eye, X,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from './ui';
@@ -17,6 +18,7 @@ export default function Layout() {
   const location = useLocation();
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +35,11 @@ export default function Layout() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Close More sheet on navigation
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -208,25 +215,116 @@ export default function Layout() {
           </div>
         </aside>
 
-        {/* Mobile Navigation */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-20 px-2 py-1 safe-area-pb">
-          <div className="flex justify-around">
-            {navItems.slice(0, 5).map((item) => {
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-20 pb-safe">
+          <div className="flex justify-around items-center px-1 py-1">
+            {navItems.slice(0, 4).map((item) => {
               const active = isActive(item.path);
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-colors ${active ? 'text-primary' : 'text-foreground-muted'
-                    }`}
+                  className="flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-[56px] group"
                 >
-                  <item.icon size={20} />
-                  <span className="text-[10px] font-medium">{item.label}</span>
+                  <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                    active ? 'bg-primary/10' : 'group-active:bg-accent'
+                  }`}>
+                    <item.icon
+                      size={22}
+                      className={active ? 'text-primary' : 'text-foreground-muted'}
+                      strokeWidth={active ? 2.5 : 2}
+                    />
+                  </div>
+                  <span className={`text-[10px] font-medium leading-none ${
+                    active ? 'text-primary' : 'text-foreground-muted'
+                  }`}>
+                    {item.label === 'Work Orders' ? 'Orders' : item.label}
+                  </span>
                 </Link>
               );
             })}
+
+            {/* More button */}
+            <button
+              onClick={() => setMoreOpen(true)}
+              className="flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-[56px] group"
+            >
+              <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                navItems.slice(4).some(i => isActive(i.path)) ? 'bg-primary/10' : 'group-active:bg-accent'
+              }`}>
+                <MoreHorizontal
+                  size={22}
+                  className={navItems.slice(4).some(i => isActive(i.path)) ? 'text-primary' : 'text-foreground-muted'}
+                />
+              </div>
+              <span className={`text-[10px] font-medium leading-none ${
+                navItems.slice(4).some(i => isActive(i.path)) ? 'text-primary' : 'text-foreground-muted'
+              }`}>
+                More
+              </span>
+            </button>
           </div>
         </nav>
+
+        {/* More Sheet — slide-up drawer for remaining nav items */}
+        {moreOpen && (
+          <>
+            {/* Scrim */}
+            <div
+              className="lg:hidden fixed inset-0 bg-black/40 z-30 animate-fade-in"
+              onClick={() => setMoreOpen(false)}
+            />
+            {/* Sheet */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card rounded-t-2xl z-40 shadow-2xl border-t border-border pb-safe animate-slide-up">
+              {/* Handle */}
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-border rounded-full" />
+              </div>
+              <div className="px-4 pb-6 space-y-1">
+                <p className="text-xs font-semibold text-foreground-muted uppercase tracking-widest px-3 py-2">
+                  More
+                </p>
+                {navItems.slice(4).map((item) => {
+                  const active = isActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center gap-4 px-3 py-3 rounded-xl transition-colors ${
+                        active
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-foreground hover:bg-accent'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg ${
+                        active ? 'bg-primary/20' : 'bg-background-subtle'
+                      }`}>
+                        <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.label}</p>
+                        <p className="text-xs text-foreground-muted">{item.description}</p>
+                      </div>
+                      {active && (
+                        <div className="w-2 h-2 bg-primary rounded-full" />
+                      )}
+                    </Link>
+                  );
+                })}
+                {/* Sign out shortcut */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-4 px-3 py-3 rounded-xl text-danger hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors mt-2 border-t border-border pt-4"
+                >
+                  <div className="p-2 rounded-lg bg-danger-50 dark:bg-danger-950">
+                    <LogOut size={20} />
+                  </div>
+                  <span className="font-medium text-sm">Sign out</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-8 pb-20 lg:pb-8 min-h-[calc(100vh-4rem)]">

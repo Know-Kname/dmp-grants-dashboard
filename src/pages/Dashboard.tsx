@@ -1,313 +1,566 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
-import { Card, CardHeader, CardBody, LoadingSpinner, Badge } from '../components/ui';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
+import { format, subMonths, startOfMonth, parseISO } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  MapPin, Phone, Building2,
-  ExternalLink
+  MapPin, Phone, TrendingUp, BookOpen, FileText, Activity, Zap,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import {
+  useWorkOrders, useBurials, useInventory, useReceivables,
+  useDeposits, useContracts,
+} from '../hooks/useData';
+import { Card, CardHeader, CardBody, Badge } from '../components/ui';
 import { COMPANY } from '../config/company';
 import { formatCurrency } from '../lib/utils';
 
+// DMP brand + semantic chart colors
+const C = {
+  green: '#1a3d2b',
+  gold: '#c49a2c',
+  info: '#0ea5e9',
+  success: '#22c55e',
+  warning: '#f59e0b',
+  muted: '#94a3b8',
+  tick: '#94a3b8',
+  grid: '#e2e8f0',
+};
+
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{ color: string; name: string; value: number }>;
+  label?: string;
+  formatter?: (v: number) => string;
+}
+
+function ChartTooltip({ active, payload, label, formatter }: TooltipProps) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 text-sm min-w-[110px]">
+      {label && <p className="text-foreground-muted text-xs mb-1">{label}</p>}
+      {payload.map((p, i) => (
+        <p key={i} className="font-semibold" style={{ color: p.color }}>
+          {p.name}: {formatter ? formatter(p.value) : p.value}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    workOrders: { total: 0, pending: 0, inProgress: 0, completed: 0 },
-    inventory: { total: 0, lowStock: 0 },
-    receivables: { total: 0, overdue: 0, amount: 0 },
-    burials: { total: 0, thisMonth: 0 },
-  });
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const { data: workOrders = [] } = useWorkOrders();
+  const { data: burials = [] } = useBurials();
+  const { data: inventory = [] } = useInventory();
+  const { data: receivables = [] } = useReceivables();
+  const { data: deposits = [] } = useDeposits();
+  const { data: contracts = [] } = useContracts();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  const now = new Date();
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [workOrders, inventory, receivables, burials] = await Promise.all([
-        api.get('/work-orders'),
-        api.get('/inventory'),
-        api.get('/financial/receivables'),
-        api.get('/burials'),
-      ]);
+  // Last 12 month buckets
+  const months = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => {
+      const d = subMonths(now, 11 - i);
+      return { key: format(d, 'yyyy-MM'), label: format(d, 'MMM') };
+    }),
+  []);
 
-      // Calculate work order stats
-      const woStats = {
-        total: (workOrders as any[]).length,
-        pending: (workOrders as any[]).filter((w: any) => w.status === 'pending').length,
-        inProgress: (workOrders as any[]).filter((w: any) => w.status === 'in_progress').length,
-        completed: (workOrders as any[]).filter((w: any) => w.status === 'completed').length,
-      };
+  // ── KPI stats ──────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const thisMonthKey = format(startOfMonth(now), 'yyyy-MM');
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const thisYear = now.getFullYear();
 
-      // Calculate inventory stats
-      const invStats = {
-        total: (inventory as any[]).length,
-        lowStock: (inventory as any[]).filter((i: any) => i.quantity <= i.reorder_point).length,
-      };
+    const burialsThisMonth = burials.filter(b => b.burialDate.startsWith(thisMonthKey)).length;
+    const burialsYTD = burials.filter(b => parseISO(b.burialDate).getFullYear() === thisYear).length;
 
-      // Calculate receivables stats
-      const arStats = {
-        total: (receivables as any[]).length,
-        overdue: (receivables as any[]).filter((r: any) => r.status === 'overdue').length,
-        amount: (receivables as any[]).reduce((sum: number, r: any) => sum + (r.amount - (r.amount_paid || 0)), 0),
-      };
+    const activeContracts = contracts.filter(c => c.status === 'active');
+    const contractsValue = activeContracts.reduce((s, c) => s + c.totalAmount, 0);
 
-      // Calculate burial stats
-      const now = new Date();
-      const thisMonth = (burials as any[]).filter((b: any) => {
-        const burialDate = new Date(b.burial_date);
-        return burialDate.getMonth() === now.getMonth() && burialDate.getFullYear() === now.getFullYear();
-      }).length;
+    const unpaidAR = receivables.filter(r => r.status !== 'paid');
+    const arOutstanding = unpaidAR.reduce((s, r) => s + (r.amount - r.amountPaid), 0);
+    const overdueAR = receivables.filter(r => r.status === 'overdue').length;
 
-      setStats({
-        workOrders: woStats,
-        inventory: invStats,
-        receivables: arStats,
-        burials: { total: (burials as any[]).length, thisMonth },
-      });
+    const lowStock = inventory.filter(i => i.quantity <= i.reorderPoint).length;
 
-      // Create recent activity feed
-      const activities = [
-        ...(workOrders as any[]).slice(0, 3).map((w: any) => ({
-          type: 'work_order',
-          title: w.title,
-          status: w.status,
-          date: w.created_at,
-        })),
-        ...(burials as any[]).slice(0, 2).map((b: any) => ({
-          type: 'burial',
-          title: `${b.deceased_first_name} ${b.deceased_last_name}`,
-          date: b.burial_date,
-        })),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+    const revenue30d = deposits
+      .filter(d => parseISO(d.date) >= thirtyDaysAgo)
+      .reduce((s, d) => s + d.amount, 0);
 
-      setRecentActivity(activities);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return {
+      burialsThisMonth, burialsYTD,
+      activeContracts: activeContracts.length, contractsValue,
+      arOutstanding, overdueAR,
+      unpaidAR: unpaidAR.length,
+      activeWO: workOrders.filter(w => w.status === 'in_progress').length,
+      totalWO: workOrders.length,
+      lowStock, totalInventory: inventory.length,
+      revenue30d,
+    };
+  }, [workOrders, burials, inventory, receivables, deposits, contracts]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+  // ── Chart data ─────────────────────────────────────────────
+  const burialTrend = useMemo(() =>
+    months.map(m => ({
+      month: m.label,
+      Burials: burials.filter(b => b.burialDate.startsWith(m.key)).length,
+    })),
+  [burials, months]);
 
-  const statCards = [
-    {
-      icon: ClipboardList,
-      label: 'Work Orders',
-      value: stats.workOrders.total,
-      subtitle: `${stats.workOrders.inProgress} in progress`,
-      color: 'bg-info',
-      link: '/work-orders',
-    },
-    {
-      icon: Package,
-      label: 'Inventory Items',
-      value: stats.inventory.total,
-      subtitle: stats.inventory.lowStock > 0 ? `${stats.inventory.lowStock} low stock` : 'All items stocked',
-      color: stats.inventory.lowStock > 0 ? 'bg-warning' : 'bg-success',
-      alert: stats.inventory.lowStock > 0,
-      link: '/inventory',
-    },
-    {
-      icon: DollarSign,
-      label: 'Receivables',
-      value: formatCurrency(stats.receivables.amount),
-      subtitle: `${stats.receivables.total} accounts`,
-      color: 'bg-warning',
-      alert: stats.receivables.overdue > 0,
-      link: '/financial',
-    },
-    {
-      icon: Users,
-      label: 'Burials (YTD)',
-      value: stats.burials.total,
-      subtitle: `${stats.burials.thisMonth} this month`,
-      color: 'bg-primary',
-      link: '/burials',
-    },
-  ];
+  const revenueTrend = useMemo(() =>
+    months.map(m => ({
+      month: m.label,
+      Revenue: deposits
+        .filter(d => d.date.startsWith(m.key))
+        .reduce((s, d) => s + d.amount, 0),
+    })),
+  [deposits, months]);
 
-  const locations = Object.entries(COMPANY.locations);
+  const woChartData = useMemo(() => {
+    const raw = [
+      { name: 'Pending',     value: workOrders.filter(w => w.status === 'pending').length,     color: C.warning },
+      { name: 'In Progress', value: workOrders.filter(w => w.status === 'in_progress').length, color: C.info },
+      { name: 'Completed',   value: workOrders.filter(w => w.status === 'completed').length,   color: C.success },
+      { name: 'Cancelled',   value: workOrders.filter(w => w.status === 'cancelled').length,   color: C.muted },
+    ].filter(d => d.value > 0);
+    return raw.length > 0 ? raw : [{ name: 'No Data', value: 1, color: '#e2e8f0' }];
+  }, [workOrders]);
+
+  const inventoryCategoryData = useMemo(() => {
+    const cats = ['casket', 'urn', 'vault', 'marker', 'supplies', 'other'] as const;
+    return cats.map(cat => ({
+      category: cat.charAt(0).toUpperCase() + cat.slice(1),
+      Items: inventory.filter(i => i.category === cat).length,
+    })).filter(d => d.Items > 0);
+  }, [inventory]);
+
+  // ── Recent activity ────────────────────────────────────────
+  const recentActivity = useMemo(() => {
+    const wos = workOrders.slice(0, 5).map(w => ({
+      type: 'work_order' as const,
+      title: w.title,
+      sub: w.status.replace('_', ' '),
+      date: w.createdAt,
+      status: w.status,
+    }));
+    const bs = burials.slice(0, 3).map(b => ({
+      type: 'burial' as const,
+      title: `${b.deceasedLastName}, ${b.deceasedFirstName}`,
+      sub: b.plotLocation,
+      date: b.burialDate,
+      status: undefined as string | undefined,
+    }));
+    return [...wos, ...bs]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 6);
+  }, [workOrders, burials]);
+
+  const hasAlerts = stats.lowStock > 0 || stats.overdueAR > 0;
+
+  const quickActions = [
+    { to: '/burials',     icon: BookOpen,      label: 'Record Burial',    cls: 'text-primary bg-primary-100 dark:bg-primary-950' },
+    { to: '/work-orders', icon: ClipboardList, label: 'New Work Order',   cls: 'text-info bg-info-100 dark:bg-info-950' },
+    { to: '/financial',   icon: DollarSign,    label: 'Add Deposit',      cls: 'text-success bg-success-100 dark:bg-success-950' },
+    { to: '/contracts',   icon: FileText,      label: 'New Contract',     cls: 'text-warning bg-warning-100 dark:bg-warning-950' },
+    { to: '/customers',   icon: Users,         label: 'Add Customer',     cls: 'text-primary bg-primary-100 dark:bg-primary-950' },
+    { to: '/inventory',   icon: Package,       label: 'Update Inventory', cls: 'text-info bg-info-100 dark:bg-info-950' },
+  ] as const;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-foreground-muted mt-1">
-            Welcome back! Here's what's happening at {COMPANY.shortName}.
-          </p>
-        </div>
-        <div className="text-sm text-foreground-muted">
-          {format(new Date(), 'EEEE, MMMM d, yyyy')}
-        </div>
-      </div>
 
-      {/* Company Overview Card */}
-      <Card className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-950 dark:to-slate-900 border-primary-200 dark:border-primary-800">
-        <CardBody className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
-                  <Building2 className="text-white" size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">{COMPANY.name}</h2>
-                  <p className="text-sm text-foreground-muted">{COMPANY.tagline}</p>
-                </div>
+      {/* ── Brand Hero ── */}
+      <div
+        className="rounded-2xl overflow-hidden relative"
+        style={{ background: 'linear-gradient(135deg, #0f2419 0%, #1a3d2b 50%, #2d5a3d 100%)' }}
+      >
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: 'url(/hero-bg.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+        />
+        <div className="relative p-6 lg:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
+                style={{ backgroundColor: C.gold }}
+              >
+                <span className="font-bold text-[#1a3d2b] text-xl">DMP</span>
               </div>
-              <p className="text-sm text-foreground-muted max-w-2xl">
-                {COMPANY.description}
-              </p>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-white leading-tight">
+                  {COMPANY.shortName}
+                </h1>
+                <p className="text-white/60 text-sm mt-0.5">
+                  {COMPANY.tagline} · 3 Locations · 170+ Acres
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <a
-                href={`tel:${COMPANY.phone.main.replace(/[^\d]/g, '')}`}
-                className="flex items-center gap-2 px-4 py-2 bg-card rounded-lg border border-border hover:bg-accent transition-colors"
-              >
-                <Phone size={16} className="text-primary" />
-                <span className="text-sm font-medium">{COMPANY.phone.main}</span>
-              </a>
-              <a
-                href={COMPANY.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-card rounded-lg border border-border hover:bg-accent transition-colors"
-              >
-                <ExternalLink size={16} className="text-primary" />
-                <span className="text-sm font-medium">Website</span>
-              </a>
+
+            <div className="flex flex-wrap items-center gap-6 lg:gap-8">
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-widest">Today</p>
+                <p className="text-white font-semibold mt-0.5">{format(now, 'EEEE, MMM d')}</p>
+                <p className="text-white/50 text-sm">{format(now, 'yyyy')}</p>
+              </div>
+              <div className="w-px h-10 bg-white/20" />
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-widest">Milestone</p>
+                <p className="font-bold text-lg mt-0.5" style={{ color: C.gold }}>100 Years</p>
+                <p className="text-white/50 text-xs">1925 – 2025</p>
+              </div>
+              <div className="w-px h-10 bg-white/20" />
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-widest">Burials YTD</p>
+                <p className="text-white font-bold text-2xl mt-0.5">{stats.burialsYTD}</p>
+                <p className="text-white/50 text-xs">{stats.burialsThisMonth} this month</p>
+              </div>
+              <div className="w-px h-10 bg-white/20" />
+              <div>
+                <p className="text-white/40 text-xs uppercase tracking-widest">Active WO</p>
+                <p className="text-white font-bold text-2xl mt-0.5">{stats.activeWO}</p>
+                <p className="text-white/50 text-xs">{stats.totalWO} total</p>
+              </div>
             </div>
           </div>
-        </CardBody>
-      </Card>
-
-      {/* Alerts */}
-      {(stats.inventory.lowStock > 0 || stats.receivables.overdue > 0) && (
-        <Card className="border-l-4 border-l-warning">
-          <CardBody className="flex items-start space-x-3">
-            <AlertCircle className="text-warning mt-0.5 shrink-0" size={20} />
-            <div className="flex-1">
-              <h3 className="font-semibold text-foreground">Attention Required</h3>
-              <ul className="mt-2 space-y-1 text-sm text-foreground-muted">
-                {stats.inventory.lowStock > 0 && (
-                  <li>• {stats.inventory.lowStock} inventory items are low on stock</li>
-                )}
-                {stats.receivables.overdue > 0 && (
-                  <li>• {stats.receivables.overdue} accounts receivable are overdue</li>
-                )}
-              </ul>
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <Link key={card.label} to={card.link}>
-            <Card hoverable className="relative overflow-hidden h-full">
-              <CardBody>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-foreground-muted text-sm font-medium mb-1">{card.label}</p>
-                    <p className="text-3xl font-bold text-foreground mb-1">{card.value}</p>
-                    <p className="text-xs text-foreground-muted">{card.subtitle}</p>
-                  </div>
-                  <div className={`${card.color} p-4 rounded-xl`}>
-                    <card.icon className="text-white" size={28} />
-                  </div>
-                </div>
-                {card.alert && (
-                  <div className="absolute top-3 right-3">
-                    <div className="w-2 h-2 bg-danger rounded-full animate-pulse" />
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-          </Link>
-        ))}
+        </div>
       </div>
 
+      {/* ── Alert Bar ── */}
+      {hasAlerts && (
+        <div className="flex items-start gap-3 bg-warning-50 dark:bg-warning-950/30 border border-warning-200 dark:border-warning-800 rounded-xl px-4 py-3">
+          <AlertCircle className="text-warning shrink-0 mt-0.5" size={18} />
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            {stats.lowStock > 0 && (
+              <Link to="/inventory" className="text-warning-700 dark:text-warning-400 hover:underline">
+                {stats.lowStock} inventory item{stats.lowStock !== 1 ? 's' : ''} below reorder point
+              </Link>
+            )}
+            {stats.overdueAR > 0 && (
+              <Link to="/financial" className="text-warning-700 dark:text-warning-400 hover:underline">
+                {stats.overdueAR} overdue receivable{stats.overdueAR !== 1 ? 's' : ''}
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Link to="/burials" className="contents">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Burials</p>
+                <div className="p-1.5 bg-primary-100 dark:bg-primary-950 rounded-lg">
+                  <BookOpen size={14} className="text-primary" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{stats.burialsThisMonth}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">this month</p>
+              </div>
+            </CardBody>
+          </Card>
+        </Link>
+
+        <Link to="/contracts" className="contents">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Contracts</p>
+                <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
+                  <FileText size={14} className="text-info" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{stats.activeContracts}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">{formatCurrency(stats.contractsValue)}</p>
+              </div>
+            </CardBody>
+          </Card>
+        </Link>
+
+        <Link to="/financial" className="contents">
+          <Card hoverable className={`h-full ${stats.overdueAR > 0 ? 'border-warning' : ''}`}>
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Receivables</p>
+                <div className={`p-1.5 rounded-lg ${stats.overdueAR > 0 ? 'bg-warning-100 dark:bg-warning-950' : 'bg-success-100 dark:bg-success-950'}`}>
+                  <DollarSign size={14} className={stats.overdueAR > 0 ? 'text-warning' : 'text-success'} />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{formatCurrency(stats.arOutstanding)}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">{stats.unpaidAR} open</p>
+              </div>
+            </CardBody>
+          </Card>
+        </Link>
+
+        <Link to="/work-orders" className="contents">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Work Orders</p>
+                <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
+                  <ClipboardList size={14} className="text-info" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{stats.totalWO}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">{stats.activeWO} in progress</p>
+              </div>
+            </CardBody>
+          </Card>
+        </Link>
+
+        <Link to="/inventory" className="contents">
+          <Card hoverable className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Inventory</p>
+                <div className={`p-1.5 rounded-lg ${stats.lowStock > 0 ? 'bg-warning-100 dark:bg-warning-950' : 'bg-success-100 dark:bg-success-950'}`}>
+                  <Package size={14} className={stats.lowStock > 0 ? 'text-warning' : 'text-success'} />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{stats.totalInventory}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  {stats.lowStock > 0 ? `${stats.lowStock} low stock` : 'All stocked'}
+                </p>
+              </div>
+            </CardBody>
+          </Card>
+        </Link>
+
+        <Link to="/financial" className="contents">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Revenue (30d)</p>
+                <div className="p-1.5 bg-success-100 dark:bg-success-950 rounded-lg">
+                  <TrendingUp size={14} className="text-success" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{formatCurrency(stats.revenue30d)}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">deposits</p>
+              </div>
+            </CardBody>
+          </Card>
+        </Link>
+      </div>
+
+      {/* ── Charts Row 1: Burial Trend + Work Orders Donut ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Work Orders Status */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Work Orders Status</h3>
-            <Link to="/work-orders" className="text-sm text-primary hover:underline">View all</Link>
+            <div>
+              <h3 className="font-semibold text-foreground">Burial Trend</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">Interments per month — last 12 months</p>
+            </div>
+            <Badge variant="secondary" size="sm">{stats.burialsYTD} YTD</Badge>
           </CardHeader>
-          <CardBody className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-warning rounded-full" />
-                <span className="text-sm text-foreground-muted">Pending</span>
-              </div>
-              <span className="font-semibold text-foreground">{stats.workOrders.pending}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-info rounded-full" />
-                <span className="text-sm text-foreground-muted">In Progress</span>
-              </div>
-              <span className="font-semibold text-foreground">{stats.workOrders.inProgress}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-success rounded-full" />
-                <span className="text-sm text-foreground-muted">Completed</span>
-              </div>
-              <span className="font-semibold text-foreground">{stats.workOrders.completed}</span>
-            </div>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={burialTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="burialGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={C.green} stopOpacity={0.35} />
+                    <stop offset="95%" stopColor={C.green} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} strokeOpacity={0.6} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="Burials"
+                  stroke={C.green}
+                  strokeWidth={2.5}
+                  fill="url(#burialGrad)"
+                  dot={false}
+                  activeDot={{ r: 4, fill: C.green, strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </CardBody>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
+            <h3 className="font-semibold text-foreground">Work Order Status</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">{stats.totalWO} total orders</p>
+          </CardHeader>
+          <CardBody className="flex flex-col items-center">
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={woChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={52}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {woChartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ChartTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 justify-center mt-1">
+              {woChartData.map((d, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-xs text-foreground-muted">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                  {d.name}
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* ── Charts Row 2: Revenue + Inventory by Category ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-foreground">Monthly Revenue</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">Deposit totals — last 12 months</p>
+            </div>
+            <Badge variant="success" size="sm">{formatCurrency(stats.revenue30d)} (30d)</Badge>
+          </CardHeader>
+          <CardBody>
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart data={revenueTrend} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor={C.gold} stopOpacity={1} />
+                    <stop offset="100%" stopColor={C.gold} stopOpacity={0.55} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} strokeOpacity={0.6} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: C.tick }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
+                />
+                <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                <Bar dataKey="Revenue" fill="url(#revenueGrad)" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-foreground">Inventory by Category</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">{stats.totalInventory} items on hand</p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {inventoryCategoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={inventoryCategoryData} layout="vertical" margin={{ top: 0, right: 8, left: 16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={C.grid} strokeOpacity={0.6} horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="category" tick={{ fontSize: 12, fill: C.tick }} axisLine={false} tickLine={false} width={58} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="Items" fill={C.green} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[210px] flex items-center justify-center text-foreground-muted text-sm">
+                No inventory data yet
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* ── Bottom Row: Locations | Activity | Quick Actions ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Locations</h3>
+            <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
+          </CardHeader>
+          <CardBody className="space-y-3">
+            {Object.values(COMPANY.locations).map((loc) => (
+              <div
+                key={loc.name}
+                className="flex items-start gap-3 p-3 rounded-lg bg-background-subtle hover:bg-accent transition-colors"
+              >
+                <div className="p-1.5 bg-primary-100 dark:bg-primary-950 rounded-lg flex-shrink-0 mt-0.5">
+                  <MapPin size={14} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground leading-tight">
+                    {loc.name.replace('Detroit Memorial Park ', 'DMP ')}
+                  </p>
+                  <p className="text-xs text-foreground-muted mt-0.5">{loc.address}</p>
+                  <p className="text-xs text-foreground-muted">{loc.city}, {loc.state} {loc.zip}</p>
+                  <a
+                    href={`tel:${loc.phone.replace(/[^\d]/g, '')}`}
+                    className="inline-flex items-center gap-1 mt-1 text-xs text-primary hover:underline"
+                  >
+                    <Phone size={10} /> {loc.phone}
+                  </a>
+                </div>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground">Recent Activity</h3>
+            <Activity size={15} className="text-foreground-muted" />
           </CardHeader>
           <CardBody>
             {recentActivity.length === 0 ? (
-              <p className="text-foreground-muted text-sm text-center py-4">No recent activity</p>
+              <p className="text-sm text-foreground-muted text-center py-8">No recent activity</p>
             ) : (
-              <div className="space-y-4">
-                {recentActivity.map((activity, idx) => (
-                  <div key={idx} className="flex items-start space-x-3 pb-4 border-b border-border last:border-0 last:pb-0">
-                    <div className={`p-2 rounded-lg ${activity.type === 'work_order' ? 'bg-info-100 dark:bg-info-950' : 'bg-primary-100 dark:bg-primary-950'}`}>
-                      {activity.type === 'work_order' ? (
-                        <ClipboardList size={16} className="text-info" />
-                      ) : (
-                        <Users size={16} className="text-primary" />
-                      )}
+              <div className="space-y-3">
+                {recentActivity.map((a, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${
+                      a.type === 'burial'
+                        ? 'bg-primary-100 dark:bg-primary-950'
+                        : 'bg-info-100 dark:bg-info-950'
+                    }`}>
+                      {a.type === 'burial'
+                        ? <BookOpen size={12} className="text-primary" />
+                        : <ClipboardList size={12} className="text-info" />
+                      }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{activity.title}</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">
-                        {format(new Date(activity.date), 'MMM d, yyyy')}
+                      <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
+                      <p className="text-xs text-foreground-muted mt-0.5 capitalize">
+                        {a.sub} · {format(new Date(a.date), 'MMM d')}
                       </p>
                     </div>
-                    {activity.status && (
+                    {a.status && (
                       <Badge
                         variant={
-                          activity.status === 'completed' ? 'success' :
-                            activity.status === 'in_progress' ? 'info' : 'warning'
+                          a.status === 'completed'   ? 'success' :
+                          a.status === 'in_progress' ? 'info'    : 'warning'
                         }
                         size="sm"
                       >
-                        {activity.status.replace('_', ' ')}
+                        {a.status.replace('_', ' ')}
                       </Badge>
                     )}
                   </div>
@@ -316,121 +569,32 @@ export default function Dashboard() {
             )}
           </CardBody>
         </Card>
-      </div>
-
-      {/* Cemetery Locations */}
-      <Card>
-        <CardHeader className="flex items-center justify-between">
-          <h3 className="font-semibold text-foreground">Cemetery Locations</h3>
-          <Badge variant="secondary">{locations.length} Locations</Badge>
-        </CardHeader>
-        <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {locations.map(([key, location]) => (
-              <div
-                key={key}
-                className="p-4 rounded-lg bg-background-subtle border border-border hover:border-primary-300 dark:hover:border-primary-700 transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-primary-100 dark:bg-primary-950 rounded-lg">
-                    <MapPin size={18} className="text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-foreground">{location.name}</h4>
-                    <p className="text-sm text-foreground-muted mt-1">{location.address}</p>
-                    <p className="text-sm text-foreground-muted">{location.city}, {location.state} {location.zip}</p>
-                    <a
-                      href={`tel:${location.phone.replace(/[^\d]/g, '')}`}
-                      className="inline-flex items-center gap-1 mt-2 text-sm text-primary hover:underline"
-                    >
-                      <Phone size={12} />
-                      {location.phone}
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <h3 className="font-semibold text-foreground">Quick Actions</h3>
-        </CardHeader>
-        <CardBody>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link
-              to="/work-orders"
-              className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
-            >
-              <ClipboardList className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">New Work Order</span>
-            </Link>
-            <Link
-              to="/burials"
-              className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
-            >
-              <Users className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">Record Burial</span>
-            </Link>
-            <Link
-              to="/financial"
-              className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
-            >
-              <DollarSign className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">Add Deposit</span>
-            </Link>
-            <Link
-              to="/inventory"
-              className="flex flex-col items-center p-4 rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950 transition group"
-            >
-              <Package className="text-foreground-muted group-hover:text-primary mb-2" size={24} />
-              <span className="text-sm font-medium text-foreground-muted group-hover:text-primary text-center">Update Inventory</span>
-            </Link>
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Business Hours */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <h3 className="font-semibold text-foreground">Business Hours</h3>
-          </CardHeader>
-          <CardBody>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-foreground-muted">Monday - Friday</span>
-                <span className="font-medium text-foreground">{COMPANY.hours.weekday.open} - {COMPANY.hours.weekday.close}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-foreground-muted">Saturday</span>
-                <span className="font-medium text-foreground">{COMPANY.hours.saturday.open} - {COMPANY.hours.saturday.close}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-foreground-muted">Sunday</span>
-                <span className="font-medium text-foreground">{COMPANY.hours.sunday}</span>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
 
         <Card>
-          <CardHeader>
-            <h3 className="font-semibold text-foreground">Services Offered</h3>
+          <CardHeader className="flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Quick Actions</h3>
+            <Zap size={15} className="text-foreground-muted" />
           </CardHeader>
           <CardBody>
-            <div className="flex flex-wrap gap-2">
-              {COMPANY.services.map((service) => (
-                <Badge key={service} variant="secondary" size="sm">
-                  {service}
-                </Badge>
+            <div className="grid grid-cols-2 gap-2">
+              {quickActions.map(({ to, icon: Icon, label, cls }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary-50 dark:hover:bg-primary-950/50 transition-colors group text-center"
+                >
+                  <div className={`p-2 rounded-lg ${cls}`}>
+                    <Icon size={16} />
+                  </div>
+                  <span className="text-xs font-medium text-foreground-muted group-hover:text-foreground leading-tight">
+                    {label}
+                  </span>
+                </Link>
               ))}
             </div>
           </CardBody>
         </Card>
+
       </div>
     </div>
   );
