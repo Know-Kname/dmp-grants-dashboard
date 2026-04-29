@@ -4,7 +4,7 @@ export interface User {
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'staff';
-  createdAt: Date;
+  createdAt: string;
 }
 
 // Work Order Types
@@ -16,11 +16,11 @@ export interface WorkOrder {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo?: string;
-  dueDate?: Date;
-  completedDate?: Date;
+  dueDate?: string;
+  completedDate?: string;
   createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Inventory Types
@@ -34,21 +34,21 @@ export interface InventoryItem {
   unitPrice: number;
   vendorId?: string;
   location?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Financial Types
 export interface Deposit {
   id: string;
   amount: number;
-  date: Date;
+  date: string;
   method: 'cash' | 'check' | 'credit_card' | 'wire' | 'other';
   reference?: string;
   customerId?: string;
   notes?: string;
   createdBy: string;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface AccountsReceivable {
@@ -57,10 +57,10 @@ export interface AccountsReceivable {
   invoiceNumber: string;
   amount: number;
   amountPaid: number;
-  dueDate: Date;
+  dueDate: string;
   status: 'pending' | 'partial' | 'paid' | 'overdue';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AccountsPayable {
@@ -69,10 +69,10 @@ export interface AccountsPayable {
   invoiceNumber: string;
   amount: number;
   amountPaid: number;
-  dueDate: Date;
+  dueDate: string;
   status: 'pending' | 'partial' | 'paid' | 'overdue';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Burial Types
@@ -81,9 +81,9 @@ export interface Burial {
   deceasedFirstName: string;
   deceasedLastName: string;
   deceasedMiddleName?: string;
-  dateOfBirth?: Date;
-  dateOfDeath?: Date;
-  burialDate: Date;
+  dateOfBirth?: string;
+  dateOfDeath?: string;
+  burialDate: string;
   plotLocation: string;
   section: string;
   lot: string;
@@ -93,8 +93,8 @@ export interface Burial {
   contactEmail?: string;
   permitNumber?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Contract Types
@@ -106,11 +106,11 @@ export interface Contract {
   totalAmount: number;
   amountPaid: number;
   status: 'active' | 'paid' | 'cancelled' | 'transferred';
-  signedDate: Date;
+  signedDate: string;
   items: ContractItem[];
   paymentPlan?: PaymentPlan;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ContractItem {
@@ -122,8 +122,8 @@ export interface ContractItem {
 export interface PaymentPlan {
   frequency: 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly';
   installmentAmount: number;
-  startDate: Date;
-  endDate?: Date;
+  startDate: string;
+  endDate?: string;
 }
 
 // Grant Types
@@ -134,12 +134,12 @@ export interface Grant {
   type: 'grant' | 'benefit' | 'opportunity';
   source: string;
   amount?: number;
-  deadline?: Date;
+  deadline?: string;
   status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
-  applicationDate?: Date;
+  applicationDate?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Customer/Contact Types
@@ -154,8 +154,8 @@ export interface Customer {
   state?: string;
   zipCode?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Vendor {
@@ -166,6 +166,6 @@ export interface Vendor {
   phone?: string;
   address?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }

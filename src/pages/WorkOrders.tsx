@@ -46,7 +46,7 @@ export default function WorkOrders() {
 
   const loadWorkOrders = async () => {
     try {
-      const data = await api.get('/work-orders');
+      const data = await api.get<any[]>('/work-orders');
       setWorkOrders(data);
       clearError();
     } catch (err) {

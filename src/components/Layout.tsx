@@ -11,7 +11,7 @@ import { Avatar } from './ui';
 import { COMPANY } from '../config/company';
 
 export default function Layout() {
-  const { user, logout, isDemo } = useAuth();
+  const { currentUser: user, logout, isDemo } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();

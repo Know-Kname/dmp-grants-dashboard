@@ -7,6 +7,11 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import WorkOrders from './pages/WorkOrders';
 import Grants from './pages/Grants';
+import Inventory from './pages/Inventory';
+import Financial from './pages/Financial';
+import Burials from './pages/Burials';
+import Contracts from './pages/Contracts';
+import Customers from './pages/Customers';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -38,12 +43,12 @@ function AppRoutes() {
       >
         <Route index element={<Dashboard />} />
         <Route path="work-orders" element={<WorkOrders />} />
-        <Route path="inventory" element={<div className="text-2xl text-foreground">Inventory (Coming Soon)</div>} />
-        <Route path="financial" element={<div className="text-2xl text-foreground">Financial (Coming Soon)</div>} />
-        <Route path="burials" element={<div className="text-2xl text-foreground">Burials (Coming Soon)</div>} />
-        <Route path="contracts" element={<div className="text-2xl text-foreground">Contracts (Coming Soon)</div>} />
+        <Route path="inventory" element={<Inventory />} />
+        <Route path="financial" element={<Financial />} />
+        <Route path="burials" element={<Burials />} />
+        <Route path="contracts" element={<Contracts />} />
         <Route path="grants" element={<Grants />} />
-        <Route path="customers" element={<div className="text-2xl text-foreground">Customers (Coming Soon)</div>} />
+        <Route path="customers" element={<Customers />} />
       </Route>
     </Routes>
   );
