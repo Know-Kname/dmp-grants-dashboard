@@ -5,7 +5,7 @@ import { useTheme } from '../lib/theme';
 import { Button, Input, Card, Alert } from '../components/ui';
 import { getErrorMessage, getErrorRequestId } from '../lib/errors';
 import { enableDemoMode } from '../lib/demo-data';
-import { Mail, Lock, Sun, Moon, Phone, ExternalLink, Play, Monitor } from 'lucide-react';
+import { Mail, Lock, Sun, Moon, Phone, ExternalLink, Play } from 'lucide-react';
 import { COMPANY } from '../config/company';
 
 export default function Login() {

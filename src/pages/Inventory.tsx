@@ -4,7 +4,7 @@ import {
   useUpdateInventoryItem, useDeleteInventoryItem,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
-import { formatCurrency, formatDateForInput, cn } from '../lib/utils';
+import { formatCurrency, cn } from '../lib/utils';
 import type { InventoryItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,

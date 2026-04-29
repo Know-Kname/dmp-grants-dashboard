@@ -4,7 +4,7 @@ import {
   useUpdateCustomer, useDeleteCustomer,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
-import { formatDate, formatDateForInput } from '../lib/utils';
+import { formatDate } from '../lib/utils';
 import type { Customer } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
