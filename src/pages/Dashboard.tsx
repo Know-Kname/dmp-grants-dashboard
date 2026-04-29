@@ -191,10 +191,13 @@ export default function Dashboard() {
                 <span className="font-bold text-[#1a3d2b] text-xl">DMP</span>
               </div>
               <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-white leading-tight">
-                  {COMPANY.shortName}
-                </h1>
-                <p className="text-white/60 text-sm mt-0.5">
+                <img
+                  src="/dmp-logo.png"
+                  alt="Detroit Memorial Park"
+                  className="h-8 object-contain object-left mb-1"
+                  style={{ filter: 'brightness(0) invert(1)', opacity: 0.9 }}
+                />
+                <p className="text-white/55 text-sm">
                   {COMPANY.tagline} · 3 Locations · 170+ Acres
                 </p>
               </div>
