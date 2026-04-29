@@ -403,12 +403,21 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="text-center py-16 px-4">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-background-muted text-foreground-muted mb-4">
-        {icon}
+    <div className="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
+      {/* Icon container with brand gradient */}
+      <div className="relative mb-6">
+        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary-50 via-primary-100 to-primary-50 dark:from-primary-950 dark:via-primary-900 dark:to-primary-950 border border-primary-200/60 dark:border-primary-700/40 flex items-center justify-center shadow-sm">
+          <div className="text-primary/50 dark:text-primary/40">
+            {icon}
+          </div>
+        </div>
+        {/* Decorative accent dots */}
+        <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary-200 dark:bg-primary-800 rounded-full opacity-50" />
+        <div className="absolute -bottom-1 -left-2 w-3 h-3 bg-primary-100 dark:bg-primary-900 rounded-full opacity-50" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-foreground-muted mb-6 max-w-sm mx-auto leading-relaxed">{description}</p>
+
+      <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-foreground-muted text-sm max-w-[22rem] mx-auto leading-relaxed mb-6">{description}</p>
       {action}
     </div>
   );
