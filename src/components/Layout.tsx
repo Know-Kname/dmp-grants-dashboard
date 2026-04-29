@@ -10,6 +10,7 @@ import {
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from './ui';
 import { COMPANY } from '../config/company';
+import AIAssistant from './AIAssistant';
 
 // DMP brand constants — fixed regardless of light/dark theme
 const DMP_GREEN = '#1a3d2b';
@@ -369,6 +370,9 @@ export default function Layout() {
           </button>
         </div>
       </nav>
+
+      {/* AI Assistant — floating panel */}
+      <AIAssistant />
 
       {/* More drawer */}
       {moreOpen && (

@@ -7,7 +7,7 @@ import {
 import { format, subMonths, startOfMonth, parseISO } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  MapPin, Phone, TrendingUp, BookOpen, FileText, Activity, Zap,
+  Phone, TrendingUp, BookOpen, FileText, Activity, Zap,
 } from 'lucide-react';
 import {
   useWorkOrders, useBurials, useInventory, useReceivables,
@@ -184,12 +184,12 @@ export default function Dashboard() {
         <div className="relative p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
-                style={{ backgroundColor: C.gold }}
-              >
-                <span className="font-bold text-[#1a3d2b] text-xl">DMP</span>
-              </div>
+              <img
+                src="/dmp-crest.jpg"
+                alt="DMP Crest"
+                className="w-16 h-16 rounded-2xl object-cover shadow-xl flex-shrink-0 border-2"
+                style={{ borderColor: C.gold }}
+              />
               <div>
                 <img
                   src="/dmp-logo.png"
@@ -500,27 +500,31 @@ export default function Dashboard() {
             <h3 className="font-semibold text-foreground">Locations</h3>
             <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
           </CardHeader>
-          <CardBody className="space-y-3">
-            {Object.values(COMPANY.locations).map((loc) => (
-              <div
-                key={loc.name}
-                className="flex items-start gap-3 p-3 rounded-lg bg-background-subtle hover:bg-accent transition-colors"
-              >
-                <div className="p-1.5 bg-primary-100 dark:bg-primary-950 rounded-lg flex-shrink-0 mt-0.5">
-                  <MapPin size={14} className="text-primary" />
+          <CardBody className="space-y-3 p-0 overflow-hidden">
+            {([
+              { loc: COMPANY.locations.east, img: '/east-1.jpg', label: 'DMP East' },
+              { loc: COMPANY.locations.west, img: '/west-2.jpg', label: 'DMP West' },
+              { loc: COMPANY.locations.gracelawn, img: '/gracelawn-1.jpg', label: 'Gracelawn' },
+            ] as const).map(({ loc, img, label }) => (
+              <div key={loc.name} className="relative overflow-hidden group">
+                <div
+                  className="h-[88px] bg-cover bg-center"
+                  style={{ backgroundImage: `url(${img})` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#0f2419]/80 via-[#1a3d2b]/60 to-transparent" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground leading-tight">
-                    {loc.name.replace('Detroit Memorial Park ', 'DMP ')}
-                  </p>
-                  <p className="text-xs text-foreground-muted mt-0.5">{loc.address}</p>
-                  <p className="text-xs text-foreground-muted">{loc.city}, {loc.state} {loc.zip}</p>
-                  <a
-                    href={`tel:${loc.phone.replace(/[^\d]/g, '')}`}
-                    className="inline-flex items-center gap-1 mt-1 text-xs text-primary hover:underline"
-                  >
-                    <Phone size={10} /> {loc.phone}
-                  </a>
+                <div className="absolute inset-0 flex items-center px-4 gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-white leading-tight">{label}</p>
+                    <p className="text-[11px] text-white/70 mt-0.5">{loc.city}, {loc.state}</p>
+                    <a
+                      href={`tel:${loc.phone.replace(/[^\d]/g, '')}`}
+                      className="inline-flex items-center gap-1 mt-0.5 text-[11px] hover:underline"
+                      style={{ color: C.gold }}
+                    >
+                      <Phone size={9} /> {loc.phone}
+                    </a>
+                  </div>
                 </div>
               </div>
             ))}

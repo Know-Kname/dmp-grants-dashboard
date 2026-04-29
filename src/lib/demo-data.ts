@@ -321,6 +321,7 @@ export function isDemoMode(): boolean {
 // Enable demo mode
 export function enableDemoMode(): void {
   localStorage.setItem('dmp-demo-mode', 'true');
+  window.dispatchEvent(new CustomEvent('dmp-demo-change', { detail: true }));
   localStorage.setItem('dmp-token', 'demo-token');
   localStorage.setItem('dmp-user', JSON.stringify(DEMO_USER));
 }
@@ -330,4 +331,5 @@ export function disableDemoMode(): void {
   localStorage.removeItem('dmp-demo-mode');
   localStorage.removeItem('dmp-token');
   localStorage.removeItem('dmp-user');
+  window.dispatchEvent(new CustomEvent('dmp-demo-change', { detail: false }));
 }

@@ -42,7 +42,7 @@ export default function Login() {
       <div
         className="hidden lg:flex lg:w-[55%] relative flex-col justify-between p-12 text-white overflow-hidden"
         style={{
-          backgroundImage: 'url(/hero-bg.jpg)',
+          backgroundImage: 'url(/dmp-hero.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundColor: '#1a3d2b',

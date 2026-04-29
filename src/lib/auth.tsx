@@ -35,8 +35,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isDemoActive, setIsDemoActive] = useState(() => localStorage.getItem('dmp-demo-mode') === 'true')
 
-  const isDemoActive = localStorage.getItem('dmp-demo-mode') === 'true'
+  // React to demo mode toggled from outside (Login page, logout, etc.)
+  useEffect(() => {
+    const handler = (e: Event) => setIsDemoActive((e as CustomEvent<boolean>).detail)
+    window.addEventListener('dmp-demo-change', handler)
+    return () => window.removeEventListener('dmp-demo-change', handler)
+  }, [])
 
   useEffect(() => {
     if (isDemoActive) {
@@ -59,7 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isDemoActive])
 
   const isDemo = isDemoActive
 
