@@ -88,7 +88,7 @@ export function useForm<T extends Record<string, unknown>>({
   const validateField = useCallback((field: keyof T): boolean => {
     try {
       // Create a partial schema for just this field
-      const fieldSchema = (schema as z.ZodObject<z.ZodRawShape>).shape[field as string];
+      const fieldSchema = (schema as unknown as z.ZodObject<z.ZodRawShape>).shape[field as string];
       if (fieldSchema) {
         fieldSchema.parse(values[field]);
         setErrors((prev) => {
