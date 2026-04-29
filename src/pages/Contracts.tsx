@@ -14,6 +14,7 @@ import {
   Plus, Search, FileText, Edit, Trash2,
   AlertCircle, RefreshCw, DollarSign, TrendingUp,
 } from 'lucide-react';
+import { useToast } from '../lib/toast';
 
 type ContractFormData = {
   contractNumber: string;
@@ -56,9 +57,19 @@ const typeBadge = (t: Contract['type']) =>
 export default function Contracts() {
   const { data: contracts = [], isLoading, error, refetch } = useContracts();
 
-  const createMutation = useCreateContract({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateContract({ onSuccess: () => { setShowModal(false); setEditingContract(null); setFormData(initialForm); } });
-  const deleteMutation = useDeleteContract();
+  const toast = useToast();
+  const createMutation = useCreateContract({
+    onSuccess: () => { toast.success('Contract created'); setShowModal(false); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create contract'),
+  });
+  const updateMutation = useUpdateContract({
+    onSuccess: () => { toast.success('Contract updated'); setShowModal(false); setEditingContract(null); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update contract'),
+  });
+  const deleteMutation = useDeleteContract({
+    onSuccess: () => toast.success('Contract removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);

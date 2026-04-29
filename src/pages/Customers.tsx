@@ -14,6 +14,7 @@ import {
   Plus, Search, Users, Edit, Trash2,
   AlertCircle, RefreshCw, Mail, Phone,
 } from 'lucide-react';
+import { useToast } from '../lib/toast';
 
 type CustomerFormData = {
   firstName: string;
@@ -35,9 +36,19 @@ const initialForm: CustomerFormData = {
 export default function Customers() {
   const { data: customers = [], isLoading, error, refetch } = useCustomers();
 
-  const createMutation = useCreateCustomer({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateCustomer({ onSuccess: () => { setShowModal(false); setEditingCustomer(null); setFormData(initialForm); } });
-  const deleteMutation = useDeleteCustomer();
+  const toast = useToast();
+  const createMutation = useCreateCustomer({
+    onSuccess: () => { toast.success('Customer added'); setShowModal(false); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to add customer'),
+  });
+  const updateMutation = useUpdateCustomer({
+    onSuccess: () => { toast.success('Customer updated'); setShowModal(false); setEditingCustomer(null); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update customer'),
+  });
+  const deleteMutation = useDeleteCustomer({
+    onSuccess: () => toast.success('Customer removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);

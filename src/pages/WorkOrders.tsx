@@ -4,8 +4,10 @@ import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptySta
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
+import { useToast } from '../lib/toast';
 
 export default function WorkOrders() {
+  const toast = useToast();
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -80,12 +82,14 @@ export default function WorkOrders() {
         await api.post('/work-orders', formData);
       }
       clearError();
+      toast.success(editingOrder ? 'Work order updated' : 'Work order created');
       setShowModal(false);
       setEditingOrder(null);
       resetForm();
       loadWorkOrders();
     } catch (error) {
       handleError(error, 'Failed to save work order.');
+      toast.error(getErrorMessage(error), 'Failed to save');
     }
   };
 
@@ -107,9 +111,11 @@ export default function WorkOrders() {
       try {
         await api.delete(`/work-orders/${id}`);
         clearError();
+        toast.success('Work order deleted');
         loadWorkOrders();
       } catch (error) {
         handleError(error, 'Failed to delete work order.');
+        toast.error(getErrorMessage(error), 'Failed to delete');
       }
     }
   };

@@ -14,6 +14,7 @@ import {
   Plus, Search, Package, Edit, Trash2,
   AlertCircle, RefreshCw, AlertTriangle, DollarSign,
 } from 'lucide-react';
+import { useToast } from '../lib/toast';
 
 type InventoryFormData = {
   name: string;
@@ -42,9 +43,19 @@ const CATEGORIES: { value: InventoryItem['category']; label: string }[] = [
 export default function Inventory() {
   const { data: items = [], isLoading, error, refetch } = useInventory();
 
-  const createMutation = useCreateInventoryItem({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateInventoryItem({ onSuccess: () => { setShowModal(false); setEditingItem(null); setFormData(initialForm); } });
-  const deleteMutation = useDeleteInventoryItem();
+  const toast = useToast();
+  const createMutation = useCreateInventoryItem({
+    onSuccess: () => { toast.success('Item created'); setShowModal(false); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create item'),
+  });
+  const updateMutation = useUpdateInventoryItem({
+    onSuccess: () => { toast.success('Item updated'); setShowModal(false); setEditingItem(null); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update item'),
+  });
+  const deleteMutation = useDeleteInventoryItem({
+    onSuccess: () => toast.success('Item removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);

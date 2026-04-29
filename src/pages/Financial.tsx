@@ -15,6 +15,7 @@ import {
   Plus, DollarSign, TrendingUp, TrendingDown,
   AlertCircle, RefreshCw, Edit, CreditCard, ArrowRightLeft, FileText,
 } from 'lucide-react';
+import { useToast } from '../lib/toast';
 
 type ActiveTab = 'deposits' | 'receivables' | 'payables';
 
@@ -78,11 +79,27 @@ export default function Financial() {
   const receivables = receivablesQuery.data ?? [];
   const payables = payablesQuery.data ?? [];
 
-  const depositCreateMutation = useCreateDeposit({ onSuccess: () => { setShowModal(false); setDepositForm(initialDepositForm); } });
-  const receivableCreateMutation = useCreateReceivable({ onSuccess: () => { setShowModal(false); setReceivableForm(initialReceivableForm); } });
-  const receivableUpdateMutation = useUpdateReceivable({ onSuccess: () => { setShowModal(false); setEditingReceivable(null); setReceivableEditForm(initialReceivableEditForm); } });
-  const payableCreateMutation = useCreatePayable({ onSuccess: () => { setShowModal(false); setPayableForm(initialPayableForm); } });
-  const payableUpdateMutation = useUpdatePayable({ onSuccess: () => { setShowModal(false); setEditingPayable(null); setPayableEditForm(initialPayableEditForm); } });
+  const toast = useToast();
+  const depositCreateMutation = useCreateDeposit({
+    onSuccess: () => { toast.success('Deposit recorded'); setShowModal(false); setDepositForm(initialDepositForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to record deposit'),
+  });
+  const receivableCreateMutation = useCreateReceivable({
+    onSuccess: () => { toast.success('Invoice created'); setShowModal(false); setReceivableForm(initialReceivableForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create invoice'),
+  });
+  const receivableUpdateMutation = useUpdateReceivable({
+    onSuccess: () => { toast.success('Invoice updated'); setShowModal(false); setEditingReceivable(null); setReceivableEditForm(initialReceivableEditForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update invoice'),
+  });
+  const payableCreateMutation = useCreatePayable({
+    onSuccess: () => { toast.success('Bill recorded'); setShowModal(false); setPayableForm(initialPayableForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to record bill'),
+  });
+  const payableUpdateMutation = useUpdatePayable({
+    onSuccess: () => { toast.success('Bill updated'); setShowModal(false); setEditingPayable(null); setPayableEditForm(initialPayableEditForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update bill'),
+  });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('deposits');
   const [showModal, setShowModal] = useState(false);

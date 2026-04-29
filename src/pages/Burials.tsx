@@ -15,6 +15,7 @@ import {
   AlertCircle, RefreshCw, Calendar,
 } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
+import { useToast } from '../lib/toast';
 
 type BurialFormData = {
   deceasedFirstName: string;
@@ -49,9 +50,19 @@ function deceasedName(b: Burial): string {
 export default function Burials() {
   const { data: burials = [], isLoading, error, refetch } = useBurials();
 
-  const createMutation = useCreateBurial({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateBurial({ onSuccess: () => { setShowModal(false); setEditingBurial(null); setFormData(initialForm); } });
-  const deleteMutation = useDeleteBurial();
+  const toast = useToast();
+  const createMutation = useCreateBurial({
+    onSuccess: () => { toast.success('Burial record created'); setShowModal(false); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to save burial'),
+  });
+  const updateMutation = useUpdateBurial({
+    onSuccess: () => { toast.success('Burial record updated'); setShowModal(false); setEditingBurial(null); setFormData(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update burial'),
+  });
+  const deleteMutation = useDeleteBurial({
+    onSuccess: () => toast.success('Burial record removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
