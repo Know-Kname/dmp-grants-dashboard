@@ -1,225 +1,267 @@
-import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, Alert } from '../components/ui';
-import { Plus, Search, Edit, Trash2, ClipboardList, Calendar } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import {
+  useWorkOrders, useCreateWorkOrder,
+  useUpdateWorkOrder, useDeleteWorkOrder,
+} from '../hooks/useData';
+import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
+import type { WorkOrder } from '../types';
+import {
+  Card, CardBody, Button, Modal, Input, Select, Textarea,
+  Badge, EmptyState, LoadingSpinner,
+} from '../components/ui';
+import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
+import { isThisMonth } from 'date-fns';
+
+type WorkOrderFormData = {
+  title: string;
+  description: string;
+  type: WorkOrder['type'];
+  priority: WorkOrder['priority'];
+  assignedTo: string;
+  dueDate: string;
+};
+
+const initialForm: WorkOrderFormData = {
+  title: '',
+  description: '',
+  type: 'maintenance',
+  priority: 'medium',
+  assignedTo: '',
+  dueDate: '',
+};
+
+const STATUS_VARIANTS: Record<WorkOrder['status'], 'warning' | 'info' | 'success' | 'danger'> = {
+  pending: 'warning',
+  in_progress: 'info',
+  completed: 'success',
+  cancelled: 'danger',
+};
+
+const PRIORITY_VARIANTS: Record<WorkOrder['priority'], 'secondary' | 'info' | 'warning' | 'danger'> = {
+  low: 'secondary',
+  medium: 'info',
+  high: 'warning',
+  urgent: 'danger',
+};
+
+const TYPE_OPTIONS = [
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'burial_prep', label: 'Burial Prep' },
+  { value: 'grounds', label: 'Grounds' },
+  { value: 'repair', label: 'Repair' },
+  { value: 'other', label: 'Other' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 export default function WorkOrders() {
-  const [workOrders, setWorkOrders] = useState<any[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
+  const { data: workOrders = [], isLoading, error, refetch } = useWorkOrders();
+
+  const createMutation = useCreateWorkOrder({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
+  const updateMutation = useUpdateWorkOrder({ onSuccess: () => { setShowModal(false); setEditingOrder(null); setFormData(initialForm); } });
+  const deleteMutation = useDeleteWorkOrder();
+
   const [showModal, setShowModal] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [error, setError] = useState<string | null>(null);
-  const [errorDetails, setErrorDetails] = useState<string[]>([]);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    type: 'maintenance',
-    priority: 'medium',
-    assignedTo: '',
-    dueDate: '',
-  });
+  const [formData, setFormData] = useState<WorkOrderFormData>(initialForm);
 
-  useEffect(() => {
-    loadWorkOrders();
-  }, []);
+  const stats = useMemo(() => ({
+    total: workOrders.length,
+    open: workOrders.filter(wo => wo.status === 'pending' || wo.status === 'in_progress').length,
+    thisMonth: workOrders.filter(wo => {
+      try { return isThisMonth(new Date(wo.createdAt)); } catch { return false; }
+    }).length,
+  }), [workOrders]);
 
-  useEffect(() => {
-    filterOrders();
-  }, [workOrders, searchTerm, statusFilter]);
-
-  const handleError = (err: unknown, fallback: string) => {
-    const message = getErrorMessage(err, fallback);
-    const details = getErrorDetails(err);
-    const requestId = getErrorRequestId(err);
-    setError(message);
-    setErrorDetails(requestId ? [...details, `Request ID: ${requestId}`] : details);
-  };
-
-  const clearError = () => {
-    setError(null);
-    setErrorDetails([]);
-  };
-
-  const loadWorkOrders = async () => {
-    try {
-      const data = await api.get<any[]>('/work-orders');
-      setWorkOrders(data);
-      clearError();
-    } catch (err) {
-      handleError(err, 'Failed to load work orders.');
-    }
-  };
-
-  const filterOrders = () => {
-    let filtered = workOrders;
-
+  const filteredOrders = useMemo(() => {
+    let result = workOrders;
+    if (statusFilter !== 'all') result = result.filter(wo => wo.status === statusFilter);
     if (searchTerm) {
-      filtered = filtered.filter(wo =>
-        wo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        wo.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      const s = searchTerm.toLowerCase();
+      result = result.filter(wo =>
+        wo.title.toLowerCase().includes(s) ||
+        wo.description?.toLowerCase().includes(s) ||
+        wo.assignedTo?.toLowerCase().includes(s)
       );
     }
+    return result;
+  }, [workOrders, searchTerm, statusFilter]);
 
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(wo => wo.status === statusFilter);
-    }
-
-    setFilteredOrders(filtered);
-  };
+  const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
+  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
+  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (editingOrder) {
-        await api.put(`/work-orders/${editingOrder.id}`, formData);
-      } else {
-        await api.post('/work-orders', formData);
-      }
-      clearError();
-      setShowModal(false);
-      setEditingOrder(null);
-      resetForm();
-      loadWorkOrders();
-    } catch (error) {
-      handleError(error, 'Failed to save work order.');
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      type: formData.type,
+      priority: formData.priority,
+      assignedTo: formData.assignedTo || undefined,
+      dueDate: formData.dueDate || undefined,
+    };
+    if (editingOrder) {
+      updateMutation.mutate({ id: editingOrder.id, ...payload });
+    } else {
+      createMutation.mutate(payload as Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>);
     }
   };
 
-  const handleEdit = (order: any) => {
-    setEditingOrder(order);
+  const handleEdit = (wo: WorkOrder) => {
+    setEditingOrder(wo);
     setFormData({
-      title: order.title,
-      description: order.description || '',
-      type: order.type,
-      priority: order.priority,
-      assignedTo: order.assigned_to || '',
-      dueDate: order.due_date ? format(new Date(order.due_date), 'yyyy-MM-dd') : '',
+      title: wo.title,
+      description: wo.description || '',
+      type: wo.type,
+      priority: wo.priority,
+      assignedTo: wo.assignedTo || '',
+      dueDate: wo.dueDate ? format(new Date(wo.dueDate), 'yyyy-MM-dd') : '',
     });
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this work order?')) {
-      try {
-        await api.delete(`/work-orders/${id}`);
-        clearError();
-        loadWorkOrders();
-      } catch (error) {
-        handleError(error, 'Failed to delete work order.');
-      }
+  const handleDelete = (id: string) => {
+    if (confirm('Delete this work order? This cannot be undone.')) {
+      deleteMutation.mutate(id);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      type: 'maintenance',
-      priority: 'medium',
-      assignedTo: '',
-      dueDate: '',
-    });
-  };
-
-  const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'in_progress', label: 'In Progress' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' },
-  ];
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      pending: 'warning',
-      in_progress: 'info',
-      completed: 'success',
-      cancelled: 'danger',
-    };
-    return <Badge variant={variants[status]}>{status.replace('_', ' ')}</Badge>;
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    const variants: Record<string, any> = {
-      low: 'gray',
-      medium: 'info',
-      high: 'warning',
-      urgent: 'danger',
-    };
-    return <Badge variant={variants[priority]} size="sm">{priority}</Badge>;
-  };
+  const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const f = (field: keyof WorkOrderFormData) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setFormData(prev => ({ ...prev, [field]: e.target.value }));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Work Orders</h1>
-          <p className="text-gray-500 mt-1">Manage and track all maintenance and service tasks</p>
+          <h1 className="text-3xl font-bold text-foreground">Work Orders</h1>
+          <p className="text-foreground-muted mt-1">Manage and track maintenance and service tasks</p>
         </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={20} />}
-          onClick={() => {
-            resetForm();
-            setEditingOrder(null);
-            setShowModal(true);
-          }}
-        >
-          New Work Order
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+            Refresh
+          </Button>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingOrder(null); setShowModal(true); }}>
+            New Work Order
+          </Button>
+        </div>
       </div>
 
-      {error && (
-        <Alert
-          title="Something went wrong"
-          message={error}
-          details={errorDetails}
-          onDismiss={clearError}
-        />
+      {combinedError && (
+        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
+          <div>
+            <h3 className="font-medium text-danger">Error</h3>
+            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
+            {(errorDetails.length > 0 || errorRequestId) && (
+              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
+                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
+                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-foreground-muted mb-1">Total Orders</p>
+                <p className="text-2xl font-bold text-primary">{stats.total.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-primary-100 dark:bg-primary-950 rounded-lg">
+                <ClipboardList className="text-primary" size={24} />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-foreground-muted mb-1">Open / In Progress</p>
+                <p className="text-2xl font-bold text-warning">{stats.open}</p>
+              </div>
+              <div className="p-3 bg-warning-100 dark:bg-warning-950 rounded-lg">
+                <AlertCircle className="text-warning" size={24} />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-foreground-muted mb-1">Created This Month</p>
+                <p className="text-2xl font-bold text-info">{stats.thisMonth}</p>
+              </div>
+              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
+                <Calendar className="text-info" size={24} />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
       <Card>
         <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              placeholder="Search work orders..."
-              icon={<Search size={18} />}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Select
-              options={statusOptions}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            />
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">
-                {filteredOrders.length} of {workOrders.length} orders
-              </span>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search work orders…"
+                icon={<Search size={18} />}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
+            <div className="sm:w-48">
+              <Select
+                options={STATUS_FILTER_OPTIONS}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              />
+            </div>
+            <p className="text-sm text-foreground-muted self-center whitespace-nowrap">
+              {filteredOrders.length} of {workOrders.length}
+            </p>
           </div>
         </CardBody>
       </Card>
 
-      {/* Work Orders List */}
-      {filteredOrders.length === 0 ? (
+      {isLoading ? (
+        <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+      ) : filteredOrders.length === 0 ? (
         <Card>
           <CardBody>
             <EmptyState
               icon={<ClipboardList size={48} />}
               title="No work orders found"
               description={searchTerm || statusFilter !== 'all'
-                ? "Try adjusting your filters"
-                : "Create your first work order to get started"}
+                ? 'Try adjusting your filters'
+                : 'Create your first work order to get started'}
               action={
                 <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>
-                  Create Work Order
+                  New Work Order
                 </Button>
               }
             />
@@ -229,79 +271,53 @@ export default function WorkOrders() {
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-background-subtle border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Work Order
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Priority
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assigned To
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  {['Work Order', 'Type', 'Priority', 'Status', 'Assigned To', 'Due Date', ''].map(h => (
+                    <th key={h} className={`px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider ${!h ? 'text-right' : ''}`}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {filteredOrders.map((wo) => (
-                  <tr key={wo.id} className="hover:bg-gray-50 transition">
+                  <tr key={wo.id} className="hover:bg-accent transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{wo.title}</div>
+                      <div className="font-medium text-foreground">{wo.title}</div>
                       {wo.description && (
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
-                          {wo.description}
-                        </div>
+                        <div className="text-sm text-foreground-muted truncate max-w-xs">{wo.description}</div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm capitalize">
+                    <td className="px-6 py-4 text-sm text-foreground capitalize">
                       {wo.type.replace('_', ' ')}
                     </td>
                     <td className="px-6 py-4">
-                      {getPriorityBadge(wo.priority)}
+                      <Badge variant={PRIORITY_VARIANTS[wo.priority]} size="sm">{wo.priority}</Badge>
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(wo.status)}
+                      <Badge variant={STATUS_VARIANTS[wo.status]}>{wo.status.replace('_', ' ')}</Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {wo.assigned_to_name || 'Unassigned'}
+                    <td className="px-6 py-4 text-sm text-foreground">
+                      {wo.assignedTo || <span className="text-foreground-subtle">Unassigned</span>}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {wo.due_date ? (
-                        <div className="flex items-center space-x-1">
+                    <td className="px-6 py-4 text-sm text-foreground-muted">
+                      {wo.dueDate ? (
+                        <div className="flex items-center gap-1.5">
                           <Calendar size={14} />
-                          <span>{format(new Date(wo.due_date), 'MMM d, yyyy')}</span>
+                          {format(new Date(wo.dueDate), 'MMM d, yyyy')}
                         </div>
-                      ) : (
-                        '-'
-                      )}
+                      ) : '—'}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => handleEdit(wo)}
-                        className="text-primary-600 hover:text-primary-800"
-                        aria-label="Edit work order"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(wo.id)}
-                        className="text-red-600 hover:text-red-800"
-                        aria-label="Delete work order"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleEdit(wo)} className="text-primary hover:text-primary-hover transition-colors" aria-label="Edit">
+                          <Edit size={16} />
+                        </button>
+                        <button onClick={() => handleDelete(wo.id)} className="text-destructive hover:text-destructive-hover transition-colors" aria-label="Delete">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -311,68 +327,28 @@ export default function WorkOrders() {
         </Card>
       )}
 
-      {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setEditingOrder(null);
-        }}
-        title={editingOrder ? 'Edit Work Order' : 'Create New Work Order'}
+        onClose={() => { setShowModal(false); setEditingOrder(null); }}
+        title={editingOrder ? 'Edit Work Order' : 'New Work Order'}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSubmit}>
-              {editingOrder ? 'Update' : 'Create'}
+            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleSubmit} loading={isMutating}>
+              {editingOrder ? 'Save Changes' : 'Create'}
             </Button>
           </>
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Title"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            required
-          />
-          <Textarea
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          />
+          <Input label="Title" value={formData.title} onChange={f('title')} required />
+          <Textarea label="Description" value={formData.description} onChange={f('description')} />
           <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Type"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              options={[
-                { value: 'maintenance', label: 'Maintenance' },
-                { value: 'burial_prep', label: 'Burial Prep' },
-                { value: 'grounds', label: 'Grounds' },
-                { value: 'repair', label: 'Repair' },
-                { value: 'other', label: 'Other' },
-              ]}
-            />
-            <Select
-              label="Priority"
-              value={formData.priority}
-              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              options={[
-                { value: 'low', label: 'Low' },
-                { value: 'medium', label: 'Medium' },
-                { value: 'high', label: 'High' },
-                { value: 'urgent', label: 'Urgent' },
-              ]}
-            />
+            <Select label="Type" value={formData.type} onChange={f('type')} options={TYPE_OPTIONS} />
+            <Select label="Priority" value={formData.priority} onChange={f('priority')} options={PRIORITY_OPTIONS} />
           </div>
-          <Input
-            label="Due Date"
-            type="date"
-            value={formData.dueDate}
-            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-          />
+          <Input label="Assigned To" value={formData.assignedTo} onChange={f('assignedTo')} placeholder="Staff name" />
+          <Input label="Due Date" type="date" value={formData.dueDate} onChange={f('dueDate')} />
         </form>
       </Modal>
     </div>
