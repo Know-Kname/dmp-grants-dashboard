@@ -586,3 +586,28 @@ html {
 .focus-ring:focus-visible {
   box-shadow: 0 0 0 2px hsl(var(--ring-offset)), 0 0 0 4px hsl(var(--ring));
 }
+
+/* Login page brand-green button + demo button hover states.
+   Inline here (not Tailwind) because brand colors must stay fixed
+   regardless of light/dark theme — same rationale as the sidebar. */
+:root {
+  --brand-green: #1a3d2b;
+  --brand-green-deep: #0f2419;
+  --brand-gold: #c49a2c;
+}
+
+.login-submit {
+  background-color: var(--brand-green);
+}
+.login-submit:not(:disabled):hover {
+  background-color: var(--brand-green-deep);
+}
+
+.login-demo {
+  border-color: rgba(196, 154, 44, 0.4);
+  background-color: rgba(196, 154, 44, 0.05);
+}
+.login-demo:hover {
+  border-color: var(--brand-gold);
+  background-color: rgba(196, 154, 44, 0.1);
+}

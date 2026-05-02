@@ -15,12 +15,12 @@ import {
 } from '../hooks/useData';
 import { Card, CardHeader, CardBody, Badge } from '../components/ui';
 import { COMPANY } from '../config/company';
+import { BRAND } from '../config/brand';
 import { formatCurrency } from '../lib/utils';
 
-// DMP brand + semantic chart colors
 const C = {
-  green: '#1a3d2b',
-  gold: '#c49a2c',
+  green: BRAND.green,
+  gold: BRAND.gold,
   info: '#0ea5e9',
   success: '#22c55e',
   warning: '#f59e0b',
@@ -175,7 +175,7 @@ export default function Dashboard() {
       {/* ── Brand Hero ── */}
       <div
         className="rounded-2xl overflow-hidden relative"
-        style={{ background: 'linear-gradient(135deg, #0f2419 0%, #1a3d2b 50%, #2d5a3d 100%)' }}
+        style={{ background: `linear-gradient(135deg, ${BRAND.greenDeep} 0%, ${BRAND.green} 50%, #2d5a3d 100%)` }}
       >
         <div
           className="absolute inset-0 opacity-10"
@@ -188,7 +188,7 @@ export default function Dashboard() {
                 className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
                 style={{ backgroundColor: C.gold }}
               >
-                <span className="font-bold text-[#1a3d2b] text-xl">DMP</span>
+                <span className="font-bold text-xl" style={{ color: BRAND.green }}>DMP</span>
               </div>
               <div>
                 <h1 className="text-2xl lg:text-3xl font-bold text-white leading-tight">
