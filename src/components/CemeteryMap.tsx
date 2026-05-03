@@ -1,6 +1,7 @@
 import { Map as MapLibreMap, Marker, NavigationControl, Popup, type MapRef, type MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import { useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import type { StyleSpecification } from 'maplibre-gl';
 import { Search, Compass, Crosshair, X } from 'lucide-react';
 import type { Grave } from '../types';
 
@@ -16,6 +17,22 @@ const STATUS_LABELS: Record<Grave['status'], string> = {
   reserved: 'Reserved',
   occupied: 'Occupied',
   unavailable: 'Unavailable',
+};
+
+const STREET_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  name: 'Satellite',
+  sources: {
+    esri: {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 20,
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DigitalGlobe, GeoEye',
+    },
+  },
+  layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
 };
 
 // Detroit Memorial Park (Warren, MI) — fallback center when no graves have coords
@@ -46,6 +63,7 @@ export default function CemeteryMap({ graves, height = 400, onMapPinDrop }: Prop
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<Grave['status']>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [dropMode, setDropMode] = useState(false);
+  const [satellite, setSatellite] = useState(false);
 
   const placedGraves = useMemo(
     () => graves.filter(g => g.lat != null && g.lng != null),
@@ -169,6 +187,27 @@ export default function CemeteryMap({ graves, height = 400, onMapPinDrop }: Prop
           )}
         </div>
 
+        {/* Satellite toggle */}
+        <div className="flex overflow-hidden rounded-md border border-border shadow-sm">
+          {(['Street', 'Satellite'] as const).map(label => {
+            const active = label === 'Satellite' ? satellite : !satellite;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setSatellite(label === 'Satellite')}
+                className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-foreground-muted hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Drop-pin toggle */}
         {onMapPinDrop && (
           <button
@@ -217,7 +256,7 @@ export default function CemeteryMap({ graves, height = 400, onMapPinDrop }: Prop
         <MapLibreMap
           ref={mapRef}
           initialViewState={initialView}
-          mapStyle="https://tiles.openfreemap.org/styles/liberty"
+          mapStyle={satellite ? SATELLITE_STYLE : STREET_STYLE}
           style={{ width: '100%', height: '100%', cursor: dropMode ? 'crosshair' : undefined }}
           onClick={handleMapClick}
         >

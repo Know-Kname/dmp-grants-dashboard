@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, lazy, Suspense } from 'react';
+const LocationsMap = lazy(() => import('../components/LocationsMap'));
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -7,7 +8,7 @@ import {
 import { format, subMonths, startOfMonth, parseISO } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  MapPin, Phone, TrendingUp, BookOpen, FileText, Activity, Zap,
+  TrendingUp, BookOpen, FileText, Activity, Zap,
 } from 'lucide-react';
 import {
   useWorkOrders, useBurials, useInventory, useReceivables,
@@ -484,40 +485,33 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* ── Bottom Row: Locations | Activity | Quick Actions ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Locations</h3>
-            <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
-          </CardHeader>
-          <CardBody className="space-y-3">
-            {Object.values(COMPANY.locations).map((loc) => (
-              <div
-                key={loc.name}
-                className="flex items-start gap-3 p-3 rounded-lg bg-background-subtle hover:bg-accent transition-colors"
-              >
-                <div className="p-1.5 bg-primary-100 dark:bg-primary-950 rounded-lg flex-shrink-0 mt-0.5">
-                  <MapPin size={14} className="text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground leading-tight">
-                    {loc.name.replace('Detroit Memorial Park ', 'DMP ')}
-                  </p>
-                  <p className="text-xs text-foreground-muted mt-0.5">{loc.address}</p>
-                  <p className="text-xs text-foreground-muted">{loc.city}, {loc.state} {loc.zip}</p>
-                  <a
-                    href={`tel:${loc.phone.replace(/[^\d]/g, '')}`}
-                    className="inline-flex items-center gap-1 mt-1 text-xs text-primary hover:underline"
-                  >
-                    <Phone size={10} /> {loc.phone}
-                  </a>
+      {/* ── Locations Map ── */}
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-foreground">DMP Locations</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">3 properties across Michigan · click a marker for details</p>
+          </div>
+          <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
+        </CardHeader>
+        <CardBody className="p-0">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center bg-background-subtle rounded-b-xl" style={{ height: 420 }}>
+                <div className="flex flex-col items-center gap-3 text-foreground-muted">
+                  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <p className="text-sm">Loading map…</p>
                 </div>
               </div>
-            ))}
-          </CardBody>
-        </Card>
+            }
+          >
+            <LocationsMap height={420} />
+          </Suspense>
+        </CardBody>
+      </Card>
+
+      {/* ── Bottom Row: Activity | Quick Actions ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <Card>
           <CardHeader className="flex items-center justify-between">
