@@ -25,7 +25,8 @@ docs/
 # Test and lint config
 vitest.config.*
 .eslintrc.*
-tsconfig.node.json
+# NOTE: tsconfig.node.json must NOT be ignored — it's referenced by tsconfig.json
+# via `references: [{ path: ./tsconfig.node.json }]` and removing it breaks tsc
 
 # Logs and OS noise
 *.log
