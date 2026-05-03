@@ -1,15 +1,14 @@
 # Supabase CLI project config
-# https://supabase.com/docs/reference/cli/config
+# Project: supaduba
+# URL: https://mgpwjnxtqcnoyjgebytg.supabase.co
+# Ref: mgpwjnxtqcnoyjgebytg
 #
-# To link to your remote project:
+# To link locally:
 #   supabase login
-#   supabase link --project-ref <your-project-ref>
-#
-# The project ref is the alphanumeric ID in your Supabase dashboard URL:
-#   https://supabase.com/dashboard/project/<ref>
+#   supabase link --project-ref mgpwjnxtqcnoyjgebytg
 
 [project]
-id = "dmpgrants"
+id = "supaduba"
 
 # Edge function settings
 [functions.send-payment-reminder]
