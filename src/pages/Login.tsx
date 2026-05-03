@@ -18,8 +18,7 @@ const heroLocations = [
 ];
 
 // Mount Auburn-esque landscape — quiet path / dappled light, not a building
-const PHOTO_URL =
-  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1600&q=80&auto=format&fit=crop';
+const PHOTO_URL = '/dmp-hero.jpg';
 
 const EASE_LUX: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -171,24 +170,13 @@ export default function Login() {
           variants={stagger}
         >
           {/* Top: brand mark */}
-          <motion.div variants={fadeUp} className="flex items-center gap-3.5">
-            <div
-              className="w-10 h-10 rounded-md flex items-center justify-center font-bold text-sm"
-              style={{ backgroundColor: BRAND.gold, color: BRAND.greenDeep, letterSpacing: '0.04em' }}
-            >
-              DMP
-            </div>
-            <div>
-              <p
-                className="text-white text-xs uppercase"
-                style={{ letterSpacing: '0.22em', fontWeight: 600 }}
-              >
-                Detroit Memorial Park
-              </p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,154,44,0.7)', letterSpacing: '0.18em' }}>
-                Association · Est. {COMPANY.established}
-              </p>
-            </div>
+          <motion.div variants={fadeUp}>
+            <img
+              src="/dmp-logo.png"
+              alt="Detroit Memorial Park"
+              className="h-12 w-auto"
+              style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.92 }}
+            />
           </motion.div>
 
           {/* Middle: headline + tagline */}
@@ -289,24 +277,13 @@ export default function Login() {
         </div>
 
         {/* Mobile brand bar */}
-        <div className="lg:hidden flex items-center gap-3 px-6 py-5" style={{ backgroundColor: BRAND.greenDeep }}>
-          <div
-            className="w-9 h-9 rounded-md flex items-center justify-center font-bold text-sm"
-            style={{ backgroundColor: BRAND.gold, color: BRAND.greenDeep }}
-          >
-            DMP
-          </div>
-          <div>
-            <p
-              className="text-white text-xs uppercase"
-              style={{ letterSpacing: '0.18em', fontWeight: 600 }}
-            >
-              Detroit Memorial Park
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,154,44,0.75)', letterSpacing: '0.14em' }}>
-              Cemetery Management
-            </p>
-          </div>
+        <div className="lg:hidden flex items-center px-6 py-4" style={{ backgroundColor: BRAND.greenDeep }}>
+          <img
+            src="/dmp-logo.png"
+            alt="Detroit Memorial Park"
+            className="h-9 w-auto"
+            style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.9 }}
+          />
         </div>
 
         <div className="flex-1 flex items-center justify-center px-6 py-16 sm:px-12">

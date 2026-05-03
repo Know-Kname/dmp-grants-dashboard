@@ -77,13 +77,13 @@ export default function Layout() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-800 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-lg">{COMPANY.abbreviation}</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold text-foreground">{COMPANY.shortName}</h1>
-                <p className="text-xs text-foreground-muted">{COMPANY.system.name}</p>
-              </div>
+              <img
+                src="/dmp-logo.png"
+                alt="Detroit Memorial Park"
+                className="h-9 w-auto"
+                style={resolvedTheme === 'dark' ? { filter: 'brightness(0) invert(1)', opacity: 0.88 } : undefined}
+              />
+              <p className="hidden sm:block text-xs text-foreground-muted">{COMPANY.system.name}</p>
             </div>
 
             {/* Right side */}

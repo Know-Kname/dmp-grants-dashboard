@@ -7,8 +7,7 @@ import { formatDate } from '../lib/utils';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 
-const PHOTO_PLACEHOLDER =
-  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&q=80&auto=format&fit=crop';
+const PHOTO_PLACEHOLDER = '/dmp-hero.jpg';
 
 const EASE_LUX: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -142,15 +141,11 @@ export default function MemorialPage() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          <div
-            className="w-8 h-8 rounded-md flex items-center justify-center text-[11px] font-bold tracking-wide"
-            style={{ backgroundColor: BRAND.green, color: BRAND.gold }}
-          >
-            DMP
-          </div>
-          <span className="text-xs uppercase" style={{ color: BRAND.green, letterSpacing: '0.18em', fontWeight: 600 }}>
-            Detroit Memorial Park
-          </span>
+          <img
+            src="/dmp-logo.png"
+            alt="Detroit Memorial Park"
+            className="h-7 w-auto"
+          />
         </motion.div>
         <motion.span
           className="text-[10px] uppercase hidden sm:block"
@@ -414,19 +409,12 @@ export default function MemorialPage() {
         <FilmGrain opacity={0.06} />
         <div className="relative max-w-4xl mx-auto px-8 text-center">
           <div className="mx-auto mb-8 w-px" style={{ height: '32px', backgroundColor: BRAND.gold, opacity: 0.5 }} />
-          <p
-            className="mb-3"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontVariationSettings: '"opsz" 144, "SOFT" 30, "WONK" 0',
-              fontSize: 'clamp(1.4rem, 2.2vw, 2rem)',
-              fontWeight: 400,
-              color: 'rgba(245,241,234,0.96)',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {COMPANY.name}
-          </p>
+          <img
+            src="/dmp-logo.png"
+            alt="Detroit Memorial Park"
+            className="mx-auto mb-4 h-12 w-auto"
+            style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.88 }}
+          />
           <p
             className="text-[10px] uppercase mb-8"
             style={{ color: BRAND.gold, letterSpacing: '0.32em', fontWeight: 500, opacity: 0.85 }}
@@ -487,12 +475,11 @@ function NotFound() {
           className="w-px mx-auto mb-10"
           style={{ height: '64px', backgroundColor: BRAND.gold, opacity: 0.5 }}
         />
-        <p
-          className="text-[10px] uppercase mb-6"
-          style={{ color: BRAND.green, letterSpacing: '0.28em', fontWeight: 600 }}
-        >
-          Detroit Memorial Park
-        </p>
+        <img
+          src="/dmp-logo.png"
+          alt="Detroit Memorial Park"
+          className="mx-auto mb-6 h-8 w-auto"
+        />
         <h1
           className="mb-5"
           style={{

@@ -179,25 +179,20 @@ export default function Dashboard() {
       >
         <div
           className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'url(/hero-bg.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+          style={{ backgroundImage: 'url(/dmp-hero.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
         />
         <div className="relative p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
-                style={{ backgroundColor: C.gold }}
-              >
-                <span className="font-bold text-xl" style={{ color: BRAND.green }}>DMP</span>
-              </div>
-              <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-white leading-tight">
-                  {COMPANY.shortName}
-                </h1>
-                <p className="text-white/60 text-sm mt-0.5">
-                  {COMPANY.tagline} · 3 Locations · 170+ Acres
-                </p>
-              </div>
+            <div className="flex items-center gap-5">
+              <img
+                src="/dmp-logo.png"
+                alt="Detroit Memorial Park"
+                className="h-14 w-auto flex-shrink-0"
+                style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.95 }}
+              />
+              <p className="text-white/55 text-sm">
+                {COMPANY.tagline} · 3 Locations · 170+ Acres
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-6 lg:gap-8">
