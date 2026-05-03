@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import {
   useCemeteries, useCreateCemetery, useUpdateCemetery, useDeleteCemetery,
   useSections, useCreateSection, useUpdateSection, useDeleteSection,
@@ -11,6 +11,7 @@ import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
   Badge, EmptyState, LoadingSpinner,
 } from '../components/ui';
+const CemeteryMap = lazy(() => import('../components/CemeteryMap'));
 import {
   Plus, Map, ChevronRight, ArrowLeft, Edit, Trash2,
   AlertCircle, RefreshCw, Home,
@@ -366,6 +367,22 @@ export default function Cemeteries() {
               </Card>
             ))}
           </div>
+          {/* Map of placed graves (lazy-loaded — maplibre-gl is ~1MB) */}
+          {graves.length > 0 && (
+            <Card>
+              <CardBody className="p-3">
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center h-[360px] bg-background-subtle rounded-lg">
+                      <LoadingSpinner />
+                    </div>
+                  }
+                >
+                  <CemeteryMap graves={graves} height={360} />
+                </Suspense>
+              </CardBody>
+            </Card>
+          )}
           {gravesQuery.isLoading ? (
             <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
           ) : graves.length === 0 ? (
