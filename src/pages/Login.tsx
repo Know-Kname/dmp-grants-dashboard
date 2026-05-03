@@ -1,39 +1,99 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import Balancer from 'react-wrap-balancer';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { Alert } from '../components/ui';
 import { getErrorMessage, getErrorRequestId } from '../lib/errors';
 import { enableDemoMode } from '../lib/demo-data';
-import { Mail, Lock, Sun, Moon, Eye, EyeOff, MapPin, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, Sparkles } from 'lucide-react';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
-import { motion, AnimatePresence } from 'framer-motion';
-
-const stats = [
-  { value: '100+', label: 'Years Serving Michigan' },
-  { value: '170+', label: 'Acres Across 3 Sites' },
-  { value: '3', label: 'Cemetery Locations' },
-];
 
 const heroLocations = [
-  { name: 'DMP East', city: COMPANY.locations.east.city + ', ' + COMPANY.locations.east.state },
-  { name: 'DMP West', city: COMPANY.locations.west.city + ', ' + COMPANY.locations.west.state },
-  { name: 'Gracelawn', city: COMPANY.locations.gracelawn.city + ', ' + COMPANY.locations.gracelawn.state },
+  { name: COMPANY.locations.east.name, city: COMPANY.locations.east.city },
+  { name: COMPANY.locations.west.name, city: COMPANY.locations.west.city },
+  { name: COMPANY.locations.gracelawn.name, city: COMPANY.locations.gracelawn.city },
 ];
 
+// Mount Auburn-esque landscape — quiet path / dappled light, not a building
 const PHOTO_URL =
-  'https://images.unsplash.com/photo-1618022325802-7e5e732d97a1?w=1400&q=80&auto=format&fit=crop';
+  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1600&q=80&auto=format&fit=crop';
+
+const EASE_LUX: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const stagger = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
+  show: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
 };
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
+  show: { opacity: 1, y: 0, transition: { duration: 1, ease: EASE_LUX } },
 };
+
+/** Word-mask reveal — same primitive as Memorial hero */
+function RevealWords({
+  children,
+  delay = 0,
+  perWord = 0.07,
+  className = '',
+  style,
+}: {
+  children: string;
+  delay?: number;
+  perWord?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const words = children.split(' ');
+  return (
+    <span aria-label={children} className={className} style={style}>
+      {words.map((w, i) => (
+        <span
+          key={i}
+          aria-hidden
+          style={{
+            display: 'inline-block',
+            overflow: 'hidden',
+            verticalAlign: 'baseline',
+            marginRight: '0.22em',
+            paddingBottom: '0.08em',
+          }}
+        >
+          <motion.span
+            style={{ display: 'inline-block' }}
+            initial={{ y: '108%' }}
+            animate={{ y: 0 }}
+            transition={{ delay: delay + i * perWord, duration: 0.95, ease: EASE_LUX }}
+          >
+            {w}
+          </motion.span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Subtle film grain — matches Memorial */
+function FilmGrain({ opacity = 0.05 }: { opacity?: number }) {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      style={{ opacity, mixBlendMode: 'overlay' }}
+    >
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        <filter id="login-grain">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#login-grain)" />
+      </svg>
+    </div>
+  );
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -56,11 +116,10 @@ export default function Login() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      const message = getErrorMessage(err, 'Unable to sign in. Please try again.');
+      setError(getErrorMessage(err, 'Unable to sign in. Please try again.'));
       const requestId = getErrorRequestId(err);
-      setError(message);
       setErrorDetails(requestId ? [`Request ID: ${requestId}`] : []);
-      setShakeKey(k => k + 1);
+      setShakeKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -72,185 +131,231 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel — photo + brand */}
-      <div className="hidden lg:flex lg:w-[52%] xl:w-[55%] flex-col relative overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center scale-105"
-          style={{ backgroundImage: `url('${PHOTO_URL}')` }}
+    <div className="min-h-screen flex" style={{ backgroundColor: 'var(--bone)' }}>
+      {/* ───── LEFT — duotone landscape + brand ───── */}
+      <div className="hidden lg:flex lg:w-[55%] flex-col relative overflow-hidden" style={{ backgroundColor: BRAND.greenDeep }}>
+        {/* Photo with Ken Burns + duotone */}
+        <motion.div
+          className="absolute inset-0"
+          initial={{ scale: 1.06, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 2.4, ease: EASE_LUX }}
+          style={{
+            backgroundImage: `url('${PHOTO_URL}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'grayscale(1) contrast(1.06) brightness(0.88)',
+          }}
         />
+        {/* Forest multiply layer — duotone */}
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(160deg,
-              rgba(10,34,21,0.88) 0%,
-              rgba(26,61,43,0.72) 45%,
-              rgba(10,34,21,0.92) 100%)`,
+            background: `linear-gradient(170deg, rgba(15,36,25,0.78) 0%, rgba(26,61,43,0.65) 50%, rgba(15,36,25,0.92) 100%)`,
+            mixBlendMode: 'multiply',
           }}
         />
+        <FilmGrain opacity={0.07} />
+
+        {/* Vertical gold rule, very thin */}
         <div
-          className="absolute bottom-0 left-0 right-0 h-px"
-          style={{ backgroundColor: BRAND.gold, opacity: 0.35 }}
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-px"
+          style={{ height: '120px', backgroundColor: BRAND.gold, opacity: 0.4 }}
         />
 
+        {/* Content */}
         <motion.div
-          className="relative flex flex-col h-full px-14 py-14 justify-between"
+          className="relative flex flex-col h-full px-12 xl:px-16 py-14 justify-between"
           initial="hidden"
           animate="show"
           variants={stagger}
         >
-          <div>
-            <motion.div variants={fadeUp} className="flex items-center gap-4 mb-14">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl shadow-xl"
-                style={{ backgroundColor: BRAND.gold, color: BRAND.greenDeep, letterSpacing: '-0.02em' }}
-              >
-                DMP
-              </div>
-              <div>
-                <p className="text-white font-semibold tracking-wide text-sm">Detroit Memorial Park</p>
-                <p className="text-xs" style={{ color: 'rgba(196,154,44,0.7)' }}>Association, Inc.</p>
-              </div>
-            </motion.div>
-
-            <div className="mb-10">
-              <motion.div
-                variants={fadeUp}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-6"
-                style={{
-                  backgroundColor: 'rgba(196,154,44,0.15)',
-                  color: BRAND.goldLight,
-                  border: '1px solid rgba(196,154,44,0.25)',
-                }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: BRAND.gold }}
-                />
-                Est. {COMPANY.established} · Michigan's Trusted Cemetery
-              </motion.div>
-
-              <motion.h1
-                variants={fadeUp}
-                className="text-white leading-[1.1] mb-5"
-                style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: 'clamp(2.2rem, 3.5vw, 3rem)',
-                  fontWeight: 600,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Honoring Lives.<br />
-                <span style={{ color: BRAND.gold }}>Preserving</span><br />
-                Legacies.
-              </motion.h1>
-
-              <motion.p
-                variants={fadeUp}
-                className="leading-relaxed text-sm max-w-xs"
-                style={{ color: 'rgba(255,255,255,0.52)' }}
-              >
-                A century of dignified service across three Michigan communities.
-                This management system keeps our operations as enduring as our mission.
-              </motion.p>
+          {/* Top: brand mark */}
+          <motion.div variants={fadeUp} className="flex items-center gap-3.5">
+            <div
+              className="w-10 h-10 rounded-md flex items-center justify-center font-bold text-sm"
+              style={{ backgroundColor: BRAND.gold, color: BRAND.greenDeep, letterSpacing: '0.04em' }}
+            >
+              DMP
             </div>
+            <div>
+              <p
+                className="text-white text-xs uppercase"
+                style={{ letterSpacing: '0.22em', fontWeight: 600 }}
+              >
+                Detroit Memorial Park
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,154,44,0.7)', letterSpacing: '0.18em' }}>
+                Association · Est. {COMPANY.established}
+              </p>
+            </div>
+          </motion.div>
 
-            <motion.div variants={fadeUp} className="flex gap-8 mb-10">
-              {stats.map((s) => (
-                <div key={s.label}>
-                  <p className="text-2xl font-bold" style={{ color: BRAND.gold }}>{s.value}</p>
-                  <p className="text-xs mt-0.5 leading-tight" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    {s.label}
-                  </p>
-                </div>
-              ))}
+          {/* Middle: headline + tagline */}
+          <div className="max-w-2xl">
+            <motion.div
+              variants={fadeUp}
+              className="text-[10px] uppercase mb-8"
+              style={{ color: BRAND.gold, letterSpacing: '0.32em', fontWeight: 500, opacity: 0.85 }}
+            >
+              A Century of Remembrance
             </motion.div>
+
+            <h1
+              className="text-white leading-[0.96] mb-10"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(2.6rem, 5.5vw, 5rem)',
+                fontWeight: 400,
+                fontVariationSettings: '"opsz" 144, "SOFT" 50, "WONK" 0',
+                letterSpacing: '-0.025em',
+              }}
+            >
+              <span className="block">
+                <RevealWords delay={0.15}>Honoring lives.</RevealWords>
+              </span>
+              <span className="block" style={{ fontStyle: 'italic', color: BRAND.gold, fontVariationSettings: '"opsz" 144, "SOFT" 100, "WONK" 1' }}>
+                <RevealWords delay={0.45}>Preserving</RevealWords>
+              </span>
+              <span className="block">
+                <RevealWords delay={0.65}>legacies.</RevealWords>
+              </span>
+            </h1>
 
             <motion.div
               variants={fadeUp}
-              className="mb-10"
-              style={{ width: '3rem', height: '1px', backgroundColor: 'rgba(196,154,44,0.45)' }}
+              className="mb-8"
+              style={{ width: '48px', height: '1px', backgroundColor: BRAND.gold, opacity: 0.6 }}
             />
 
-            <motion.div variants={fadeUp} className="space-y-3">
-              {heroLocations.map((loc) => (
-                <div key={loc.name} className="flex items-center gap-3">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{
-                      backgroundColor: 'rgba(196,154,44,0.12)',
-                      border: '1px solid rgba(196,154,44,0.2)',
-                    }}
-                  >
-                    <MapPin size={12} style={{ color: BRAND.gold }} />
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-white">{loc.name}</span>
-                    <span className="text-xs ml-2" style={{ color: 'rgba(255,255,255,0.38)' }}>
-                      {loc.city}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
+            <motion.p
+              variants={fadeUp}
+              className="text-base leading-relaxed max-w-md"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontStyle: 'italic',
+                color: 'rgba(245,241,234,0.62)',
+                fontSize: '1.05rem',
+                lineHeight: 1.65,
+              }}
+            >
+              <Balancer>
+                A century of dignified service across three Michigan sanctuaries.
+                This system keeps our operations as enduring as our mission.
+              </Balancer>
+            </motion.p>
           </div>
 
+          {/* Bottom: locations + copyright */}
           <motion.div variants={fadeUp}>
-            <div className="w-full h-px mb-6" style={{ backgroundColor: 'rgba(196,154,44,0.15)' }} />
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.28)' }}>
+            <div className="grid grid-cols-3 gap-6 mb-10 max-w-lg">
+              {heroLocations.map((loc) => (
+                <div key={loc.name}>
+                  <p
+                    className="text-[10px] uppercase mb-1"
+                    style={{ color: BRAND.gold, letterSpacing: '0.22em', fontWeight: 600, opacity: 0.7 }}
+                  >
+                    {loc.name}
+                  </p>
+                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-serif)' }}>
+                    {loc.city}, MI
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="w-full h-px mb-5" style={{ backgroundColor: 'rgba(196,154,44,0.18)' }} />
+            <p className="text-[10px] uppercase" style={{ color: 'rgba(245,241,234,0.32)', letterSpacing: '0.2em' }}>
               {COMPANY.legal.copyright} · State of Michigan Official Historic Site
             </p>
           </motion.div>
         </motion.div>
       </div>
 
-      {/* Right panel — form */}
-      <div className="flex-1 flex flex-col bg-background relative overflow-y-auto">
+      {/* ───── RIGHT — bone form panel ───── */}
+      <div
+        className="flex-1 flex flex-col relative overflow-y-auto"
+        style={{ backgroundColor: 'var(--bone)' }}
+      >
         <div className="absolute top-5 right-5 z-10">
           <button
             onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            className="p-2 rounded-xl border border-border text-foreground-muted hover:text-foreground hover:bg-accent transition-all"
+            className="p-2 rounded-md transition-all"
+            style={{ border: '1px solid rgba(26,61,43,0.18)', color: 'rgba(26,26,26,0.5)' }}
             aria-label="Toggle theme"
           >
-            {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            {resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
 
-        <div
-          className="lg:hidden flex items-center gap-3 px-6 py-5"
-          style={{ backgroundColor: BRAND.green }}
-        >
+        {/* Mobile brand bar */}
+        <div className="lg:hidden flex items-center gap-3 px-6 py-5" style={{ backgroundColor: BRAND.greenDeep }}>
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm"
+            className="w-9 h-9 rounded-md flex items-center justify-center font-bold text-sm"
             style={{ backgroundColor: BRAND.gold, color: BRAND.greenDeep }}
           >
             DMP
           </div>
           <div>
-            <p className="text-white font-semibold text-sm">Detroit Memorial Park</p>
-            <p className="text-xs" style={{ color: 'rgba(196,154,44,0.8)' }}>Cemetery Management System</p>
+            <p
+              className="text-white text-xs uppercase"
+              style={{ letterSpacing: '0.18em', fontWeight: 600 }}
+            >
+              Detroit Memorial Park
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,154,44,0.75)', letterSpacing: '0.14em' }}>
+              Cemetery Management
+            </p>
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-6 py-12 sm:px-10">
+        <div className="flex-1 flex items-center justify-center px-6 py-16 sm:px-12">
           <motion.div
-            className="w-full max-w-[400px]"
+            className="w-full max-w-[420px]"
             initial="hidden"
             animate="show"
             variants={stagger}
           >
-            <motion.div variants={fadeUp} className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h2>
-              <p className="text-foreground-muted text-sm mt-1.5">
-                Sign in to access the {COMPANY.system.name}
-              </p>
-            </motion.div>
+            <motion.p
+              variants={fadeUp}
+              className="text-[10px] uppercase mb-5"
+              style={{ color: BRAND.green, letterSpacing: '0.28em', fontWeight: 600 }}
+            >
+              Staff Sign In
+            </motion.p>
+
+            <motion.h2
+              variants={fadeUp}
+              className="leading-tight mb-3"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(2rem, 3.4vw, 2.75rem)',
+                fontWeight: 400,
+                fontVariationSettings: '"opsz" 144, "SOFT" 30, "WONK" 0',
+                letterSpacing: '-0.02em',
+                color: 'var(--ink)',
+              }}
+            >
+              <Balancer>Welcome back.</Balancer>
+            </motion.h2>
+
+            <motion.p
+              variants={fadeUp}
+              className="text-sm mb-10"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontStyle: 'italic',
+                color: 'rgba(26,26,26,0.5)',
+              }}
+            >
+              Sign in to access the {COMPANY.system.name}.
+            </motion.p>
 
             <AnimatePresence mode="wait">
               {error && (
                 <motion.div
                   key={shakeKey}
-                  initial={{ opacity: 0, x: 0 }}
+                  initial={{ opacity: 0 }}
                   animate={{
                     opacity: 1,
                     x: [0, -10, 10, -10, 10, -5, 5, 0],
@@ -263,19 +368,32 @@ export default function Login() {
                     title="Unable to sign in"
                     message={error}
                     details={errorDetails}
-                    onDismiss={() => { setError(null); setErrorDetails([]); }}
+                    onDismiss={() => {
+                      setError(null);
+                      setErrorDetails([]);
+                    }}
                   />
                 </motion.div>
               )}
             </AnimatePresence>
 
             <form onSubmit={handleSubmit}>
-              <motion.div variants={fadeUp} className="mb-4">
-                <label htmlFor="login-email" className="block text-sm font-medium text-foreground mb-1.5">
-                  Email address
+              <motion.div variants={fadeUp} className="mb-5">
+                <label
+                  htmlFor="login-email"
+                  className="block text-[10px] uppercase mb-2.5"
+                  style={{ color: 'rgba(26,26,26,0.55)', letterSpacing: '0.22em', fontWeight: 600 }}
+                >
+                  Email
                 </label>
-                <div className="login-field group relative flex items-center rounded-xl border border-border bg-input transition-all duration-150 focus-within:border-[var(--brand-green)] focus-within:shadow-[0_0_0_3px_rgba(26,61,43,0.1)]">
-                  <Mail size={16} className="absolute left-3.5 text-foreground-subtle" />
+                <div
+                  className="relative flex items-center transition-all duration-200"
+                  style={{
+                    borderBottom: '1px solid rgba(26,61,43,0.25)',
+                    backgroundColor: 'transparent',
+                  }}
+                >
+                  <Mail size={15} style={{ color: 'rgba(26,26,26,0.4)' }} />
                   <input
                     id="login-email"
                     type="email"
@@ -284,17 +402,30 @@ export default function Login() {
                     placeholder="you@detroitmemorialpark.org"
                     required
                     autoComplete="email"
-                    className="w-full pl-10 pr-4 py-3 bg-transparent text-sm text-foreground placeholder:text-foreground-subtle outline-none rounded-xl"
+                    className="w-full pl-3 pr-2 py-3 bg-transparent text-base outline-none"
+                    style={{
+                      color: 'var(--ink)',
+                      fontFamily: 'var(--font-serif)',
+                    }}
                   />
                 </div>
               </motion.div>
 
-              <motion.div variants={fadeUp} className="mb-4">
-                <label htmlFor="login-password" className="block text-sm font-medium text-foreground mb-1.5">
+              <motion.div variants={fadeUp} className="mb-8">
+                <label
+                  htmlFor="login-password"
+                  className="block text-[10px] uppercase mb-2.5"
+                  style={{ color: 'rgba(26,26,26,0.55)', letterSpacing: '0.22em', fontWeight: 600 }}
+                >
                   Password
                 </label>
-                <div className="login-field group relative flex items-center rounded-xl border border-border bg-input transition-all duration-150 focus-within:border-[var(--brand-green)] focus-within:shadow-[0_0_0_3px_rgba(26,61,43,0.1)]">
-                  <Lock size={16} className="absolute left-3.5 text-foreground-subtle" />
+                <div
+                  className="relative flex items-center transition-all duration-200"
+                  style={{
+                    borderBottom: '1px solid rgba(26,61,43,0.25)',
+                  }}
+                >
+                  <Lock size={15} style={{ color: 'rgba(26,26,26,0.4)' }} />
                   <input
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
@@ -303,16 +434,21 @@ export default function Login() {
                     placeholder="Enter your password"
                     required
                     autoComplete="current-password"
-                    className="w-full pl-10 pr-11 py-3 bg-transparent text-sm text-foreground placeholder:text-foreground-subtle outline-none rounded-xl"
+                    className="w-full pl-3 pr-9 py-3 bg-transparent text-base outline-none"
+                    style={{
+                      color: 'var(--ink)',
+                      fontFamily: 'var(--font-serif)',
+                    }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 text-foreground-subtle hover:text-foreground transition-colors"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 transition-colors"
+                    style={{ color: 'rgba(26,26,26,0.4)' }}
                     tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </motion.div>
@@ -321,71 +457,116 @@ export default function Login() {
                 <motion.button
                   type="submit"
                   disabled={loading}
-                  whileHover={loading ? {} : { scale: 1.02 }}
-                  whileTap={loading ? {} : { scale: 0.98 }}
-                  className="login-submit w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm text-white shadow-[0_4px_14px_rgba(26,61,43,0.35)] disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none mt-2"
+                  whileHover={loading ? {} : { scale: 1.005 }}
+                  whileTap={loading ? {} : { scale: 0.995 }}
+                  className="w-full flex items-center justify-center gap-2.5 py-4 px-5 text-[11px] uppercase font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: BRAND.greenDeep,
+                    color: 'var(--bone)',
+                    letterSpacing: '0.22em',
+                    border: 'none',
+                    borderRadius: '2px',
+                  }}
                 >
                   {loading ? (
                     <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Signing in…
+                      <span
+                        className="w-3.5 h-3.5 border rounded-full animate-spin"
+                        style={{ borderColor: 'rgba(245,241,234,0.3)', borderTopColor: 'var(--bone)' }}
+                      />
+                      Signing in
                     </>
                   ) : (
                     <>
-                      Sign in
-                      <ArrowRight size={16} />
+                      Sign In
+                      <ArrowRight size={14} />
                     </>
                   )}
                 </motion.button>
               </motion.div>
             </form>
 
-            <motion.div variants={fadeUp} className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-foreground-subtle px-1">or</span>
-              <div className="flex-1 h-px bg-border" />
+            <motion.div
+              variants={fadeUp}
+              className="flex items-center gap-4 my-8"
+            >
+              <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
+              <span
+                className="text-[10px] uppercase"
+                style={{ color: 'rgba(26,26,26,0.4)', letterSpacing: '0.28em' }}
+              >
+                or
+              </span>
+              <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
             </motion.div>
 
             <motion.div variants={fadeUp}>
               <motion.button
                 type="button"
                 onClick={handleDemo}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className="login-demo w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border text-sm font-medium transition-all duration-150 text-foreground"
+                whileHover={{ scale: 1.005 }}
+                whileTap={{ scale: 0.995 }}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 text-[11px] uppercase font-medium transition-colors"
+                style={{
+                  border: '1px solid rgba(26,61,43,0.25)',
+                  color: BRAND.green,
+                  backgroundColor: 'transparent',
+                  letterSpacing: '0.22em',
+                  borderRadius: '2px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(26,61,43,0.04)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
-                <Sparkles size={15} style={{ color: BRAND.gold }} />
+                <Sparkles size={13} style={{ color: BRAND.gold }} />
                 Explore Demo
-                <span className="text-xs text-foreground-subtle font-normal">— no login required</span>
               </motion.button>
             </motion.div>
 
-            <motion.p variants={fadeUp} className="text-xs text-center text-foreground-subtle mt-4">
-              Staff login:&ensp;
-              <span className="font-medium text-foreground">admin@dmp.com</span>
-              &ensp;/&ensp;
-              <span className="font-medium text-foreground">admin123</span>
+            <motion.p
+              variants={fadeUp}
+              className="text-xs text-center mt-6"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontStyle: 'italic',
+                color: 'rgba(26,26,26,0.4)',
+              }}
+            >
+              Staff demo: <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin@dmp.com</span>
+              {' / '}
+              <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin123</span>
             </motion.p>
 
-            <motion.div variants={fadeUp} className="mt-10 pt-6 border-t border-border">
-              <div className="flex items-center justify-center gap-5 text-xs text-foreground-subtle">
+            <motion.div
+              variants={fadeUp}
+              className="mt-14 pt-8"
+              style={{ borderTop: '1px solid rgba(26,61,43,0.12)' }}
+            >
+              <div
+                className="flex items-center justify-center gap-5 text-[11px] uppercase"
+                style={{ color: 'rgba(26,26,26,0.42)', letterSpacing: '0.18em', fontWeight: 500 }}
+              >
                 <a
                   href={`tel:${COMPANY.phone.main.replace(/[^\d]/g, '')}`}
-                  className="hover:text-foreground transition-colors"
+                  className="hover:underline transition-colors"
+                  style={{ color: 'rgba(26,26,26,0.55)' }}
                 >
                   {COMPANY.phone.main}
                 </a>
-                <span className="w-1 h-1 rounded-full bg-border" />
+                <span style={{ color: 'rgba(196,154,44,0.5)' }}>·</span>
                 <a
                   href={COMPANY.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-foreground transition-colors"
+                  className="hover:underline transition-colors"
+                  style={{ color: 'rgba(26,26,26,0.55)' }}
                 >
                   detroitmemorialpark.org
                 </a>
               </div>
-              <p className="text-xs text-center text-foreground-subtle mt-2">
+              <p
+                className="text-[10px] uppercase text-center mt-3"
+                style={{ color: 'rgba(26,26,26,0.3)', letterSpacing: '0.2em' }}
+              >
                 {COMPANY.legal.copyright}
               </p>
             </motion.div>

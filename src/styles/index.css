@@ -158,8 +158,9 @@
     --status-cancelled: var(--slate-400);
 
     /* ========================================
-       TYPOGRAPHY
+       TYPOGRAPHY — Green-Wood lodestar
        ======================================== */
+    --font-display: 'Fraunces', 'Source Serif 4', Georgia, serif;
     --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 
@@ -169,14 +170,28 @@
     --step-2: clamp(1.5rem, 1.35rem + 0.75vw, 2.25rem);
     --step-3: clamp(2rem, 1.75rem + 1.25vw, 3.5rem);
     --step-4: clamp(2.5rem, 2.1rem + 2vw, 5rem);
+    --step-display: clamp(3rem, 7vw, 7rem); /* Memorial hero */
 
     /* ========================================
-       DMP BRAND PALETTE (raw hex for non-token use)
+       DMP BRAND PALETTE — 60/30/10 forest/bone/gold
        ======================================== */
-    --bone: #F5F1EA;      /* warm off-white — public pages */
-    --ink: #1a1a1a;       /* near-black body text */
-    --gold-hex: #c49a2c;  /* DMP gold */
-    --forest-hex: #1a3d2b; /* DMP forest green */
+    --bone: #F5F1EA;          /* page background */
+    --bone-200: #ECE5D8;      /* card surfaces */
+    --ink: #1a1a1a;           /* body text on bone */
+    --gold-hex: #c49a2c;      /* accent — fewer than 5 places per page */
+    --gold-soft: #d4b35c;     /* ornamental rules */
+    --forest-hex: #1a3d2b;    /* sidebar, hero overlays */
+    --forest-700: #2d5240;    /* hover, gradient mid */
+    --forest-900: #0f2419;    /* deep section bg */
+    --taupe: #9C8E7D;         /* secondary text, captions (Pendragon) */
+
+    /* ========================================
+       MOTION — heavy, contemplative
+       ======================================== */
+    --ease-lux: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-micro: 200ms;
+    --dur-reveal: 1000ms;
+    --dur-hero: 2400ms;
 
     /* ========================================
        SIZING & SPACING
