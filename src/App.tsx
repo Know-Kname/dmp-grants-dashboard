@@ -12,6 +12,8 @@ import Financial from './pages/Financial';
 import Burials from './pages/Burials';
 import Contracts from './pages/Contracts';
 import Customers from './pages/Customers';
+import Vendors from './pages/Vendors';
+import Cemeteries from './pages/Cemeteries';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -49,6 +51,8 @@ function AppRoutes() {
         <Route path="contracts" element={<Contracts />} />
         <Route path="grants" element={<Grants />} />
         <Route path="customers" element={<Customers />} />
+        <Route path="vendors" element={<Vendors />} />
+        <Route path="cemeteries" element={<Cemeteries />} />
       </Route>
     </Routes>
   );

@@ -160,4 +160,11 @@ export const queryKeys = {
     list: () => [...queryKeys.users.all, 'list'] as const,
     me: () => [...queryKeys.users.all, 'me'] as const,
   },
+
+  // Vendors
+  vendors: {
+    all: ['vendors'] as const,
+    list: () => [...queryKeys.vendors.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.vendors.all, 'detail', id] as const,
+  },
 };

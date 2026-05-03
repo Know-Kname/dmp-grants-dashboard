@@ -11,6 +11,7 @@ import type {
   Grant,
   InventoryItem,
   Customer,
+  Vendor,
   Burial,
   Contract,
   Deposit,
@@ -533,6 +534,63 @@ export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
     onError: (error: Error) => {
       callbacks?.onError?.(error);
     },
+  });
+}
+
+// ============================================
+// VENDORS
+// ============================================
+
+export function useVendors() {
+  return useQuery({
+    queryKey: queryKeys.vendors.list(),
+    queryFn: () => api.get<Vendor[]>('/vendors'),
+  });
+}
+
+export function useVendor(id: string) {
+  return useQuery({
+    queryKey: queryKeys.vendors.detail(id),
+    queryFn: () => api.get<Vendor>(`/vendors/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreateVendor(callbacks?: MutationCallbacks<Vendor>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<Vendor>('/vendors', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useUpdateVendor(callbacks?: MutationCallbacks<Vendor>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Vendor> & { id: string }) =>
+      api.put<Vendor>(`/vendors/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useDeleteVendor(callbacks?: MutationCallbacks<{ success: boolean }>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/vendors/${id}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 

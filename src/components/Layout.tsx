@@ -5,7 +5,7 @@ import {
   Home, FileText, Package, DollarSign, Users,
   FileSignature, Gift, ClipboardList, LogOut,
   Sun, Moon, Monitor, ChevronDown, Phone, ExternalLink, Eye, X,
-  MoreHorizontal,
+  MoreHorizontal, Building2, Map,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from './ui';
@@ -55,6 +55,8 @@ export default function Layout() {
     { icon: FileSignature, label: 'Contracts', path: '/contracts', description: 'Agreements & docs' },
     { icon: Gift, label: 'Grants', path: '/grants', description: 'Funding & benefits' },
     { icon: FileText, label: 'Customers', path: '/customers', description: 'Contact information' },
+    { icon: Building2, label: 'Vendors', path: '/vendors', description: 'Supplier management' },
+    { icon: Map, label: 'Cemeteries', path: '/cemeteries', description: 'Plot & grave inventory' },
   ];
 
   const isActive = (path: string) => {
