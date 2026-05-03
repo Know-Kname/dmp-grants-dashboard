@@ -4,6 +4,9 @@
 .github/
 node_modules/
 
+# Supabase project files (Deno Edge Functions, SQL migrations — not part of Vercel build)
+supabase/
+
 # Build artifacts
 dist/
 build/
