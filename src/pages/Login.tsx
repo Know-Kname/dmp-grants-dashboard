@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Balancer from 'react-wrap-balancer';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
-import { Alert } from '../components/ui';
-import { getErrorMessage, getErrorRequestId } from '../lib/errors';
+import { getErrorRequestId } from '../lib/errors';
 import { enableDemoMode } from '../lib/demo-data';
-import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 
@@ -19,6 +18,35 @@ const heroLocations = [
 
 // Mount Auburn-esque landscape — quiet path / dappled light, not a building
 const PHOTO_URL = '/dmp-hero.jpg';
+
+function friendlyAuthError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/invalid.*login.*credentials|invalid.*credentials|wrong.*password|incorrect.*password/i.test(raw))
+    return 'Incorrect email or password. Please try again.';
+  if (/email.*not.*confirm|not.*verified/i.test(raw))
+    return 'Please verify your email address before signing in.';
+  if (/user.*not.*found/i.test(raw))
+    return 'No account found with this email address.';
+  if (/too.*many.*requests|rate.*limit/i.test(raw))
+    return 'Too many attempts. Please wait a moment and try again.';
+  if (/network|fetch|connect|ECONNREFUSED|missing-supabase|invalid.*url/i.test(raw))
+    return 'Unable to reach the authentication service. Please try again or contact your administrator.';
+  if (/oauth.*error|provider.*error/i.test(raw))
+    return 'Google sign-in failed. Please try again or use email and password.';
+  if (raw && raw !== '[object Object]') return raw;
+  return 'Unable to sign in. Please try again.';
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
 
 const EASE_LUX: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -102,7 +130,8 @@ export default function Login() {
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
-  const { login } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { login, signInWithGoogle } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -115,7 +144,7 @@ export default function Login() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(getErrorMessage(err, 'Unable to sign in. Please try again.'));
+      setError(friendlyAuthError(err));
       const requestId = getErrorRequestId(err);
       setErrorDetails(requestId ? [`Request ID: ${requestId}`] : []);
       setShakeKey((k) => k + 1);
@@ -127,6 +156,20 @@ export default function Login() {
   const handleDemo = () => {
     enableDemoMode();
     navigate('/');
+  };
+
+  const handleGoogle = async () => {
+    setError(null);
+    setErrorDetails([]);
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      // Supabase redirects away — no navigate() needed
+    } catch (err) {
+      setError(friendlyAuthError(err));
+      setShakeKey((k) => k + 1);
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -332,24 +375,22 @@ export default function Login() {
               {error && (
                 <motion.div
                   key={shakeKey}
-                  initial={{ opacity: 0 }}
-                  animate={{
-                    opacity: 1,
-                    x: [0, -10, 10, -10, 10, -5, 5, 0],
-                    transition: { duration: 0.5, ease: 'easeOut' },
-                  }}
-                  exit={{ opacity: 0 }}
-                  className="mb-6"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0, x: [0, -8, 8, -8, 8, -4, 4, 0] }}
+                  transition={{ duration: 0.45, ease: 'easeOut' }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="mb-6 flex items-start gap-2.5 rounded px-3.5 py-3 text-sm"
+                  style={{ backgroundColor: 'rgba(185,28,28,0.07)', border: '1px solid rgba(185,28,28,0.18)', color: 'rgb(153,27,27)' }}
                 >
-                  <Alert
-                    title="Unable to sign in"
-                    message={error}
-                    details={errorDetails}
-                    onDismiss={() => {
-                      setError(null);
-                      setErrorDetails([]);
-                    }}
-                  />
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                  <span className="flex-1">{error}{errorDetails.map(d => ` (${d})`).join('')}</span>
+                  <button
+                    onClick={() => { setError(null); setErrorDetails([]); }}
+                    className="flex-shrink-0 text-current/60 hover:text-current transition-colors"
+                    aria-label="Dismiss"
+                  >
+                    ✕
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -463,38 +504,56 @@ export default function Login() {
               </motion.div>
             </form>
 
-            <motion.div
-              variants={fadeUp}
-              className="flex items-center gap-4 my-8"
-            >
-              <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
-              <span
-                className="text-[10px] uppercase"
-                style={{ color: 'rgba(26,26,26,0.4)', letterSpacing: '0.28em' }}
+            {/* ── Google OAuth ── */}
+            <motion.div variants={fadeUp} className="mt-5">
+              <div className="flex items-center gap-4 mb-5">
+                <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
+                <span className="text-[10px] uppercase" style={{ color: 'rgba(26,26,26,0.4)', letterSpacing: '0.28em' }}>or</span>
+                <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
+              </div>
+              <motion.button
+                type="button"
+                onClick={handleGoogle}
+                disabled={googleLoading || loading}
+                whileHover={googleLoading || loading ? {} : { scale: 1.005 }}
+                whileTap={googleLoading || loading ? {} : { scale: 0.995 }}
+                className="w-full flex items-center justify-center gap-3 py-3.5 px-5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  border: '1px solid rgba(26,61,43,0.22)',
+                  color: 'rgba(26,26,26,0.8)',
+                  backgroundColor: 'var(--bone)',
+                  borderRadius: '2px',
+                }}
+                onMouseEnter={(e) => { if (!googleLoading && !loading) e.currentTarget.style.backgroundColor = 'rgba(26,61,43,0.04)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--bone)'; }}
               >
-                or
-              </span>
-              <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
+                {googleLoading ? (
+                  <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(26,61,43,0.2)', borderTopColor: BRAND.green }} />
+                ) : (
+                  <GoogleIcon />
+                )}
+                Continue with Google
+              </motion.button>
             </motion.div>
 
-            <motion.div variants={fadeUp}>
+            {/* ── Demo ── */}
+            <motion.div variants={fadeUp} className="mt-3">
               <motion.button
                 type="button"
                 onClick={handleDemo}
                 whileHover={{ scale: 1.005 }}
                 whileTap={{ scale: 0.995 }}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 text-[11px] uppercase font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2.5 py-3 px-5 text-[11px] uppercase font-medium transition-colors"
                 style={{
-                  border: '1px solid rgba(26,61,43,0.25)',
-                  color: BRAND.green,
+                  color: 'rgba(26,26,26,0.45)',
                   backgroundColor: 'transparent',
                   letterSpacing: '0.22em',
-                  borderRadius: '2px',
+                  border: 'none',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(26,61,43,0.04)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = BRAND.green)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(26,26,26,0.45)')}
               >
-                <Sparkles size={13} style={{ color: BRAND.gold }} />
+                <Sparkles size={12} style={{ color: BRAND.gold }} />
                 Explore Demo
               </motion.button>
             </motion.div>
