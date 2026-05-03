@@ -14,7 +14,7 @@ import {
 const CemeteryMap = lazy(() => import('../components/CemeteryMap'));
 import {
   Plus, Map, ChevronRight, ArrowLeft, Edit, Trash2,
-  AlertCircle, RefreshCw, Home,
+  AlertCircle, RefreshCw, Home, MapPin, Loader2,
 } from 'lucide-react';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -94,8 +94,37 @@ export default function Cemeteries() {
   const [showGraveModal, setShowGraveModal] = useState(false);
   const [editingGrave, setEditingGrave] = useState<Grave | null>(null);
   const [graveForm, setGraveForm] = useState<GraveForm>(emptyGraveForm);
-  const createGrave = useCreateGrave({ onSuccess: () => { setShowGraveModal(false); setGraveForm(emptyGraveForm); } });
-  const updateGrave = useUpdateGrave({ onSuccess: () => { setShowGraveModal(false); setEditingGrave(null); setGraveForm(emptyGraveForm); } });
+  const [gpsState, setGpsState] = useState<{ status: 'idle' | 'capturing' | 'error' | 'success'; message?: string }>({ status: 'idle' });
+  const createGrave = useCreateGrave({ onSuccess: () => { setShowGraveModal(false); setGraveForm(emptyGraveForm); setGpsState({ status: 'idle' }); } });
+  const updateGrave = useUpdateGrave({ onSuccess: () => { setShowGraveModal(false); setEditingGrave(null); setGraveForm(emptyGraveForm); setGpsState({ status: 'idle' }); } });
+
+  const captureGps = () => {
+    if (!('geolocation' in navigator)) {
+      setGpsState({ status: 'error', message: 'Geolocation not supported on this device' });
+      return;
+    }
+    setGpsState({ status: 'capturing' });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGraveForm(p => ({
+          ...p,
+          lat: pos.coords.latitude.toFixed(7),
+          lng: pos.coords.longitude.toFixed(7),
+        }));
+        const accuracy = Math.round(pos.coords.accuracy);
+        setGpsState({ status: 'success', message: `Captured (±${accuracy}m accuracy)` });
+      },
+      (err) => {
+        const messages: Record<number, string> = {
+          1: 'Location permission denied — enable it in browser settings',
+          2: 'Location unavailable — check GPS signal',
+          3: 'Location request timed out',
+        };
+        setGpsState({ status: 'error', message: messages[err.code] ?? err.message });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
   const deleteGrave = useDeleteGrave();
 
   const queryError = cemeteriesQuery.error || sectionsQuery.error || lotsQuery.error || gravesQuery.error;
@@ -574,9 +603,30 @@ export default function Cemeteries() {
               onChange={e => setGraveForm(p => ({ ...p, status: e.target.value as Grave['status'] }))}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Latitude" type="number" step="any" placeholder="e.g. 42.3314" value={graveForm.lat} onChange={e => setGraveForm(p => ({ ...p, lat: e.target.value }))} />
-            <Input label="Longitude" type="number" step="any" placeholder="e.g. -83.0458" value={graveForm.lng} onChange={e => setGraveForm(p => ({ ...p, lng: e.target.value }))} />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-foreground">Coordinates</label>
+              <button
+                type="button"
+                onClick={captureGps}
+                disabled={gpsState.status === 'capturing'}
+                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border border-primary text-primary hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {gpsState.status === 'capturing'
+                  ? <><Loader2 size={12} className="animate-spin" /> Getting location…</>
+                  : <><MapPin size={12} /> Use my location</>
+                }
+              </button>
+            </div>
+            {gpsState.message && (
+              <p className={`text-xs ${gpsState.status === 'error' ? 'text-danger' : 'text-success'}`}>
+                {gpsState.message}
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Latitude" type="number" step="any" placeholder="e.g. 42.3314" value={graveForm.lat} onChange={e => setGraveForm(p => ({ ...p, lat: e.target.value }))} />
+              <Input label="Longitude" type="number" step="any" placeholder="e.g. -83.0458" value={graveForm.lng} onChange={e => setGraveForm(p => ({ ...p, lng: e.target.value }))} />
+            </div>
           </div>
           <Textarea label="Notes" value={graveForm.notes} onChange={e => setGraveForm(p => ({ ...p, notes: e.target.value }))} rows={2} />
         </div>
