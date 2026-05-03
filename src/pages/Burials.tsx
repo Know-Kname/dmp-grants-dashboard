@@ -31,6 +31,7 @@ type BurialFormData = {
   contactEmail: string;
   permitNumber: string;
   notes: string;
+  memorialPublished: boolean;
 };
 
 const initialForm: BurialFormData = {
@@ -39,6 +40,7 @@ const initialForm: BurialFormData = {
   section: '', lot: '', grave: '',
   contactName: '', contactPhone: '', contactEmail: '',
   permitNumber: '', notes: '',
+  memorialPublished: false,
 };
 
 function deceasedName(b: Burial): string {
@@ -95,6 +97,7 @@ export default function Burials() {
       section: formData.section,
       lot: formData.lot,
       grave: formData.grave,
+      memorialPublished: formData.memorialPublished,
       contactName: formData.contactName || undefined,
       contactPhone: formData.contactPhone || undefined,
       contactEmail: formData.contactEmail || undefined,
@@ -122,6 +125,7 @@ export default function Burials() {
       section: b.section || parts[0] || '',
       lot: b.lot || parts[1] || '',
       grave: b.grave || parts[2] || '',
+      memorialPublished: b.memorialPublished ?? false,
       contactName: b.contactName || '',
       contactPhone: b.contactPhone || '',
       contactEmail: b.contactEmail || '',
@@ -340,6 +344,16 @@ export default function Burials() {
             <Input label="Permit Number" value={formData.permitNumber} onChange={f('permitNumber')} />
           </div>
           <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={formData.memorialPublished}
+              onChange={e => setFormData(prev => ({ ...prev, memorialPublished: e.target.checked }))}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-foreground">Publish public memorial page</span>
+            <span className="text-xs text-foreground-muted">(family-facing, no login required)</span>
+          </label>
         </form>
       </Modal>
     </div>
