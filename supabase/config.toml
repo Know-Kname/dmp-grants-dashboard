@@ -1,36 +1,16 @@
-# Supabase project config
+# Supabase CLI project config
 # https://supabase.com/docs/reference/cli/config
+#
+# To link to your remote project:
+#   supabase login
+#   supabase link --project-ref <your-project-ref>
+#
+# The project ref is the alphanumeric ID in your Supabase dashboard URL:
+#   https://supabase.com/dashboard/project/<ref>
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
+[project]
+id = "dmpgrants"
 
-[db]
-port = 54322
-shadow_port = 54320
-major_version = 15
-
-[studio]
-enabled = true
-port = 54323
-
-[inbucket]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-file_size_limit = "50MiB"
-
-[auth]
-enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["https://dmpgrants.vercel.app"]
-jwt_expiry = 3600
-enable_signup = true
-
+# Edge function settings
 [functions.send-payment-reminder]
 verify_jwt = false
