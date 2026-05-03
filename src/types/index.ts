@@ -88,6 +88,8 @@ export interface Burial {
   section: string;
   lot: string;
   grave: string;
+  graveId?: string;
+  memorialPublished?: boolean;
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
@@ -117,6 +119,8 @@ export interface ContractItem {
   id: string;
   description: string;
   amount: number;
+  inventoryId?: string;
+  quantity?: number;
 }
 
 export interface PaymentPlan {
@@ -165,6 +169,64 @@ export interface Vendor {
   email?: string;
   phone?: string;
   address?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Payment Schedule
+export interface PaymentScheduleEntry {
+  id: string;
+  contractId: string;
+  dueDate: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'overdue' | 'waived';
+  paidDate?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Cemetery Hierarchy
+export interface Cemetery {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  phone?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Section {
+  id: string;
+  cemeteryId: string;
+  name: string;
+  description?: string;
+  capacity?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Lot {
+  id: string;
+  sectionId: string;
+  lotNumber: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Grave {
+  id: string;
+  lotId: string;
+  graveNumber: string;
+  status: 'available' | 'reserved' | 'occupied' | 'unavailable';
+  lat?: number;
+  lng?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;

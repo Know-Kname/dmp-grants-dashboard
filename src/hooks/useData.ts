@@ -17,6 +17,11 @@ import type {
   Deposit,
   AccountsReceivable,
   AccountsPayable,
+  PaymentScheduleEntry,
+  Cemetery,
+  Section,
+  Lot,
+  Grave,
 } from '../types';
 
 // ============================================
@@ -588,6 +593,231 @@ export function useDeleteVendor(callbacks?: MutationCallbacks<{ success: boolean
     mutationFn: (id: string) => api.delete<{ success: boolean }>(`/vendors/${id}`),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+// ============================================
+// PAYMENT SCHEDULE
+// ============================================
+
+export function usePaymentSchedule(contractId: string) {
+  return useQuery({
+    queryKey: queryKeys.paymentSchedule.byContract(contractId),
+    queryFn: () => api.get<PaymentScheduleEntry[]>(`/payment-schedule?contractId=${contractId}`),
+    enabled: !!contractId,
+  });
+}
+
+export function useCreatePaymentScheduleEntry(callbacks?: MutationCallbacks<PaymentScheduleEntry>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<PaymentScheduleEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<PaymentScheduleEntry>('/payment-schedule', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.paymentSchedule.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useUpdatePaymentScheduleEntry(callbacks?: MutationCallbacks<PaymentScheduleEntry>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<PaymentScheduleEntry> & { id: string }) =>
+      api.put<PaymentScheduleEntry>(`/payment-schedule/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.paymentSchedule.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+// ============================================
+// CEMETERY HIERARCHY
+// ============================================
+
+export function useCemeteries() {
+  return useQuery({
+    queryKey: queryKeys.cemeteries.list(),
+    queryFn: () => api.get<Cemetery[]>('/cemeteries'),
+  });
+}
+
+export function useCreateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Cemetery, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<Cemetery>('/cemeteries', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useUpdateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Cemetery> & { id: string }) =>
+      api.put<Cemetery>(`/cemeteries/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useDeleteCemetery(callbacks?: MutationCallbacks<{ success: boolean }>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/cemeteries/${id}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useSections(cemeteryId: string) {
+  return useQuery({
+    queryKey: queryKeys.sections.byCemetery(cemeteryId),
+    queryFn: () => api.get<Section[]>('/sections', { params: { cemeteryId } }),
+    enabled: !!cemeteryId,
+  });
+}
+
+export function useCreateSection(callbacks?: MutationCallbacks<Section>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Section, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<Section>('/sections', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useUpdateSection(callbacks?: MutationCallbacks<Section>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Section> & { id: string }) =>
+      api.put<Section>(`/sections/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useDeleteSection(callbacks?: MutationCallbacks<{ success: boolean }>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/sections/${id}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useLots(sectionId: string) {
+  return useQuery({
+    queryKey: queryKeys.lots.bySection(sectionId),
+    queryFn: () => api.get<Lot[]>('/lots', { params: { sectionId } }),
+    enabled: !!sectionId,
+  });
+}
+
+export function useCreateLot(callbacks?: MutationCallbacks<Lot>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Lot, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<Lot>('/lots', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useUpdateLot(callbacks?: MutationCallbacks<Lot>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Lot> & { id: string }) =>
+      api.put<Lot>(`/lots/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useDeleteLot(callbacks?: MutationCallbacks<{ success: boolean }>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/lots/${id}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useGraves(lotId: string) {
+  return useQuery({
+    queryKey: queryKeys.graves.byLot(lotId),
+    queryFn: () => api.get<Grave[]>('/graves', { params: { lotId } }),
+    enabled: !!lotId,
+  });
+}
+
+export function useCreateGrave(callbacks?: MutationCallbacks<Grave>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Grave, 'id' | 'createdAt' | 'updatedAt'>) =>
+      api.post<Grave>('/graves', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useUpdateGrave(callbacks?: MutationCallbacks<Grave>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Grave> & { id: string }) =>
+      api.put<Grave>(`/graves/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+export function useDeleteGrave(callbacks?: MutationCallbacks<{ success: boolean }>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/graves/${id}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => callbacks?.onError?.(error),
