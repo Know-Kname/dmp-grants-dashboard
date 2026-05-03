@@ -14,7 +14,7 @@ import {
 const CemeteryMap = lazy(() => import('../components/CemeteryMap'));
 import {
   Plus, Map, ChevronRight, ArrowLeft, Edit, Trash2,
-  AlertCircle, RefreshCw, Home, MapPin, Loader2,
+  AlertCircle, RefreshCw, MapPin, Loader2, Building2,
 } from 'lucide-react';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -199,8 +199,8 @@ export default function Cemeteries() {
       {level !== 'cemeteries' && (
         <div className="flex items-center gap-2 text-sm">
           <button onClick={goToCemeteries} className="flex items-center gap-1 text-primary hover:text-primary-hover">
-            <Home size={14} />
-            Cemeteries
+            <Building2 size={14} />
+            All cemeteries
           </button>
           {selectedCemetery && (
             <>
@@ -407,7 +407,19 @@ export default function Cemeteries() {
                     </div>
                   }
                 >
-                  <CemeteryMap graves={graves} height={360} />
+                  <CemeteryMap
+                    graves={graves}
+                    height={360}
+                    onMapPinDrop={(coords) => {
+                      setEditingGrave(null);
+                      setGraveForm({
+                        ...emptyGraveForm,
+                        lat: coords.lat.toFixed(7),
+                        lng: coords.lng.toFixed(7),
+                      });
+                      setShowGraveModal(true);
+                    }}
+                  />
                 </Suspense>
               </CardBody>
             </Card>
