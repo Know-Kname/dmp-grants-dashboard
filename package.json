@@ -16,9 +16,11 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@studio-freight/lenis": "^1.0.42",
     "@supabase/supabase-js": "^2.38.0",
     "@tanstack/react-query": "^5.0.0",
     "date-fns": "^2.29.3",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.263.1",
     "maplibre-gl": "^5.24.0",
     "react": "^18.2.0",

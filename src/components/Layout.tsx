@@ -10,6 +10,7 @@ import {
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from './ui';
 import { COMPANY } from '../config/company';
+import AIAssistant from './AIAssistant';
 
 export default function Layout() {
   const { currentUser: user, logout, isDemo } = useAuth();
@@ -363,6 +364,7 @@ export default function Layout() {
           </div>
         </main>
       </div>
+      <AIAssistant />
     </div>
   );
 }

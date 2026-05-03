@@ -158,6 +158,27 @@
     --status-cancelled: var(--slate-400);
 
     /* ========================================
+       TYPOGRAPHY
+       ======================================== */
+    --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* Fluid type scale (min at 320px → max at 1440px) */
+    --step-0: clamp(0.875rem, 0.85rem + 0.125vw, 1rem);
+    --step-1: clamp(1.125rem, 1.05rem + 0.375vw, 1.5rem);
+    --step-2: clamp(1.5rem, 1.35rem + 0.75vw, 2.25rem);
+    --step-3: clamp(2rem, 1.75rem + 1.25vw, 3.5rem);
+    --step-4: clamp(2.5rem, 2.1rem + 2vw, 5rem);
+
+    /* ========================================
+       DMP BRAND PALETTE (raw hex for non-token use)
+       ======================================== */
+    --bone: #F5F1EA;      /* warm off-white — public pages */
+    --ink: #1a1a1a;       /* near-black body text */
+    --gold-hex: #c49a2c;  /* DMP gold */
+    --forest-hex: #1a3d2b; /* DMP forest green */
+
+    /* ========================================
        SIZING & SPACING
        ======================================== */
     --touch-target-min: 44px;
@@ -265,8 +286,7 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.6;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
