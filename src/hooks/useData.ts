@@ -5,6 +5,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, getErrorMessage } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import { toCamelCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
 import type {
   WorkOrder,
@@ -821,6 +823,29 @@ export function useDeleteGrave(callbacks?: MutationCallbacks<{ success: boolean 
       callbacks?.onSuccess?.(data);
     },
     onError: (error: Error) => callbacks?.onError?.(error),
+  });
+}
+
+// ============================================
+// PUBLIC MEMORIAL (no auth — uses Supabase direct with anon RLS policy)
+// ============================================
+
+export function usePublicBurial(id: string) {
+  return useQuery({
+    queryKey: ['burials', 'memorial', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('burials')
+        .select('id, deceased_first_name, deceased_last_name, deceased_middle_name, date_of_birth, date_of_death, burial_date, plot_location, section, lot, grave, memorial_published')
+        .eq('id', id)
+        .eq('memorial_published', true)
+        .single();
+      if (error) throw new Error(error.message);
+      return toCamelCaseKeys(data) as unknown as Burial;
+    },
+    enabled: !!id,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
   });
 }
 

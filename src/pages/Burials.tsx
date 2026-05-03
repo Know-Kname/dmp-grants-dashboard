@@ -12,9 +12,10 @@ import {
 } from '../components/ui';
 import {
   Plus, Search, BookOpen, Edit, Trash2,
-  AlertCircle, RefreshCw, Calendar,
+  AlertCircle, RefreshCw, Calendar, QrCode, Globe,
 } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
+import QRCode from 'react-qr-code';
 
 type BurialFormData = {
   deceasedFirstName: string;
@@ -57,6 +58,7 @@ export default function Burials() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
+  const [qrBurial, setQrBurial] = useState<Burial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<BurialFormData>(initialForm);
 
@@ -289,6 +291,16 @@ export default function Burials() {
                         : <span className="text-foreground-muted">—</span>}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
+                      {b.memorialPublished && (
+                        <button
+                          onClick={() => setQrBurial(b)}
+                          className="text-info hover:text-info-hover"
+                          aria-label="Show QR code"
+                          title="Memorial QR code"
+                        >
+                          <QrCode size={17} />
+                        </button>
+                      )}
                       <button onClick={() => handleEdit(b)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
                       <button onClick={() => handleDelete(b.id)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
                     </td>
@@ -300,7 +312,44 @@ export default function Burials() {
         </Card>
       )}
 
-      {/* Modal */}
+      {/* QR Code Modal */}
+      {qrBurial && (
+        <Modal
+          isOpen={!!qrBurial}
+          onClose={() => setQrBurial(null)}
+          title="Memorial QR Code"
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setQrBurial(null)}>Close</Button>
+              <Button variant="primary" icon={<Globe size={16} />} onClick={() => window.open(`/memorial/${qrBurial.id}`, '_blank')}>
+                Open Memorial
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col items-center gap-4 py-2">
+            <div className="bg-white p-4 rounded-xl border border-border shadow-sm">
+              <QRCode
+                value={`${window.location.origin}/memorial/${qrBurial.id}`}
+                size={180}
+              />
+            </div>
+            <p className="text-sm font-medium text-foreground text-center">{deceasedName(qrBurial)}</p>
+            <p className="text-xs text-foreground-muted text-center break-all">
+              {window.location.origin}/memorial/{qrBurial.id}
+            </p>
+            <button
+              onClick={() => window.print()}
+              className="text-xs text-primary hover:underline"
+            >
+              Print this QR code
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Burial Record Modal */}
       <Modal
         isOpen={showModal}
         onClose={() => { setShowModal(false); setEditingBurial(null); }}

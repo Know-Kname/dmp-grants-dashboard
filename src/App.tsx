@@ -14,6 +14,7 @@ import Contracts from './pages/Contracts';
 import Customers from './pages/Customers';
 import Vendors from './pages/Vendors';
 import Cemeteries from './pages/Cemeteries';
+import MemorialPage from './pages/MemorialPage';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,6 +36,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/memorial/:id" element={<MemorialPage />} />
       <Route
         path="/"
         element={
