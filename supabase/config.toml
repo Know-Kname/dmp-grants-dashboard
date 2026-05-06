@@ -1,0 +1,15 @@
+# Supabase CLI project config
+# Project: supaduba
+# URL: https://mgpwjnxtqcnoyjgebytg.supabase.co
+# Ref: mgpwjnxtqcnoyjgebytg
+#
+# To link locally:
+#   supabase login
+#   supabase link --project-ref mgpwjnxtqcnoyjgebytg
+
+[project]
+id = "supaduba"
+
+# Edge function settings
+[functions.send-payment-reminder]
+verify_jwt = false

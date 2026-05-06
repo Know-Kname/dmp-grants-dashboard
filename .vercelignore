@@ -1,35 +1,34 @@
-# Development
+# Development tooling
 .cursor/
 .git/
 .github/
 node_modules/
 
+# Supabase project files (Deno Edge Functions, SQL migrations — not part of Vercel build)
+supabase/
+
 # Build artifacts
 dist/
 build/
+coverage/
+.nyc_output/
 
-# Documentation (keep only essential)
+# Documentation (not needed at runtime)
 docs/
 *.md
 !README.md
 
-# Environment files (except example)
+# Environment files (never deploy secrets; example is fine)
 .env*
 !.env.example
 
-# Server files (not needed for frontend)
-server/
-Dockerfile*
-docker-compose.yml
-railway.toml
-render.yaml
-Procfile
+# Test and lint config
+vitest.config.*
+.eslintrc.*
+# NOTE: tsconfig.node.json must NOT be ignored — it's referenced by tsconfig.json
+# via `references: [{ path: ./tsconfig.node.json }]` and removing it breaks tsc
 
-# Testing and coverage
-coverage/
-.nyc_output/
-
-# Logs and OS files
+# Logs and OS noise
 *.log
 .DS_Store
 Thumbs.db

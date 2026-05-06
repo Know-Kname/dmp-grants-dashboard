@@ -158,6 +158,42 @@
     --status-cancelled: var(--slate-400);
 
     /* ========================================
+       TYPOGRAPHY — Green-Wood lodestar
+       ======================================== */
+    --font-display: 'Fraunces', 'Source Serif 4', Georgia, serif;
+    --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* Fluid type scale (min at 320px → max at 1440px) */
+    --step-0: clamp(0.875rem, 0.85rem + 0.125vw, 1rem);
+    --step-1: clamp(1.125rem, 1.05rem + 0.375vw, 1.5rem);
+    --step-2: clamp(1.5rem, 1.35rem + 0.75vw, 2.25rem);
+    --step-3: clamp(2rem, 1.75rem + 1.25vw, 3.5rem);
+    --step-4: clamp(2.5rem, 2.1rem + 2vw, 5rem);
+    --step-display: clamp(3rem, 7vw, 7rem); /* Memorial hero */
+
+    /* ========================================
+       DMP BRAND PALETTE — 60/30/10 forest/bone/gold
+       ======================================== */
+    --bone: #F5F1EA;          /* page background */
+    --bone-200: #ECE5D8;      /* card surfaces */
+    --ink: #1a1a1a;           /* body text on bone */
+    --gold-hex: #c49a2c;      /* accent — fewer than 5 places per page */
+    --gold-soft: #d4b35c;     /* ornamental rules */
+    --forest-hex: #1a3d2b;    /* sidebar, hero overlays */
+    --forest-700: #2d5240;    /* hover, gradient mid */
+    --forest-900: #0f2419;    /* deep section bg */
+    --taupe: #9C8E7D;         /* secondary text, captions (Pendragon) */
+
+    /* ========================================
+       MOTION — heavy, contemplative
+       ======================================== */
+    --ease-lux: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-micro: 200ms;
+    --dur-reveal: 1000ms;
+    --dur-hero: 2400ms;
+
+    /* ========================================
        SIZING & SPACING
        ======================================== */
     --touch-target-min: 44px;
@@ -265,8 +301,7 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.6;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
@@ -585,4 +620,29 @@ html {
 
 .focus-ring:focus-visible {
   box-shadow: 0 0 0 2px hsl(var(--ring-offset)), 0 0 0 4px hsl(var(--ring));
+}
+
+/* Login page brand-green button + demo button hover states.
+   Inline here (not Tailwind) because brand colors must stay fixed
+   regardless of light/dark theme — same rationale as the sidebar. */
+:root {
+  --brand-green: #1a3d2b;
+  --brand-green-deep: #0f2419;
+  --brand-gold: #c49a2c;
+}
+
+.login-submit {
+  background-color: var(--brand-green);
+}
+.login-submit:not(:disabled):hover {
+  background-color: var(--brand-green-deep);
+}
+
+.login-demo {
+  border-color: rgba(196, 154, 44, 0.4);
+  background-color: rgba(196, 154, 44, 0.05);
+}
+.login-demo:hover {
+  border-color: var(--brand-gold);
+  background-color: rgba(196, 154, 44, 0.1);
 }

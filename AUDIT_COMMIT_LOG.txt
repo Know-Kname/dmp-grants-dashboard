@@ -1,0 +1,54 @@
+* 35cf96c feat: add interactive locations map + satellite view throughout
+* c63bef8 feat: add Google OAuth login + improve auth error messages
+* af620b2 design: integrate real DMP logos and grounds photography
+* 7b38bee design: Green-Wood lodestar redesign — Memorial + Login pages
+* 2874596 design: museum-monograph redesign — Login + Memorial pages
+* c37b88b feat: map search, find-nearest-available, drop-pin + UX fixes
+* 3872813 feat: GPS capture + status filter for cemetery map
+* b2117b5 fix: stop ignoring tsconfig.node.json — it's required for the build
+* 468cb59 fix: correct supabase project.id to supaduba (was dmpgrants)
+* 6ec8c8c fix: overhaul CI, Vercel config, and Supabase config after deep audit
+* a09c731 fix: exclude supabase/ from Vercel deploy
+* 1ca0599 fix: harden Supabase init and pin Node version for Vercel deploys
+* f3af5fc feat: Step 7 — cemetery map with maplibre-gl
+* 5181c8d feat: Steps 2-6 — Supabase migrations and payment-reminder Edge Function
+* 191aaab feat: Step 4 — memorial pages with QR codes (public route)
+* 9c1ba24 feat: Step 3 — full Cemeteries hierarchy page + memorial toggle on Burials
+* 4af1027 feat: Step 2 — types, payment schedule hooks, cemetery hierarchy hooks, Contracts UI
+* a07bfd3 feat: add Vendors page and vendor hooks (Step 1)
+* 26d7be7 refactor(work-orders): migrate from Express API to React Query + fix dark mode
+* 1509305 refactor(login): apply simplify-pass cleanups
+* 4fa68bd feat: redesign login screen with modern split-screen layout
+* 418bb32 fix: stage missed working-tree changes from docs overhaul
+* a86f0e5 docs: rewrite documentation, remove legacy deploy infrastructure
+| * cf2e9b2 Fix demo login, add Gemini AI assistant, add DMP photos
+| * d9490ed Redesign app shell: dark DMP-green sidebar with gold branding
+| * 3f9325a Add toast notifications, fix login, store OpenRouter key
+| *   f199b58 Merge claude/finish-site-audit-2ICL3 into main
+| |\  
+| |/  
+|/|   
+* | 92c4df1 Improve mobile nav with More drawer, upgrade EmptyState visuals
+* | 7e91210 Redesign Dashboard with recharts charts, brand hero, and KPI grid
+* | 9415217 feat: implement 5 missing CMS modules and fix blocking bugs
+| * 796fa9a feat: redesign login page with DMP brand split-panel layout
+| * 7a11281 fix: add ESLint config, test deps, and resolve all lint errors
+| * 408f723 feat: implement 5 missing CMS modules and fix blocking bugs (#35)
+|/  
+* f79bf08 security: pin GitHub Actions to commit SHAs for supply chain protection
+* b66adfc ci: add Dependabot config for npm and GitHub Actions updates
+* 466b6b3 ci: add GitHub Actions workflows, PR/issue templates, and security policy
+* 932a889 Replace demo auth with Supabase authentication
+* 59fdb06 Fix package.json and add Supabase dependency
+* 8b33960 Add @supabase/supabase-js dependency
+* 4b176b7 Add Supabase client configuration and types
+* aca6768 Fix install command: use npm install instead of npm ci
+* 4049f2d Remove package-lock.json to resolve Zod version conflict
+* 8734a21 Relax TypeScript config to allow deployment with current code
+* 6d0f957 Fix TypeScript build: downgrade Zod to v3 for compatibility
+* c84b817 Fix vercel.json: remove routes to fix deployment conflict
+* 223e0a4 Add .vercelignore for optimized Vercel builds
+* 2f37595 Optimize vercel.json for new dmpgrants deployment
+* 9243954 feat: Add preview mode, PWA support, and comprehensive deployment guide
+* 54dd0ec feat: Comprehensive system upgrade with data layer, UI improvements, and production data import
+* 8728a27 Add npm publish workflow for GitHub Actions

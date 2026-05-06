@@ -3,6 +3,7 @@ import {
   useDeposits, useCreateDeposit,
   useReceivables, useCreateReceivable, useUpdateReceivable,
   usePayables, useCreatePayable, useUpdatePayable,
+  useVendors,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
 import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
@@ -74,6 +75,7 @@ export default function Financial() {
   const depositsQuery = useDeposits();
   const receivablesQuery = useReceivables();
   const payablesQuery = usePayables();
+  const { data: vendors = [] } = useVendors();
 
   const deposits = depositsQuery.data ?? [];
   const receivables = receivablesQuery.data ?? [];
@@ -462,7 +464,7 @@ export default function Financial() {
                         return (
                           <tr key={p.id} className="hover:bg-accent/40 transition-colors">
                             <td className="px-6 py-4 font-mono text-xs font-medium text-foreground">{p.invoiceNumber}</td>
-                            <td className="px-6 py-4 text-foreground-muted">{p.vendorId}</td>
+                            <td className="px-6 py-4 text-foreground-muted">{vendors.find(v => v.id === p.vendorId)?.name ?? p.vendorId}</td>
                             <td className="px-6 py-4 text-right text-foreground">{formatCurrency(p.amount)}</td>
                             <td className="px-6 py-4 text-right text-success">{formatCurrency(p.amountPaid)}</td>
                             <td className={cn('px-6 py-4 text-right font-medium', p.status === 'overdue' ? 'text-danger' : 'text-foreground-muted')}>
@@ -557,7 +559,13 @@ export default function Financial() {
           {activeTab === 'payables' && !editingPayable && (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Vendor ID" value={payableForm.vendorId} onChange={e => setPayableForm(p => ({ ...p, vendorId: e.target.value }))} required />
+                <Select
+                  label="Vendor"
+                  value={payableForm.vendorId}
+                  onChange={e => setPayableForm(p => ({ ...p, vendorId: e.target.value }))}
+                  options={vendors.map(v => ({ value: v.id, label: v.name }))}
+                  placeholder="Select vendor..."
+                />
                 <Input label="Invoice #" value={payableForm.invoiceNumber} onChange={e => setPayableForm(p => ({ ...p, invoiceNumber: e.target.value }))} required />
               </div>
               <div className="grid grid-cols-2 gap-4">

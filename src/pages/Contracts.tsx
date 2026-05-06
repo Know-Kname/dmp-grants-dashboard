@@ -2,19 +2,20 @@ import { useState, useMemo } from 'react';
 import {
   useContracts, useCreateContract,
   useUpdateContract, useDeleteContract,
+  useCustomers, usePaymentSchedule,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
 import { formatCurrency, formatDate, formatDateForInput, cn } from '../lib/utils';
-import type { Contract } from '../types';
+import type { Contract, ContractItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,
   Badge, EmptyState, LoadingSpinner,
 } from '../components/ui';
 import {
   Plus, Search, FileText, Edit, Trash2,
-  AlertCircle, RefreshCw, DollarSign, TrendingUp,
+  AlertCircle, RefreshCw, DollarSign, TrendingUp, X,
+  CalendarDays,
 } from 'lucide-react';
-import { useToast } from '../lib/toast';
 
 type ContractFormData = {
   contractNumber: string;
@@ -23,6 +24,12 @@ type ContractFormData = {
   totalAmount: string;
   signedDate: string;
   status: Contract['status'];
+};
+
+type LineItemDraft = {
+  tempId: string;
+  description: string;
+  amount: string;
 };
 
 const initialForm: ContractFormData = {
@@ -39,6 +46,10 @@ const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: 'transferred', label: 'Transferred' },
 ];
 
+const SCHEDULE_STATUS_VARIANT: Record<string, 'success' | 'danger' | 'warning' | 'secondary'> = {
+  paid: 'success', overdue: 'danger', pending: 'warning', waived: 'secondary',
+};
+
 const statusBadge = (s: Contract['status']) => {
   const map: Record<Contract['status'], 'success' | 'primary' | 'danger' | 'warning'> = {
     active: 'success', paid: 'primary', cancelled: 'danger', transferred: 'warning',
@@ -54,22 +65,55 @@ const typeBadge = (t: Contract['type']) =>
     {t === 'pre_need' ? 'Pre-Need' : 'At-Need'}
   </Badge>;
 
+function PaymentScheduleSection({ contractId }: { contractId: string }) {
+  const { data: entries = [], isLoading } = usePaymentSchedule(contractId);
+  if (isLoading) return <LoadingSpinner size="sm" className="py-2" />;
+  if (entries.length === 0) {
+    return (
+      <p className="text-sm text-foreground-muted py-2">
+        No payment schedule entries yet.
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-xs">
+        <thead className="bg-background-subtle">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium text-foreground-muted uppercase tracking-wider">#</th>
+            <th className="px-3 py-2 text-left font-medium text-foreground-muted uppercase tracking-wider">Due</th>
+            <th className="px-3 py-2 text-right font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
+            <th className="px-3 py-2 text-right font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
+            <th className="px-3 py-2 text-left font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {entries.map((e, i) => (
+            <tr key={e.id} className="hover:bg-accent/30">
+              <td className="px-3 py-2 text-foreground-muted">{i + 1}</td>
+              <td className="px-3 py-2 text-foreground">{formatDate(e.dueDate)}</td>
+              <td className="px-3 py-2 text-right text-foreground">{formatCurrency(e.amount)}</td>
+              <td className="px-3 py-2 text-right text-success">{formatCurrency(e.paidDate ? e.amount : 0)}</td>
+              <td className="px-3 py-2">
+                <Badge variant={SCHEDULE_STATUS_VARIANT[e.status] ?? 'secondary'} size="sm">
+                  {e.status.charAt(0).toUpperCase() + e.status.slice(1)}
+                </Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function Contracts() {
   const { data: contracts = [], isLoading, error, refetch } = useContracts();
+  const { data: customers = [] } = useCustomers();
 
-  const toast = useToast();
-  const createMutation = useCreateContract({
-    onSuccess: () => { toast.success('Contract created'); setShowModal(false); setFormData(initialForm); },
-    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create contract'),
-  });
-  const updateMutation = useUpdateContract({
-    onSuccess: () => { toast.success('Contract updated'); setShowModal(false); setEditingContract(null); setFormData(initialForm); },
-    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update contract'),
-  });
-  const deleteMutation = useDeleteContract({
-    onSuccess: () => toast.success('Contract removed'),
-    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
-  });
+  const createMutation = useCreateContract({ onSuccess: () => { setShowModal(false); setFormData(initialForm); setLineItems([]); } });
+  const updateMutation = useUpdateContract({ onSuccess: () => { setShowModal(false); setEditingContract(null); setFormData(initialForm); setLineItems([]); } });
+  const deleteMutation = useDeleteContract();
 
   const [showModal, setShowModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
@@ -77,6 +121,19 @@ export default function Contracts() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [formData, setFormData] = useState<ContractFormData>(initialForm);
+  const [lineItems, setLineItems] = useState<LineItemDraft[]>([]);
+
+  const customerOptions = useMemo(() =>
+    customers.map(c => ({ value: c.id, label: `${c.lastName}, ${c.firstName}` })),
+    [customers]
+  );
+
+  const computedTotal = useMemo(() =>
+    lineItems.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0),
+    [lineItems]
+  );
+
+  const displayTotal = lineItems.length > 0 ? computedTotal : parseFloat(formData.totalAmount) || 0;
 
   const stats = useMemo(() => ({
     total: contracts.length,
@@ -105,15 +162,19 @@ export default function Contracts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const itemsPayload = lineItems.map(({ description, amount }) => ({
+      description,
+      amount: parseFloat(amount) || 0,
+    }));
     const payload = {
       contractNumber: formData.contractNumber,
       type: formData.type,
       customerId: formData.customerId,
-      totalAmount: parseFloat(formData.totalAmount) || 0,
+      totalAmount: lineItems.length > 0 ? computedTotal : parseFloat(formData.totalAmount) || 0,
       amountPaid: editingContract ? editingContract.amountPaid : 0,
       signedDate: formData.signedDate,
       status: formData.status,
-      items: editingContract ? editingContract.items : [],
+      items: (itemsPayload.length > 0 ? itemsPayload : (editingContract?.items ?? [])) as ContractItem[],
     };
     if (editingContract) {
       updateMutation.mutate({ id: editingContract.id, ...payload });
@@ -132,6 +193,11 @@ export default function Contracts() {
       signedDate: formatDateForInput(c.signedDate),
       status: c.status,
     });
+    setLineItems((c.items ?? []).map(item => ({
+      tempId: item.id || crypto.randomUUID(),
+      description: item.description,
+      amount: String(item.amount),
+    })));
     setShowModal(true);
   };
 
@@ -141,10 +207,33 @@ export default function Contracts() {
     }
   };
 
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingContract(null);
+    setFormData(initialForm);
+    setLineItems([]);
+  };
+
+  const addLineItem = () => setLineItems(prev => [
+    ...prev,
+    { tempId: crypto.randomUUID(), description: '', amount: '' },
+  ]);
+
+  const removeLineItem = (tempId: string) =>
+    setLineItems(prev => prev.filter(i => i.tempId !== tempId));
+
+  const updateLineItem = (tempId: string, field: 'description' | 'amount', value: string) =>
+    setLineItems(prev => prev.map(i => i.tempId === tempId ? { ...i, [field]: value } : i));
+
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   const f = (field: keyof ContractFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
+
+  const customerName = (customerId: string) => {
+    const c = customers.find(x => x.id === customerId);
+    return c ? `${c.lastName}, ${c.firstName}` : customerId;
+  };
 
   return (
     <div className="space-y-6">
@@ -158,7 +247,7 @@ export default function Contracts() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingContract(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingContract(null); setLineItems([]); setShowModal(true); }}>
             New Contract
           </Button>
         </div>
@@ -243,7 +332,7 @@ export default function Contracts() {
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="flex-1 min-w-48">
               <Input
-                placeholder="Search by contract # or customer ID..."
+                placeholder="Search by contract # or customer..."
                 icon={<Search size={18} />}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -262,7 +351,6 @@ export default function Contracts() {
             </div>
             <span className="text-sm text-foreground-muted">{filteredContracts.length} of {contracts.length}</span>
           </div>
-          {/* PandaDoc-style pill status tabs */}
           <div className="flex gap-1 p-1 bg-background-subtle rounded-lg border border-border w-fit">
             {STATUS_TABS.map(tab => (
               <button
@@ -322,7 +410,7 @@ export default function Contracts() {
                     <tr key={c.id} className="hover:bg-accent/40 transition-colors">
                       <td className="px-6 py-4 font-mono text-sm font-medium text-foreground">{c.contractNumber}</td>
                       <td className="px-6 py-4">{typeBadge(c.type)}</td>
-                      <td className="px-6 py-4 text-foreground-muted">{c.customerId}</td>
+                      <td className="px-6 py-4 text-foreground-muted">{customerName(c.customerId)}</td>
                       <td className="px-6 py-4 text-right text-foreground">{formatCurrency(c.totalAmount)}</td>
                       <td className="px-6 py-4 text-right text-success">{formatCurrency(c.amountPaid)}</td>
                       <td className={cn('px-6 py-4 text-right font-medium', balance > 0 ? 'text-warning' : 'text-foreground-muted')}>
@@ -346,49 +434,168 @@ export default function Contracts() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingContract(null); }}
+        onClose={handleCloseModal}
         title={editingContract ? 'Edit Contract' : 'New Contract'}
-        size="md"
+        size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
               {editingContract ? 'Save Changes' : 'Create Contract'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Contract Number" value={formData.contractNumber} onChange={f('contractNumber')} required />
-            <Select
-              label="Type"
-              options={[
-                { value: 'at_need', label: 'At-Need' },
-                { value: 'pre_need', label: 'Pre-Need' },
-              ]}
-              value={formData.type}
-              onChange={f('type')}
-            />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Contract Header */}
+          <div>
+            <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">Contract Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Contract Number" value={formData.contractNumber} onChange={f('contractNumber')} required />
+              <Select
+                label="Type"
+                options={[
+                  { value: 'at_need', label: 'At-Need' },
+                  { value: 'pre_need', label: 'Pre-Need' },
+                ]}
+                value={formData.type}
+                onChange={f('type')}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <Select
+                label="Customer"
+                options={customerOptions}
+                value={formData.customerId}
+                onChange={f('customerId')}
+                placeholder="Select customer..."
+              />
+              <Select
+                label="Status"
+                options={[
+                  { value: 'active', label: 'Active' },
+                  { value: 'paid', label: 'Paid' },
+                  { value: 'cancelled', label: 'Cancelled' },
+                  { value: 'transferred', label: 'Transferred' },
+                ]}
+                value={formData.status}
+                onChange={f('status')}
+              />
+            </div>
+            <div className="mt-4">
+              <Input label="Signed Date" type="date" value={formData.signedDate} onChange={f('signedDate')} required />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Customer ID" value={formData.customerId} onChange={f('customerId')} required />
-            <Select
-              label="Status"
-              options={[
-                { value: 'active', label: 'Active' },
-                { value: 'paid', label: 'Paid' },
-                { value: 'cancelled', label: 'Cancelled' },
-                { value: 'transferred', label: 'Transferred' },
-              ]}
-              value={formData.status}
-              onChange={f('status')}
-            />
+
+          {/* Line Items */}
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Line Items</p>
+              <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={addLineItem} type="button">
+                Add Item
+              </Button>
+            </div>
+            {lineItems.length === 0 ? (
+              <div className="flex items-center gap-3">
+                <Input
+                  label="Total Amount ($)"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.totalAmount}
+                  onChange={f('totalAmount')}
+                  required={lineItems.length === 0}
+                />
+                <p className="text-xs text-foreground-muted mt-6 whitespace-nowrap">or add line items above</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {lineItems.map((item) => (
+                  <div key={item.tempId} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Description"
+                        value={item.description}
+                        onChange={e => updateLineItem(item.tempId, 'description', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        placeholder="Amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.amount}
+                        onChange={e => updateLineItem(item.tempId, 'amount', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLineItem(item.tempId)}
+                      className="mt-0 text-foreground-muted hover:text-danger transition-colors shrink-0"
+                      aria-label="Remove item"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex justify-end pt-1">
+                  <div className="text-sm font-semibold text-foreground">
+                    Total: {formatCurrency(computedTotal)}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Total Amount ($)" type="number" min="0" step="0.01" value={formData.totalAmount} onChange={f('totalAmount')} required />
-            <Input label="Signed Date" type="date" value={formData.signedDate} onChange={f('signedDate')} required />
-          </div>
+
+          {/* Payment Summary (editing only) */}
+          {editingContract && (
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">Payment Summary</p>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-background-subtle rounded-lg p-3">
+                  <p className="text-xs text-foreground-muted mb-1">Contract Total</p>
+                  <p className="text-base font-bold text-foreground">{formatCurrency(displayTotal)}</p>
+                </div>
+                <div className="bg-background-subtle rounded-lg p-3">
+                  <p className="text-xs text-foreground-muted mb-1">Amount Paid</p>
+                  <p className="text-base font-bold text-success">{formatCurrency(editingContract.amountPaid)}</p>
+                </div>
+                <div className="bg-background-subtle rounded-lg p-3">
+                  <p className="text-xs text-foreground-muted mb-1">Balance Due</p>
+                  <p className={cn('text-base font-bold', (displayTotal - editingContract.amountPaid) > 0 ? 'text-warning' : 'text-foreground-muted')}>
+                    {formatCurrency(displayTotal - editingContract.amountPaid)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Payment Plan Details */}
+              {editingContract.paymentPlan && (
+                <div className="mt-3 p-3 bg-info-50 dark:bg-info-950 border border-info-200 dark:border-info-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CalendarDays size={14} className="text-info" />
+                    <p className="text-xs font-medium text-info">Payment Plan</p>
+                  </div>
+                  <p className="text-sm text-foreground-muted">
+                    {editingContract.paymentPlan.frequency.replace('_', '-')} ·{' '}
+                    {formatCurrency(editingContract.paymentPlan.installmentAmount)} / installment ·{' '}
+                    Starting {formatDate(editingContract.paymentPlan.startDate)}
+                    {editingContract.paymentPlan.endDate ? ` — ${formatDate(editingContract.paymentPlan.endDate)}` : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Payment Schedule (editing pre_need only) */}
+          {editingContract && editingContract.type === 'pre_need' && (
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">Payment Schedule</p>
+              <PaymentScheduleSection contractId={editingContract.id} />
+            </div>
+          )}
         </form>
       </Modal>
     </div>

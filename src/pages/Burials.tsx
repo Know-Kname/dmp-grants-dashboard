@@ -12,10 +12,10 @@ import {
 } from '../components/ui';
 import {
   Plus, Search, BookOpen, Edit, Trash2,
-  AlertCircle, RefreshCw, Calendar,
+  AlertCircle, RefreshCw, Calendar, QrCode, Globe,
 } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
-import { useToast } from '../lib/toast';
+import QRCode from 'react-qr-code';
 
 type BurialFormData = {
   deceasedFirstName: string;
@@ -32,6 +32,7 @@ type BurialFormData = {
   contactEmail: string;
   permitNumber: string;
   notes: string;
+  memorialPublished: boolean;
 };
 
 const initialForm: BurialFormData = {
@@ -40,6 +41,7 @@ const initialForm: BurialFormData = {
   section: '', lot: '', grave: '',
   contactName: '', contactPhone: '', contactEmail: '',
   permitNumber: '', notes: '',
+  memorialPublished: false,
 };
 
 function deceasedName(b: Burial): string {
@@ -50,22 +52,13 @@ function deceasedName(b: Burial): string {
 export default function Burials() {
   const { data: burials = [], isLoading, error, refetch } = useBurials();
 
-  const toast = useToast();
-  const createMutation = useCreateBurial({
-    onSuccess: () => { toast.success('Burial record created'); setShowModal(false); setFormData(initialForm); },
-    onError: (err) => toast.error(getErrorMessage(err), 'Failed to save burial'),
-  });
-  const updateMutation = useUpdateBurial({
-    onSuccess: () => { toast.success('Burial record updated'); setShowModal(false); setEditingBurial(null); setFormData(initialForm); },
-    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update burial'),
-  });
-  const deleteMutation = useDeleteBurial({
-    onSuccess: () => toast.success('Burial record removed'),
-    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
-  });
+  const createMutation = useCreateBurial({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
+  const updateMutation = useUpdateBurial({ onSuccess: () => { setShowModal(false); setEditingBurial(null); setFormData(initialForm); } });
+  const deleteMutation = useDeleteBurial();
 
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
+  const [qrBurial, setQrBurial] = useState<Burial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<BurialFormData>(initialForm);
 
@@ -106,6 +99,7 @@ export default function Burials() {
       section: formData.section,
       lot: formData.lot,
       grave: formData.grave,
+      memorialPublished: formData.memorialPublished,
       contactName: formData.contactName || undefined,
       contactPhone: formData.contactPhone || undefined,
       contactEmail: formData.contactEmail || undefined,
@@ -133,6 +127,7 @@ export default function Burials() {
       section: b.section || parts[0] || '',
       lot: b.lot || parts[1] || '',
       grave: b.grave || parts[2] || '',
+      memorialPublished: b.memorialPublished ?? false,
       contactName: b.contactName || '',
       contactPhone: b.contactPhone || '',
       contactEmail: b.contactEmail || '',
@@ -296,6 +291,16 @@ export default function Burials() {
                         : <span className="text-foreground-muted">—</span>}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
+                      {b.memorialPublished && (
+                        <button
+                          onClick={() => setQrBurial(b)}
+                          className="text-info hover:text-info-hover"
+                          aria-label="Show QR code"
+                          title="Memorial QR code"
+                        >
+                          <QrCode size={17} />
+                        </button>
+                      )}
                       <button onClick={() => handleEdit(b)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
                       <button onClick={() => handleDelete(b.id)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
                     </td>
@@ -307,7 +312,44 @@ export default function Burials() {
         </Card>
       )}
 
-      {/* Modal */}
+      {/* QR Code Modal */}
+      {qrBurial && (
+        <Modal
+          isOpen={!!qrBurial}
+          onClose={() => setQrBurial(null)}
+          title="Memorial QR Code"
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setQrBurial(null)}>Close</Button>
+              <Button variant="primary" icon={<Globe size={16} />} onClick={() => window.open(`/memorial/${qrBurial.id}`, '_blank')}>
+                Open Memorial
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col items-center gap-4 py-2">
+            <div className="bg-white p-4 rounded-xl border border-border shadow-sm">
+              <QRCode
+                value={`${window.location.origin}/memorial/${qrBurial.id}`}
+                size={180}
+              />
+            </div>
+            <p className="text-sm font-medium text-foreground text-center">{deceasedName(qrBurial)}</p>
+            <p className="text-xs text-foreground-muted text-center break-all">
+              {window.location.origin}/memorial/{qrBurial.id}
+            </p>
+            <button
+              onClick={() => window.print()}
+              className="text-xs text-primary hover:underline"
+            >
+              Print this QR code
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Burial Record Modal */}
       <Modal
         isOpen={showModal}
         onClose={() => { setShowModal(false); setEditingBurial(null); }}
@@ -351,6 +393,16 @@ export default function Burials() {
             <Input label="Permit Number" value={formData.permitNumber} onChange={f('permitNumber')} />
           </div>
           <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={formData.memorialPublished}
+              onChange={e => setFormData(prev => ({ ...prev, memorialPublished: e.target.checked }))}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-foreground">Publish public memorial page</span>
+            <span className="text-xs text-foreground-muted">(family-facing, no login required)</span>
+          </label>
         </form>
       </Modal>
     </div>

@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, lazy, Suspense } from 'react';
+const LocationsMap = lazy(() => import('../components/LocationsMap'));
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -7,7 +8,7 @@ import {
 import { format, subMonths, startOfMonth, parseISO } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  Phone, TrendingUp, BookOpen, FileText, Activity, Zap,
+  TrendingUp, BookOpen, FileText, Activity, Zap,
 } from 'lucide-react';
 import {
   useWorkOrders, useBurials, useInventory, useReceivables,
@@ -15,12 +16,12 @@ import {
 } from '../hooks/useData';
 import { Card, CardHeader, CardBody, Badge } from '../components/ui';
 import { COMPANY } from '../config/company';
+import { BRAND } from '../config/brand';
 import { formatCurrency } from '../lib/utils';
 
-// DMP brand + semantic chart colors
 const C = {
-  green: '#1a3d2b',
-  gold: '#c49a2c',
+  green: BRAND.green,
+  gold: BRAND.gold,
   info: '#0ea5e9',
   success: '#22c55e',
   warning: '#f59e0b',
@@ -175,32 +176,24 @@ export default function Dashboard() {
       {/* ── Brand Hero ── */}
       <div
         className="rounded-2xl overflow-hidden relative"
-        style={{ background: 'linear-gradient(135deg, #0f2419 0%, #1a3d2b 50%, #2d5a3d 100%)' }}
+        style={{ background: `linear-gradient(135deg, ${BRAND.greenDeep} 0%, ${BRAND.green} 50%, #2d5a3d 100%)` }}
       >
         <div
           className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'url(/hero-bg.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+          style={{ backgroundImage: 'url(/dmp-hero.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
         />
         <div className="relative p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-5">
               <img
-                src="/dmp-crest.jpg"
-                alt="DMP Crest"
-                className="w-16 h-16 rounded-2xl object-cover shadow-xl flex-shrink-0 border-2"
-                style={{ borderColor: C.gold }}
+                src="/dmp-logo.png"
+                alt="Detroit Memorial Park"
+                className="h-14 w-auto flex-shrink-0"
+                style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.95 }}
               />
-              <div>
-                <img
-                  src="/dmp-logo.png"
-                  alt="Detroit Memorial Park"
-                  className="h-8 object-contain object-left mb-1"
-                  style={{ filter: 'brightness(0) invert(1)', opacity: 0.9 }}
-                />
-                <p className="text-white/55 text-sm">
-                  {COMPANY.tagline} · 3 Locations · 170+ Acres
-                </p>
-              </div>
+              <p className="text-white/55 text-sm">
+                {COMPANY.tagline} · 3 Locations · 170+ Acres
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-6 lg:gap-8">
@@ -492,44 +485,33 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* ── Bottom Row: Locations | Activity | Quick Actions ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Locations</h3>
-            <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
-          </CardHeader>
-          <CardBody className="space-y-3 p-0 overflow-hidden">
-            {([
-              { loc: COMPANY.locations.east, img: '/east-1.jpg', label: 'DMP East' },
-              { loc: COMPANY.locations.west, img: '/west-2.jpg', label: 'DMP West' },
-              { loc: COMPANY.locations.gracelawn, img: '/gracelawn-1.jpg', label: 'Gracelawn' },
-            ] as const).map(({ loc, img, label }) => (
-              <div key={loc.name} className="relative overflow-hidden group">
-                <div
-                  className="h-[88px] bg-cover bg-center"
-                  style={{ backgroundImage: `url(${img})` }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#0f2419]/80 via-[#1a3d2b]/60 to-transparent" />
-                </div>
-                <div className="absolute inset-0 flex items-center px-4 gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-white leading-tight">{label}</p>
-                    <p className="text-[11px] text-white/70 mt-0.5">{loc.city}, {loc.state}</p>
-                    <a
-                      href={`tel:${loc.phone.replace(/[^\d]/g, '')}`}
-                      className="inline-flex items-center gap-1 mt-0.5 text-[11px] hover:underline"
-                      style={{ color: C.gold }}
-                    >
-                      <Phone size={9} /> {loc.phone}
-                    </a>
-                  </div>
+      {/* ── Locations Map ── */}
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-foreground">DMP Locations</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">3 properties across Michigan · click a marker for details</p>
+          </div>
+          <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
+        </CardHeader>
+        <CardBody className="p-0">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center bg-background-subtle rounded-b-xl" style={{ height: 420 }}>
+                <div className="flex flex-col items-center gap-3 text-foreground-muted">
+                  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <p className="text-sm">Loading map…</p>
                 </div>
               </div>
-            ))}
-          </CardBody>
-        </Card>
+            }
+          >
+            <LocationsMap height={420} />
+          </Suspense>
+        </CardBody>
+      </Card>
+
+      {/* ── Bottom Row: Activity | Quick Actions ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <Card>
           <CardHeader className="flex items-center justify-between">
