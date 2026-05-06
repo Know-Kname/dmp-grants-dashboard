@@ -99,3 +99,9 @@
 | Timestamp | Phase | Action | Result |
 |-----------|-------|--------|--------|
 | 2026-05-06 | 0 | Created AUDIT_REPORT.md, captured branch/tag/commit inventory | ✅ Baseline established |
+| 2026-05-06 | 2 | Merged claude/finish-site-audit-2ICL3 → main, pushed to remote | ✅ Production now at v2.0.0 |
+| 2026-05-06 | 3 | Fixed index.html (4 broken refs, theme-color), bumped versions to 2.0.0, added source headers | ✅ |
+| 2026-05-06 | 4 | Added release.yml, supabase-migrations.yml, drift-check.yml, commitlint, husky, SHA-pinned all actions | ✅ |
+| 2026-05-06 | 5 | Applied 3 DMP migrations: cemetery_hierarchy, payment_schedule, burial_memorial_published | ✅ |
+| 2026-05-06 | 5 | Applied RLS + auth_all policies to 12 previously unprotected business tables | ✅ CRITICAL fix |
+| 2026-05-06 | 5 | pg_cron migration PENDING — enable pg_cron extension in Dashboard first, then run migration | ⬜ Manual |

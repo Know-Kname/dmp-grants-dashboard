@@ -1,3 +1,15 @@
+-- ═══════════════════════════════════════════════════════════════════
+-- Migration: 20260502_cemetery_hierarchy.sql
+-- Description: Creates 4-level cemetery hierarchy (Cemetery→Section→Lot→Grave)
+--              and links burials to structured plot data via grave_id FK.
+-- Author: Claude / Christian Hughes
+-- Date: 2026-05-02
+-- App Version: v2.0.0
+-- Rollback SQL:
+--   ALTER TABLE burials DROP COLUMN IF EXISTS grave_id;
+--   DROP TABLE IF EXISTS graves, lots, sections, cemeteries CASCADE;
+-- Dependencies: burials table must exist
+-- ═══════════════════════════════════════════════════════════════════
 -- Step 3: Cemetery hierarchy tables and burial grave_id link
 
 CREATE TABLE IF NOT EXISTS cemeteries (

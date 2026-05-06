@@ -1,3 +1,15 @@
+-- ═══════════════════════════════════════════════════════════════════
+-- Migration: 20260502_payment_schedule.sql
+-- Description: Creates payment_schedule table for contract installment tracking.
+--              Extends contract_items with inventory_id FK and quantity column.
+-- Author: Claude / Christian Hughes
+-- Date: 2026-05-02
+-- App Version: v2.0.0
+-- Rollback SQL:
+--   ALTER TABLE contract_items DROP COLUMN IF EXISTS inventory_id, DROP COLUMN IF EXISTS quantity;
+--   DROP TABLE IF EXISTS payment_schedule CASCADE;
+-- Dependencies: contracts table, inventory table, contract_items table
+-- ═══════════════════════════════════════════════════════════════════
 -- Step 2: payment_schedule table and contract_items extensions
 
 CREATE TABLE IF NOT EXISTS payment_schedule (
