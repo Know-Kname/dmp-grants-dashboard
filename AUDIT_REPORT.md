@@ -105,3 +105,8 @@
 | 2026-05-06 | 5 | Applied 3 DMP migrations: cemetery_hierarchy, payment_schedule, burial_memorial_published | ✅ |
 | 2026-05-06 | 5 | Applied RLS + auth_all policies to 12 previously unprotected business tables | ✅ CRITICAL fix |
 | 2026-05-06 | 5 | pg_cron migration PENDING — enable pg_cron extension in Dashboard first, then run migration | ⬜ Manual |
+| 2026-05-06 | 8 | Closed stale PRs #27, #25, #24, #23, #26 with explanatory comments | ✅ |
+| 2026-05-06 | 8 | Merged safe GH Actions Dependabot PRs: #38 (github-script v9), #37 (codeql v4), #36 (setup-node v6) | ✅ |
+| 2026-05-06 | 8 | Closed conflicted GH Actions PRs #42, #20 (SHA pins supersede version tags) | ✅ |
+| 2026-05-06 | 8 | Added "holding" comments to 10 major npm Dependabot PRs (#40-50) explaining risk | ✅ |
+| 2026-05-06 | 8 | Branch deletion blocked (403) — no delete_branch MCP tool available | ⬜ Manual: delete 20 stale branches via GitHub UI → repository → branches |
