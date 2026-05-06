@@ -6,6 +6,10 @@
  * - Type-safe responses
  * - Request/response interceptors
  * - Automatic token refresh handling
+ *
+ * NOTE: api.auth.login / register / logout are DEAD CODE — they call a non-existent
+ * Express backend. Real auth lives in src/lib/auth.tsx via Supabase signInWithPassword
+ * and signInWithOAuth. Do not use or expand the api.auth methods.
  */
 
 import { toCamelCaseKeys, toSnakeCaseKeys } from './utils';

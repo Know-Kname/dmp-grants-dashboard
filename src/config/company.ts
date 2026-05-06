@@ -98,7 +98,7 @@ export const COMPANY = {
   // System Info
   system: {
     name: 'Cemetery Management System',
-    version: '1.0.0',
+    version: '2.0.0',
     buildDate: '2026',
   },
 } as const;
