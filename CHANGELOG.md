@@ -23,8 +23,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Payment Schedule** — contract installment tracking with scheduled status, paid date, notes
 - **Google OAuth** — `signInWithOAuth` via Supabase Auth (Google provider)
 - **pg_cron jobs** — nightly overdue sweeps for accounts_receivable, accounts_payable,
-  payment_schedule (requires pg_cron extension in Supabase)
-- **Supabase Edge Function** — `send-payment-reminder` via Resend API
+  payment_schedule (3 jobs scheduled at 01:00 UTC)
 
 ### Changed
 - **Login page** — museum-monograph redesign with Green-Wood lodestar aesthetic,

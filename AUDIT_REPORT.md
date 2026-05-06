@@ -44,7 +44,7 @@
 - Tables without RLS: UNKNOWN — run audit SQL
 - Auth Site URL: UNKNOWN — check Dashboard
 - Google OAuth redirect URL configured: UNKNOWN — check Dashboard
-- Edge Functions deployed: `send-payment-reminder` (UNKNOWN — verify in Dashboard)
+- Edge Functions deployed: NONE (the `send-payment-reminder` code was authored but never deployed; removed from repo in Group 1 healing)
 
 ### Linear
 
@@ -110,3 +110,9 @@
 | 2026-05-06 | 8 | Closed conflicted GH Actions PRs #42, #20 (SHA pins supersede version tags) | ✅ |
 | 2026-05-06 | 8 | Added "holding" comments to 10 major npm Dependabot PRs (#40-50) explaining risk | ✅ |
 | 2026-05-06 | 8 | Branch deletion blocked (403) — no delete_branch MCP tool available | ⬜ Manual: delete 20 stale branches via GitHub UI → repository → branches |
+| 2026-05-06 | Healing Group 1 | Disabled `pg_graphql` extension via migration `20260506013408` — eliminated 38 advisor warnings (no GraphQL usage in src/) | ✅ |
+| 2026-05-06 | Healing Group 1 | Dropped template tables `flights`, `reviews`, `public.users` via migration `20260506013416` (CASCADE) | ✅ |
+| 2026-05-06 | Healing Group 1 | Applied pg_cron migration `20260506013429` — 3 nightly jobs scheduled at 01:00 UTC, all active | ✅ |
+| 2026-05-06 | Healing Group 1 | Removed `send-payment-reminder` Edge Function code, config block, and doc references (was authored but never deployed) | ✅ Honest correction |
+| 2026-05-06 | Healing Group 1 | Migration drift fix — renamed 4 local files to match ledger timestamps; reconstructed 3 missing local files (`enable_rls_all_business_tables`, `disable_pg_graphql`, `drop_template_tables`) | ✅ |
+| 2026-05-06 | Healing Group 1 | Known acceptable drift: 2 pre-DMP Supabase template migrations (`20260124040716_create_flights_table`, `20260124040723_create_reviews_table`) remain ledger-only with no local files | ℹ️ Documented |

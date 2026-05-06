@@ -77,20 +77,6 @@ Current variables (names only — values from Key Vault):
 
 ---
 
-## Supabase Edge Functions
-
-### send-payment-reminder (Resend API)
-- Location: `supabase/functions/send-payment-reminder/`
-- Trigger: Supabase Database Webhook on `accounts_receivable` UPDATE where `status = 'overdue'`
-- Required env vars (set in Supabase Dashboard → Edge Functions → Secrets):
-  - `RESEND_API_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `SUPABASE_URL`
-
-Deploy manually: `supabase functions deploy send-payment-reminder`
-
----
-
 ## Vercel Deployment
 
 Automatic on push to `main`. Manual trigger:

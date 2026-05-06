@@ -9,7 +9,3 @@
 
 [project]
 id = "supaduba"
-
-# Edge function settings
-[functions.send-payment-reminder]
-verify_jwt = false
