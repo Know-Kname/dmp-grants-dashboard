@@ -51,10 +51,21 @@ git add supabase/migrations/
 git commit -m "chore(supabase): capture dashboard-applied schema changes"
 ```
 
-### pg_cron migration (pending — one-time manual step)
-1. Supabase Dashboard → Database → Extensions → search "pg_cron" → Enable
-2. Run: `supabase db push` (applies `20260502_pg_cron_overdue.sql`)
-3. Verify: `SELECT jobname, schedule FROM cron.job;` in SQL Editor
+### Verify pg_cron jobs are running
+
+The three nightly sweep jobs were applied via migration `20260506013429_pg_cron_overdue.sql`.
+To confirm they are active:
+
+```sql
+-- Run in Supabase SQL Editor
+SELECT jobname, schedule, active FROM cron.job ORDER BY jobname;
+-- Expected: 3 rows, all active = true, schedule = '0 1 * * *' (01:00 UTC)
+```
+
+If a job shows `active = false`, re-enable it:
+```sql
+SELECT cron.schedule('job-name-here', '0 1 * * *', $$...original SQL...$$);
+```
 
 ---
 
@@ -113,18 +124,45 @@ vercel logs --environment production --status-code 5xx --since 72h
 
 ## RLS Policy Reference
 
-All business tables use `auth_all` for authenticated staff:
+### Trust model
+
+All authenticated users are treated as equally trusted DMP staff. This is intentional:
+DMP CMS has no public user accounts — every authenticated session is a staff member
+who has been issued credentials. The `auth_all` policy reflects this flat trust model.
+
+`USING(true) WITH CHECK(true)` is not a mistake or a placeholder — it is the correct
+policy for a closed, staff-only internal tool. Per-role restrictions (admin vs. read-only
+staff) can be layered on top if the trust model changes, without removing this base policy.
+
+### Policies in use
+
 ```sql
--- Authenticated users: full access
+-- All business tables: full access for any authenticated (staff) session
 CREATE POLICY "auth_all" ON public.TABLE_NAME
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- burials additionally allows anon to read published memorials:
+-- burials only: allow anonymous reads for published memorial pages (QR code access)
 CREATE POLICY "anon_memorial_read" ON public.burials
   FOR SELECT TO anon USING (memorial_published = true);
 ```
 
-To add a table: enable RLS, create both policies, test with `supabase db diff`.
+### Adding a new table
+
+```sql
+ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY auth_all ON public.new_table
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+```
+
+Then verify with `supabase db diff` and add a migration file with the standard header.
+
+### If the trust model needs to change
+
+When per-role policies become necessary (e.g., read-only field staff):
+1. Keep `auth_all` as a base
+2. Add a more restrictive `USING` clause for the specific role
+3. Test with `SET ROLE` in SQL Editor before deploying
+4. Document the new trust model here
 
 ---
 

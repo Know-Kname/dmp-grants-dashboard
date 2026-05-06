@@ -6,6 +6,10 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'supabase/seed.sql'
+  workflow_dispatch:
+    # Manual trigger: Actions → Deploy Supabase Migrations → Run workflow.
+    # Use this to deploy on a schedule you control, or to re-run after a
+    # failed auto-deploy without needing a new commit.
 
 jobs:
   deploy-migrations:

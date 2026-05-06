@@ -12,12 +12,25 @@ npm run dev                  # → http://localhost:5173
 
 ## Branch Naming
 
+**For work tracked in Linear (preferred):** use the branch name Linear generates.
+Click the Git branch icon on any issue to copy it — the format is:
+
 ```
-feat/short-description       ← new features (e.g., feat/document-upload)
-fix/short-description        ← bug fixes (e.g., fix/login-redirect)
-chore/short-description      ← maintenance (e.g., chore/update-deps)
+chichi/dmp-12-add-document-upload     ← Linear: team/issue-id-slug
+chichi/dmp-78-production-monitoring
+```
+
+**For untracked work** (quick fixes, experiments not worth a Linear issue):
+
+```
+feat/short-description       ← new features
+fix/short-description        ← bug fixes
+chore/short-description      ← maintenance (deps, config)
 docs/short-description       ← documentation only
 ```
+
+All branches merge to `main` via PR. The CI checks (`lint`, `typecheck`, `build`)
+must pass before merging.
 
 ## Commit Format (enforced by commitlint)
 
