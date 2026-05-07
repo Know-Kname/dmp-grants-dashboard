@@ -10,11 +10,10 @@ import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, Sparkles, AlertCircle }
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 
-const heroLocations = [
-  { name: COMPANY.locations.east.name, city: COMPANY.locations.east.city },
-  { name: COMPANY.locations.west.name, city: COMPANY.locations.west.city },
-  { name: COMPANY.locations.gracelawn.name, city: COMPANY.locations.gracelawn.city },
-];
+const heroLocations = Object.values(COMPANY.locations).map(loc => ({
+  name: loc.name,
+  city: loc.city,
+}));
 
 // Mount Auburn-esque landscape — quiet path / dappled light, not a building
 const PHOTO_URL = '/dmp-hero.jpg';

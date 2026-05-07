@@ -422,11 +422,12 @@ export default function MemorialPage() {
             {COMPANY.tagline}
           </p>
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-[11px] uppercase" style={{ color: 'rgba(245,241,234,0.55)', letterSpacing: '0.2em' }}>
-            <span>{COMPANY.locations.east.city}, MI</span>
-            <span style={{ color: 'rgba(196,154,44,0.45)' }}>·</span>
-            <span>{COMPANY.locations.west.city}, MI</span>
-            <span style={{ color: 'rgba(196,154,44,0.45)' }}>·</span>
-            <span>{COMPANY.locations.gracelawn.city}, MI</span>
+            {Object.values(COMPANY.locations).map((loc, i, arr) => (
+              <span key={loc.name} className="flex items-center gap-x-8">
+                <span>{loc.city}, {loc.state}</span>
+                {i < arr.length - 1 && <span style={{ color: 'rgba(196,154,44,0.45)' }}>·</span>}
+              </span>
+            ))}
           </div>
         </div>
       </footer>

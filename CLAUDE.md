@@ -7,10 +7,14 @@ It gives the AI immediate project context so it can assist without re-exploring.
 
 ## What This Project Is
 
-**Detroit Memorial Park CMS** — a React/TypeScript SPA that manages cemetery
-operations for Detroit Memorial Park Association (3 Michigan locations, est. 1925).
-Staff use it to track burials, work orders, inventory, financial records, contracts,
-customers, and grants. Deployed on Vercel, database on Supabase.
+**RIP Cemetery Management** — a React/TypeScript SPA for independent cemetery and
+memorial park operators. Tracks burials, work orders, inventory, financial records,
+contracts, customers, and grants. Forked from the Detroit Memorial Park (DMP) CMS.
+Multi-operator SaaS product. Deployed on Vercel, database on Supabase.
+
+Configure your cemetery's name/locations in `src/config/company.ts`.
+Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_OPENROUTER_API_KEY`
+in `.env.local` (copy from `.env.example`).
 
 ---
 

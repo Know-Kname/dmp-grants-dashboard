@@ -1,62 +1,40 @@
 /**
- * Detroit Memorial Park - Company Configuration
- * Real company information for the cemetery management system
+ * RIP Cemetery Management — Operator Configuration
+ * Customize this file with your cemetery's information.
+ * All values here are safe to commit (no secrets).
  */
 
 export const COMPANY = {
   // Basic Information
-  name: 'Detroit Memorial Park Association, Inc.',
-  shortName: 'Detroit Memorial Park',
-  abbreviation: 'DMP',
-  tagline: 'Preserving Memories Since 1925',
-  established: 1925,
+  name: 'Your Cemetery Name',
+  shortName: 'Your Cemetery',
+  abbreviation: 'YC',
+  tagline: 'Serving Families Since [Year]',
+  established: 2024,
 
   // Contact Information
   phone: {
-    main: '(586) 751-1313',
-    eastCemetery: '(586) 751-1313',
-    westCemetery: '(313) 533-1302',
-    gracelawn: '(810) 785-7890',
+    main: '(555) 000-0000',
   },
 
   email: {
-    general: 'info@detroitmemorialpark.org',
-    support: 'support@detroitmemorialpark.org',
+    general: 'info@yourcemetery.com',
+    support: 'support@yourcemetery.com',
   },
 
-  website: 'https://detroitmemorialpark.org',
+  website: 'https://yourcemetery.com',
 
-  // Locations
+  // Locations — add or remove entries to match your properties
   locations: {
-    east: {
-      name: 'Detroit Memorial Park East',
-      address: '4280 E. Thirteen Mile Rd',
-      city: 'Warren',
+    main: {
+      name: 'Main Cemetery',
+      address: '123 Cemetery Lane',
+      city: 'Your City',
       state: 'MI',
-      zip: '48092',
-      phone: '(586) 751-1313',
-      fullAddress: '4280 E. Thirteen Mile Rd, Warren, MI 48092',
-      coordinates: { lat: 42.5167, lng: -83.0167 },
-    },
-    west: {
-      name: 'Detroit Memorial Park West',
-      address: '25062 Plymouth Road',
-      city: 'Redford',
-      state: 'MI',
-      zip: '48239',
-      phone: '(313) 533-1302',
-      fullAddress: '25062 Plymouth Road, Redford, MI 48239',
-      coordinates: { lat: 42.3833, lng: -83.3000 },
-    },
-    gracelawn: {
-      name: 'Gracelawn Cemetery',
-      address: '5710 N. Saginaw Street',
-      city: 'Flint',
-      state: 'MI',
-      zip: '48505',
-      phone: '(810) 785-7890',
-      fullAddress: '5710 N. Saginaw Street, Flint, MI 48505',
-      coordinates: { lat: 43.0500, lng: -83.6833 },
+      zip: '00000',
+      phone: '(555) 000-0000',
+      fullAddress: '123 Cemetery Lane, Your City, MI 00000',
+      coordinates: { lat: 42.0, lng: -83.0 },
     },
   },
 
@@ -68,7 +46,7 @@ export const COMPANY = {
   },
 
   // Description
-  description: 'Detroit Memorial Park Association operates three cemetery locations across Michigan, spanning over 170 acres. Recognized by the State of Michigan as an Official Historic Site, we feature specialized sections for family estates, veterans, children, and notable figures.',
+  description: 'A professional cemetery management platform for independent cemetery operators.',
 
   // Services
   services: [
@@ -84,21 +62,21 @@ export const COMPANY = {
 
   // Legal
   legal: {
-    copyright: `© ${new Date().getFullYear()} Detroit Memorial Park Association, Inc.`,
+    copyright: `© ${new Date().getFullYear()} Your Cemetery Name`,
     allRightsReserved: 'All rights reserved.',
   },
 
-  // Social Media (placeholders - update with real links if available)
+  // Social Media
   social: {
-    facebook: 'https://facebook.com/detroitmemorialpark',
+    facebook: null,
     instagram: null,
     linkedin: null,
   },
 
   // System Info
   system: {
-    name: 'Cemetery Management System',
-    version: '2.0.0',
+    name: 'RIP Cemetery Management',
+    version: '1.0.0',
     buildDate: '2026',
   },
 } as const;

@@ -12,21 +12,18 @@ export interface ChatMessage {
   content: string;
 }
 
-const SYSTEM_PROMPT = `You are an AI assistant embedded in Detroit Memorial Park's internal Cemetery Management System (CMS). Detroit Memorial Park Association has operated since 1925 and manages three Michigan cemetery locations:
-- DMP East: 4280 E. Thirteen Mile Rd, Warren, MI 48092 — (586) 751-1313
-- DMP West: 25062 Plymouth Road, Redford, MI 48239 — (313) 533-1302
-- Gracelawn Cemetery: 5710 N. Saginaw Street, Flint, MI 48505 — (810) 785-7890
+const SYSTEM_PROMPT = `You are an AI assistant embedded in RIP Cemetery Management, a professional platform for independent cemetery operators.
 
-The CMS tracks: burials, work orders, inventory, financial records (deposits, accounts receivable/payable), contracts, customers, and grants.
+The system tracks: burials, work orders, inventory, financial records (deposits, accounts receivable/payable), contracts, customers, and grants.
 
 Help staff with questions about:
 - Cemetery operations and best practices
 - How to use the CMS features (burials, work orders, inventory, financial, contracts, customers, grants)
-- Regulatory compliance (Michigan cemetery laws, FTC funeral rule, pre-need contract regulations)
+- Regulatory compliance (cemetery laws, FTC funeral rule, pre-need contract regulations)
 - Grief support resources to share with families
-- Industry standards and terminology (plot locations, perpetual care, pre-need vs at-need)
+- Industry standards and terminology (plot locations, perpetual care, pre-need vs at-need, interment rights)
 
-Keep answers concise, practical, and professional. You are speaking to DMP internal staff.`;
+Keep answers concise, practical, and professional. You are speaking to cemetery staff.`;
 
 export async function sendMessage(messages: ChatMessage[]): Promise<string> {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -34,8 +31,8 @@ export async function sendMessage(messages: ChatMessage[]): Promise<string> {
     headers: {
       'Authorization': `Bearer ${OPENROUTER_KEY}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dmpgrants.vercel.app',
-      'X-Title': 'DMP Cemetery Management System',
+      'HTTP-Referer': 'https://rip-cms.vercel.app',
+      'X-Title': 'RIP Cemetery Management',
     },
     body: JSON.stringify({
       model: MODEL,
@@ -65,8 +62,8 @@ export async function* streamMessage(messages: ChatMessage[]): AsyncGenerator<st
     headers: {
       'Authorization': `Bearer ${OPENROUTER_KEY}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dmpgrants.vercel.app',
-      'X-Title': 'DMP Cemetery Management System',
+      'HTTP-Referer': 'https://rip-cms.vercel.app',
+      'X-Title': 'RIP Cemetery Management',
     },
     body: JSON.stringify({
       model: MODEL,
