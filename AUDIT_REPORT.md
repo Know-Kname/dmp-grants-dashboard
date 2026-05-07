@@ -44,7 +44,7 @@
 - Tables without RLS: UNKNOWN — run audit SQL
 - Auth Site URL: UNKNOWN — check Dashboard
 - Google OAuth redirect URL configured: UNKNOWN — check Dashboard
-- Edge Functions deployed: `send-payment-reminder` (UNKNOWN — verify in Dashboard)
+- Edge Functions deployed: NONE (the `send-payment-reminder` code was authored but never deployed; removed from repo in Group 1 healing)
 
 ### Linear
 
@@ -99,3 +99,24 @@
 | Timestamp | Phase | Action | Result |
 |-----------|-------|--------|--------|
 | 2026-05-06 | 0 | Created AUDIT_REPORT.md, captured branch/tag/commit inventory | ✅ Baseline established |
+| 2026-05-06 | 2 | Merged claude/finish-site-audit-2ICL3 → main, pushed to remote | ✅ Production now at v2.0.0 |
+| 2026-05-06 | 3 | Fixed index.html (4 broken refs, theme-color), bumped versions to 2.0.0, added source headers | ✅ |
+| 2026-05-06 | 4 | Added release.yml, supabase-migrations.yml, drift-check.yml, commitlint, husky, SHA-pinned all actions | ✅ |
+| 2026-05-06 | 5 | Applied 3 DMP migrations: cemetery_hierarchy, payment_schedule, burial_memorial_published | ✅ |
+| 2026-05-06 | 5 | Applied RLS + auth_all policies to 12 previously unprotected business tables | ✅ CRITICAL fix |
+| 2026-05-06 | 5 | pg_cron migration PENDING — enable pg_cron extension in Dashboard first, then run migration | ⬜ Manual |
+| 2026-05-06 | 8 | Closed stale PRs #27, #25, #24, #23, #26 with explanatory comments | ✅ |
+| 2026-05-06 | 8 | Merged safe GH Actions Dependabot PRs: #38 (github-script v9), #37 (codeql v4), #36 (setup-node v6) | ✅ |
+| 2026-05-06 | 8 | Closed conflicted GH Actions PRs #42, #20 (SHA pins supersede version tags) | ✅ |
+| 2026-05-06 | 8 | Added "holding" comments to 10 major npm Dependabot PRs (#40-50) explaining risk | ✅ |
+| 2026-05-06 | 8 | Branch deletion blocked (403) — no delete_branch MCP tool available | ⬜ Manual: delete 20 stale branches via GitHub UI → repository → branches |
+| 2026-05-06 | Healing Group 1 | Disabled `pg_graphql` extension via migration `20260506013408` — eliminated 38 advisor warnings (no GraphQL usage in src/) | ✅ |
+| 2026-05-06 | Healing Group 1 | Dropped template tables `flights`, `reviews`, `public.users` via migration `20260506013416` (CASCADE) | ✅ |
+| 2026-05-06 | Healing Group 1 | Applied pg_cron migration `20260506013429` — 3 nightly jobs scheduled at 01:00 UTC, all active | ✅ |
+| 2026-05-06 | Healing Group 1 | Removed `send-payment-reminder` Edge Function code, config block, and doc references (was authored but never deployed) | ✅ Honest correction |
+| 2026-05-06 | Healing Group 1 | Migration drift fix — renamed 4 local files to match ledger timestamps; reconstructed 3 missing local files (`enable_rls_all_business_tables`, `disable_pg_graphql`, `drop_template_tables`) | ✅ |
+| 2026-05-06 | Healing Group 1 | Known acceptable drift: 2 pre-DMP Supabase template migrations (`20260124040716_create_flights_table`, `20260124040723_create_reviews_table`) remain ledger-only with no local files | ℹ️ Documented |
+| 2026-05-06 | Healing Group 2 | Created GitHub issue #52 "Dependency upgrade backlog" as tracking anchor for all major-version Dependabot PRs | ✅ |
+| 2026-05-06 | Healing Group 2 | Closed 8 breaking Dependabot PRs (#40, #43, #44, #46, #47, #48, #49, #50) with evidence-based comments citing CI failure links and specific breaking-change reasons | ✅ |
+| 2026-05-06 | Healing Group 2 | Added hold comments to PR #41 (eslint-plugin-react-hooks 4→7: 2 unfixable `set-state-in-effect` violations) and PR #45 (recharts 2→3: Dashboard regression risk) — not merged, not closed | ✅ |
+| 2026-05-06 | Healing Group 2 | Linear MCP unavailable — issue #52 must be manually mirrored to Linear as sibling to DMP-78 in App Development & Deployment Pipeline, Team LLM4DMP, Priority Medium, Label Improvement | ⬜ Manual |

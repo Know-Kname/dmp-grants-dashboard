@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
     steps:
-      - uses: dependabot/fetch-metadata@v2
+      - uses: dependabot/fetch-metadata@d7284e0802b61a3abb4f35109f803bd9bbbb7978  # v2
         id: metadata
 
       - name: Auto-merge minor and patch updates

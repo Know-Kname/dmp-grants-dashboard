@@ -1,3 +1,9 @@
+/**
+ * Supabase client initialization. Project ref: mgpwjnxtqcnoyjgebytg (us-east-1).
+ * The Database type parameter covers only 3 tables (burials, contracts, work_orders).
+ * Newer tables (cemeteries, sections, lots, graves, payment_schedule, vendors) use
+ * untyped queries via .from() — extend src/types/index.ts + regenerate types to fix.
+ */
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL

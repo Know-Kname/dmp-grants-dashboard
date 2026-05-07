@@ -1,3 +1,10 @@
+/**
+ * Authentication provider for DMP CMS.
+ * Uses Supabase Auth (email/password + Google OAuth). Demo mode is activated via
+ * enableDemoMode() in demo-data.ts, which sets localStorage and dispatches a
+ * 'dmp-demo-change' CustomEvent — AuthProvider listens for this event and updates
+ * isDemoActive reactively without a full page reload.
+ */
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import { User, Session } from "@supabase/supabase-js"
 import { supabase } from "./supabase"

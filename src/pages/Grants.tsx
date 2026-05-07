@@ -6,6 +6,7 @@ import { Grant } from '../types';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner } from '../components/ui';
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '../lib/toast';
 
 type GrantFormData = {
   title: string;
@@ -34,23 +35,22 @@ const initialFormData: GrantFormData = {
 export default function Grants() {
   // React Query hooks
   const { data: grants = [], isLoading, error, refetch } = useGrants();
+  const toast = useToast();
 
   const createMutation = useCreateGrant({
-    onSuccess: () => {
-      setShowModal(false);
-      resetForm();
-    },
+    onSuccess: () => { toast.success('Grant added successfully'); setShowModal(false); resetForm(); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to save grant'),
   });
 
   const updateMutation = useUpdateGrant({
-    onSuccess: () => {
-      setShowModal(false);
-      setEditingGrant(null);
-      resetForm();
-    },
+    onSuccess: () => { toast.success('Grant updated'); setShowModal(false); setEditingGrant(null); resetForm(); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update grant'),
   });
 
-  const deleteMutation = useDeleteGrant();
+  const deleteMutation = useDeleteGrant({
+    onSuccess: () => toast.success('Grant removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
+  });
 
   // Local state
   const [showModal, setShowModal] = useState(false);

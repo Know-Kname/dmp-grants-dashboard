@@ -1,3 +1,9 @@
+/**
+ * AI chat client via OpenRouter → Gemini 2.5 Pro (google/gemini-2.5-pro).
+ * Streams responses using the OpenAI-compatible chat completions endpoint.
+ * VITE_OPENROUTER_API_KEY is visible in the browser bundle — see docs/09-security.md
+ * for the Vercel Edge Function proxy pattern to move the key server-side.
+ */
 const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_API_KEY as string;
 const MODEL = 'google/gemini-2.5-pro';
 
