@@ -68,11 +68,11 @@ function FilmGrain({ opacity = 0.045 }: { opacity?: number }) {
       style={{ opacity, mixBlendMode: 'overlay' }}
     >
       <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-        <filter id="dmp-grain">
+        <filter id="rip-grain">
           <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
           <feColorMatrix type="saturate" values="0" />
         </filter>
-        <rect width="100%" height="100%" filter="url(#dmp-grain)" />
+        <rect width="100%" height="100%" filter="url(#rip-grain)" />
       </svg>
     </div>
   );
@@ -142,8 +142,8 @@ export default function MemorialPage() {
           transition={{ duration: 0.6, delay: 0.1 }}
         >
           <img
-            src="/dmp-logo.png"
-            alt="Detroit Memorial Park"
+            src="/favicon.svg"
+            alt="RIP"
             className="h-7 w-auto"
           />
         </motion.div>
@@ -154,7 +154,7 @@ export default function MemorialPage() {
           transition={{ duration: 0.6, delay: 0.2 }}
           style={{ color: 'rgba(26,26,26,0.4)', letterSpacing: '0.22em', fontWeight: 500 }}
         >
-          In Memoriam · Est. 1925
+          In Memoriam
         </motion.span>
       </header>
 
@@ -357,7 +357,7 @@ export default function MemorialPage() {
               lineHeight: 1.7,
             }}
           >
-            This memorial is part of the Detroit Memorial Park archive — a public
+            This memorial is part of an officially curated archive — a public
             record of the lives entrusted to our care. Family and friends may scan
             the code at right to revisit this page from the marker, share it with
             distant relatives, or print a keepsake. The grounds are open daily;
@@ -410,8 +410,8 @@ export default function MemorialPage() {
         <div className="relative max-w-4xl mx-auto px-8 text-center">
           <div className="mx-auto mb-8 w-px" style={{ height: '32px', backgroundColor: BRAND.gold, opacity: 0.5 }} />
           <img
-            src="/dmp-logo.png"
-            alt="Detroit Memorial Park"
+            src="/favicon.svg"
+            alt="RIP"
             className="mx-auto mb-4 h-12 w-auto"
             style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.88 }}
           />
@@ -477,8 +477,8 @@ function NotFound() {
           style={{ height: '64px', backgroundColor: BRAND.gold, opacity: 0.5 }}
         />
         <img
-          src="/dmp-logo.png"
-          alt="Detroit Memorial Park"
+          src="/favicon.svg"
+          alt="RIP"
           className="mx-auto mb-6 h-8 w-auto"
         />
         <h1

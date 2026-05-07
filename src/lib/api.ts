@@ -1,5 +1,5 @@
 /**
- * Type-Safe API Client for DMP Cemetery Management System
+ * Type-safe API client — camelCase↔snake_case transform, error handling
  * Features:
  * - Automatic snake_case <-> camelCase transformation
  * - Comprehensive error handling

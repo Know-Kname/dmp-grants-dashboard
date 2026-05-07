@@ -1,5 +1,5 @@
 /**
- * DMP brand colors — single source of truth.
+ * Cemetery brand colors — matches sidebar & accent system.
  * Hardcoded (not CSS variables) so brand-fixed elements like the
  * sidebar and login hero stay dark regardless of theme toggle.
  */

@@ -1,8 +1,8 @@
 /**
- * Authentication provider for DMP CMS.
+ * Authentication provider for RIP CMS.
  * Uses Supabase Auth (email/password + Google OAuth). Demo mode is activated via
  * enableDemoMode() in demo-data.ts, which sets localStorage and dispatches a
- * 'dmp-demo-change' CustomEvent — AuthProvider listens for this event and updates
+ * 'rip-demo-change' CustomEvent — AuthProvider listens for this event and updates
  * isDemoActive reactively without a full page reload.
  */
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
@@ -43,13 +43,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isDemoActive, setIsDemoActive] = useState(() => localStorage.getItem('dmp-demo-mode') === 'true')
+  const [isDemoActive, setIsDemoActive] = useState(() => localStorage.getItem('rip-demo-mode') === 'true')
 
   // React to demo mode toggled from outside (Login page, logout, etc.)
   useEffect(() => {
     const handler = (e: Event) => setIsDemoActive((e as CustomEvent<boolean>).detail)
-    window.addEventListener('dmp-demo-change', handler)
-    return () => window.removeEventListener('dmp-demo-change', handler)
+    window.addEventListener('rip-demo-change', handler)
+    return () => window.removeEventListener('rip-demo-change', handler)
   }, [])
 
   useEffect(() => {

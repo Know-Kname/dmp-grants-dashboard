@@ -16,7 +16,7 @@ const heroLocations = Object.values(COMPANY.locations).map(loc => ({
 }));
 
 // Mount Auburn-esque landscape — quiet path / dappled light, not a building
-const PHOTO_URL = '/dmp-hero.jpg';
+const PHOTO_URL = '/dmp-hero.jpg'; // replace with your cemetery's hero image
 
 function friendlyAuthError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
@@ -214,8 +214,8 @@ export default function Login() {
           {/* Top: brand mark */}
           <motion.div variants={fadeUp}>
             <img
-              src="/dmp-logo.png"
-              alt="Detroit Memorial Park"
+              src="/favicon.svg"
+              alt="RIP"
               className="h-12 w-auto"
               style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.92 }}
             />
@@ -321,8 +321,8 @@ export default function Login() {
         {/* Mobile brand bar */}
         <div className="lg:hidden flex items-center px-6 py-4" style={{ backgroundColor: BRAND.greenDeep }}>
           <img
-            src="/dmp-logo.png"
-            alt="Detroit Memorial Park"
+            src="/favicon.svg"
+            alt="RIP"
             className="h-9 w-auto"
             style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.9 }}
           />
@@ -416,7 +416,7 @@ export default function Login() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@detroitmemorialpark.org"
+                    placeholder="you@yourcemetery.com"
                     required
                     autoComplete="email"
                     className="w-full pl-3 pr-2 py-3 bg-transparent text-base outline-none"
@@ -595,7 +595,7 @@ export default function Login() {
                   className="hover:underline transition-colors"
                   style={{ color: 'rgba(26,26,26,0.55)' }}
                 >
-                  detroitmemorialpark.org
+                  
                 </a>
               </div>
               <p

@@ -8,7 +8,7 @@ import type { User, WorkOrder, Grant, Burial, Customer, InventoryItem } from '..
 // Demo user for preview mode
 export const DEMO_USER: User = {
   id: 'demo-user-001',
-  email: 'demo@detroitmemorialpark.org',
+  email: 'demo@yourcemetery.com',
   name: 'Demo User',
   role: 'admin',
   createdAt: '2024-01-01T00:00:00.000Z',
@@ -97,7 +97,7 @@ export const DEMO_GRANTS: Grant[] = [
     title: 'Veterans Memorial Fund',
     description: 'Support for maintenance of veteran burial sections',
     type: 'benefit',
-    source: 'Michigan Department of Veterans Affairs',
+    source: 'State Department of Veterans Affairs',
     amount: 25000,
     deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     status: 'applied',
@@ -121,7 +121,7 @@ export const DEMO_GRANTS: Grant[] = [
     title: 'Community Development Block Grant',
     description: 'Infrastructure improvements for cemetery access roads',
     type: 'grant',
-    source: 'City of Warren',
+    source: 'City Community Development Fund',
     amount: 35000,
     deadline: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     status: 'approved',
@@ -196,7 +196,7 @@ export const DEMO_CUSTOMERS: Customer[] = [
     email: 'mary.johnson@email.com',
     phone: '(586) 555-0123',
     address: '1234 Oak Street',
-    city: 'Warren',
+    city: 'Springfield',
     state: 'MI',
     zipCode: '48092',
     createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
@@ -209,7 +209,7 @@ export const DEMO_CUSTOMERS: Customer[] = [
     email: 'jwilliams@email.com',
     phone: '(313) 555-0456',
     address: '5678 Maple Ave',
-    city: 'Detroit',
+    city: 'Riverside',
     state: 'MI',
     zipCode: '48201',
     createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
@@ -222,7 +222,7 @@ export const DEMO_CUSTOMERS: Customer[] = [
     email: 'pthompson@email.com',
     phone: '(810) 555-0789',
     address: '910 Pine Road',
-    city: 'Flint',
+    city: 'Lakewood',
     state: 'MI',
     zipCode: '48505',
     createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -315,21 +315,21 @@ export const DEMO_STATS = {
 
 // Check if demo mode is active
 export function isDemoMode(): boolean {
-  return localStorage.getItem('dmp-demo-mode') === 'true';
+  return localStorage.getItem('rip-demo-mode') === 'true';
 }
 
 // Enable demo mode
 export function enableDemoMode(): void {
-  localStorage.setItem('dmp-demo-mode', 'true');
-  window.dispatchEvent(new CustomEvent('dmp-demo-change', { detail: true }));
-  localStorage.setItem('dmp-token', 'demo-token');
-  localStorage.setItem('dmp-user', JSON.stringify(DEMO_USER));
+  localStorage.setItem('rip-demo-mode', 'true');
+  window.dispatchEvent(new CustomEvent('rip-demo-change', { detail: true }));
+  localStorage.setItem('rip-token', 'demo-token');
+  localStorage.setItem('rip-user', JSON.stringify(DEMO_USER));
 }
 
 // Disable demo mode
 export function disableDemoMode(): void {
-  localStorage.removeItem('dmp-demo-mode');
-  localStorage.removeItem('dmp-token');
-  localStorage.removeItem('dmp-user');
-  window.dispatchEvent(new CustomEvent('dmp-demo-change', { detail: false }));
+  localStorage.removeItem('rip-demo-mode');
+  localStorage.removeItem('rip-token');
+  localStorage.removeItem('rip-user');
+  window.dispatchEvent(new CustomEvent('rip-demo-change', { detail: false }));
 }

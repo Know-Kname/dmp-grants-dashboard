@@ -35,7 +35,7 @@ const SATELLITE_STYLE: StyleSpecification = {
   layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
 };
 
-// Detroit Memorial Park (Warren, MI) — fallback center when no graves have coords
+// Cemetery fallback center — update coordinates in company.ts for your location
 const DEFAULT_CENTER = { lat: 42.5145, lng: -83.0286 };
 
 // Haversine distance in meters between two lat/lng points

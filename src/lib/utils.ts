@@ -1,5 +1,5 @@
 /**
- * Utility functions for the DMP application
+ * Utility functions
  * Case transformation, type guards, and helpers
  */
 

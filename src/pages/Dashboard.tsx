@@ -186,13 +186,13 @@ export default function Dashboard() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-5">
               <img
-                src="/dmp-logo.png"
-                alt="Detroit Memorial Park"
+                src="/favicon.svg"
+                alt="RIP"
                 className="h-14 w-auto flex-shrink-0"
                 style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.95 }}
               />
               <p className="text-white/55 text-sm">
-                {COMPANY.tagline} · 3 Locations · 170+ Acres
+                {COMPANY.tagline} 
               </p>
             </div>
 
@@ -205,8 +205,8 @@ export default function Dashboard() {
               <div className="w-px h-10 bg-white/20" />
               <div>
                 <p className="text-white/40 text-xs uppercase tracking-widest">Milestone</p>
-                <p className="font-bold text-lg mt-0.5" style={{ color: C.gold }}>100 Years</p>
-                <p className="text-white/50 text-xs">1925 – 2025</p>
+                <p className="font-bold text-lg mt-0.5" style={{ color: C.gold }}></p>
+                <p className="text-white/50 text-xs"></p>
               </div>
               <div className="w-px h-10 bg-white/20" />
               <div>
@@ -489,10 +489,10 @@ export default function Dashboard() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-foreground">DMP Locations</h3>
-            <p className="text-xs text-foreground-muted mt-0.5">3 properties across Michigan · click a marker for details</p>
+            <h3 className="font-semibold text-foreground">Our Locations</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">Cemetery locations — click a marker for details</p>
           </div>
-          <Badge variant="secondary" size="sm">3 Sites · 170+ Acres</Badge>
+          <Badge variant="secondary" size="sm">Active Sites</Badge>
         </CardHeader>
         <CardBody className="p-0">
           <Suspense

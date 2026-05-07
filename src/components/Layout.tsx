@@ -78,8 +78,8 @@ export default function Layout() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <img
-                src="/dmp-logo.png"
-                alt="Detroit Memorial Park"
+                src="/favicon.svg"
+                alt={COMPANY.shortName}
                 className="h-9 w-auto"
                 style={resolvedTheme === 'dark' ? { filter: 'brightness(0) invert(1)', opacity: 0.88 } : undefined}
               />
@@ -208,7 +208,7 @@ export default function Layout() {
                 className="flex items-center gap-2 hover:text-foreground transition-colors"
               >
                 <ExternalLink size={12} />
-                <span>detroitmemorialpark.org</span>
+                <span>{COMPANY.website.replace('https://', '')}</span>
               </a>
               <div className="pt-2 border-t border-border">
                 <div className="font-medium">v{COMPANY.system.version}</div>
