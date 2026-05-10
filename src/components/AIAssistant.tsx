@@ -1,3 +1,8 @@
+/**
+ * Floating AI chat panel powered by Gemini 2.5 Pro via OpenRouter.
+ * Streams responses token-by-token using streamMessage() from lib/gemini.ts.
+ * The VITE_OPENROUTER_API_KEY is visible in the browser bundle — see docs/09-security.md.
+ */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Send, Sparkles, RotateCcw, Bot } from 'lucide-react';
 import { streamMessage, type ChatMessage } from '../lib/gemini';

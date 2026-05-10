@@ -9,6 +9,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Charting library — only Financial page uses it
+          recharts: ['recharts'],
+          // Supabase client
+          supabase: ['@supabase/supabase-js'],
+          // React core + router
+          react: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
