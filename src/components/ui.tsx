@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 // Button Component
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -196,6 +196,21 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, description, children, footer, size = 'md' }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      previous?.focus();
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const sizes = {
@@ -215,16 +230,21 @@ export function Modal({ isOpen, onClose, title, description, children, footer, s
 
       {/* Modal */}
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={`
           relative bg-card text-card-foreground rounded-xl shadow-xl border border-border
-          ${sizes[size]} w-full max-h-[90vh] flex flex-col
+          ${sizes[size]} w-full max-h-[90vh] flex flex-col outline-none
           animate-scale-in
         `}
       >
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+            <h2 id={titleId} className="text-xl font-semibold text-foreground">{title}</h2>
             {description && (
               <p className="mt-1 text-sm text-foreground-muted">{description}</p>
             )}
