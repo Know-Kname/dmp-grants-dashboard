@@ -1,3 +1,8 @@
+/**
+ * React error boundary — wraps the entire app tree in main.tsx.
+ * The only class component in the codebase (getDerivedStateFromError requires it).
+ * Accepts an optional fallback prop; defaults to a full-page error screen.
+ */
 import React from 'react';
 
 type ErrorBoundaryProps = {

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
@@ -6,17 +7,27 @@ import { ToastProvider } from './lib/toast';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import WorkOrders from './pages/WorkOrders';
-import Grants from './pages/Grants';
-import Inventory from './pages/Inventory';
-import Financial from './pages/Financial';
-import Burials from './pages/Burials';
-import Contracts from './pages/Contracts';
-import Customers from './pages/Customers';
-import Vendors from './pages/Vendors';
-import Cemeteries from './pages/Cemeteries';
-import MemorialPage from './pages/MemorialPage';
 import ErrorBoundary from './components/ErrorBoundary';
+
+// Lazy-loaded pages — each chunk only downloads when first visited
+const WorkOrders  = lazy(() => import('./pages/WorkOrders'));
+const Grants      = lazy(() => import('./pages/Grants'));
+const Inventory   = lazy(() => import('./pages/Inventory'));
+const Financial   = lazy(() => import('./pages/Financial'));
+const Burials     = lazy(() => import('./pages/Burials'));
+const Contracts   = lazy(() => import('./pages/Contracts'));
+const Customers   = lazy(() => import('./pages/Customers'));
+const Vendors     = lazy(() => import('./pages/Vendors'));
+const Cemeteries  = lazy(() => import('./pages/Cemeteries'));
+const MemorialPage = lazy(() => import('./pages/MemorialPage'));
+
+function PageSpinner() {
+  return (
+    <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+      <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -35,29 +46,31 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/memorial/:id" element={<MemorialPage />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Dashboard />} />
-        <Route path="work-orders" element={<WorkOrders />} />
-        <Route path="inventory" element={<Inventory />} />
-        <Route path="financial" element={<Financial />} />
-        <Route path="burials" element={<Burials />} />
-        <Route path="contracts" element={<Contracts />} />
-        <Route path="grants" element={<Grants />} />
-        <Route path="customers" element={<Customers />} />
-        <Route path="vendors" element={<Vendors />} />
-        <Route path="cemeteries" element={<Cemeteries />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<PageSpinner />}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/memorial/:id" element={<MemorialPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="work-orders" element={<WorkOrders />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="financial" element={<Financial />} />
+          <Route path="burials" element={<Burials />} />
+          <Route path="contracts" element={<Contracts />} />
+          <Route path="grants" element={<Grants />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="vendors" element={<Vendors />} />
+          <Route path="cemeteries" element={<Cemeteries />} />
+        </Route>
+      </Routes>
+    </Suspense>
   );
 }
 
