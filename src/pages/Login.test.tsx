@@ -4,78 +4,77 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import Login from './Login';
 import { ThemeProvider } from '../lib/theme';
-import { AuthProvider } from '../lib/auth';
-import { ApiRequestError, authApi } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
-vi.mock('../lib/api', async () => {
-  const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api');
-  return {
-    ...actual,
-    authApi: {
-      ...actual.authApi,
-      login: vi.fn(),
-      logout: vi.fn(),
-    },
-  };
-});
+// Mock useAuth so tests don't need a real Supabase connection.
+// Login.tsx calls useAuth().login(email, password) on submit.
+vi.mock('../lib/auth', () => ({
+  useAuth: vi.fn(),
+}));
 
-const renderLogin = () => {
-  return render(
+const baseAuth = {
+  login: vi.fn(),
+  signInWithGoogle: vi.fn(),
+  logout: vi.fn(),
+  isAuthenticated: false,
+  isLoading: false,
+  currentUser: null,
+  isDemoActive: false,
+};
+
+const renderLogin = () =>
+  render(
     <MemoryRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <Login />
-        </AuthProvider>
+        <Login />
       </ThemeProvider>
     </MemoryRouter>
   );
-};
 
 describe('Login page', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({ ...baseAuth });
   });
 
-  it('shows error details when login fails', async () => {
-    vi.mocked(authApi.login).mockRejectedValue(
-      new ApiRequestError({
-        message: 'Invalid credentials',
-        code: 'UNAUTHORIZED',
-        statusCode: 401,
-        requestId: 'req-1',
-      })
-    );
-
-    renderLogin();
-
-    const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/email address/i), 'admin@dmp.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrong');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
-
-    expect(await screen.findByText('Invalid credentials')).toBeInTheDocument();
-    expect(screen.getByText('Request ID: req-1')).toBeInTheDocument();
-  });
-
-  it('stores token on successful login', async () => {
-    vi.mocked(authApi.login).mockResolvedValue({
-      token: 'token-123',
-      user: {
-        id: 'user-1',
-        email: 'admin@dmp.com',
-        name: 'Admin',
-        role: 'admin',
-      },
+  it('shows friendly error when login fails', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      ...baseAuth,
+      login: vi.fn().mockRejectedValue(new Error('Invalid login credentials')),
     });
 
     renderLogin();
-
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/email address/i), 'admin@dmp.com');
-    await user.type(screen.getByLabelText(/password/i), 'admin123');
+
+    await user.type(screen.getByLabelText('Email', { selector: 'input' }), 'staff@dmp.com');
+    await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'wrong');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(localStorage.getItem('token')).toBe('token-123');
+    expect(
+      await screen.findByText(/incorrect email or password/i)
+    ).toBeInTheDocument();
+  });
+
+  it('calls login with submitted credentials', async () => {
+    const mockLogin = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useAuth).mockReturnValue({ ...baseAuth, login: mockLogin });
+
+    renderLogin();
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText('Email', { selector: 'input' }),
+      'staff@detroitmemorialpark.org'
+    );
+    await user.type(
+      screen.getByLabelText('Password', { selector: 'input' }),
+      'correct-password'
+    );
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(mockLogin).toHaveBeenCalledWith(
+      'staff@detroitmemorialpark.org',
+      'correct-password'
+    );
   });
 });
