@@ -1,12 +1,13 @@
 /**
- * Custom React Query Hooks for Data Fetching
- * Provides type-safe data fetching with caching, loading states, and mutations
+ * React Query hooks for all DMP CMS data modules.
+ * All hooks call Supabase directly — there is no Express/API server.
+ * Pattern: supabase.from('table') → error check → toCamelCaseKeys → typed return.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getErrorMessage } from '../lib/api';
+import { getErrorMessage } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { toCamelCaseKeys } from '../lib/utils';
+import { toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
 import type {
   WorkOrder,
@@ -35,6 +36,21 @@ interface MutationCallbacks<T> {
   onError?: (error: Error) => void;
 }
 
+// Unwrap Supabase result: throw on error, return data (non-null asserted)
+async function sb<T>(
+  q: PromiseLike<{ data: T | null; error: { message: string } | null }>
+): Promise<T> {
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return data!;
+}
+
+// Get the current authenticated user's ID (falls back to 'unknown' for demo/anon)
+async function uid(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? 'unknown';
+}
+
 // ============================================
 // WORK ORDERS
 // ============================================
@@ -42,62 +58,77 @@ interface MutationCallbacks<T> {
 export function useWorkOrders() {
   return useQuery({
     queryKey: queryKeys.workOrders.list(),
-    queryFn: () => api.get<WorkOrder[]>('/work-orders'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('work_orders').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as WorkOrder);
+    },
   });
 }
 
 export function useWorkOrder(id: string) {
   return useQuery({
     queryKey: queryKeys.workOrders.detail(id),
-    queryFn: () => api.get<WorkOrder>(`/work-orders/${id}`),
+    queryFn: async () => {
+      const row = await sb(supabase.from('work_orders').select('*').eq('id', id).single());
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as WorkOrder;
+    },
     enabled: !!id,
   });
 }
 
 export function useCreateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) =>
-      api.post<WorkOrder>('/work-orders', data),
+    mutationFn: async (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
+      const row = await sb(
+        supabase.from('work_orders')
+          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as WorkOrder;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<WorkOrder> & { id: string }) =>
-      api.put<WorkOrder>(`/work-orders/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<WorkOrder> & { id: string }) => {
+      const row = await sb(
+        supabase.from('work_orders')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as WorkOrder;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/work-orders/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('work_orders').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -108,62 +139,77 @@ export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: bool
 export function useGrants() {
   return useQuery({
     queryKey: queryKeys.grants.list(),
-    queryFn: () => api.get<Grant[]>('/grants'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('grants').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Grant);
+    },
   });
 }
 
 export function useGrant(id: string) {
   return useQuery({
     queryKey: queryKeys.grants.detail(id),
-    queryFn: () => api.get<Grant>(`/grants/${id}`),
+    queryFn: async () => {
+      const row = await sb(supabase.from('grants').select('*').eq('id', id).single());
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grant;
+    },
     enabled: !!id,
   });
 }
 
 export function useCreateGrant(callbacks?: MutationCallbacks<Grant>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Grant>('/grants', data),
+    mutationFn: async (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('grants')
+          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grant;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grants.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateGrant(callbacks?: MutationCallbacks<Grant>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Grant> & { id: string }) =>
-      api.put<Grant>(`/grants/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Grant> & { id: string }) => {
+      const row = await sb(
+        supabase.from('grants')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grant;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grants.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/grants/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('grants').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grants.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -174,62 +220,77 @@ export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean 
 export function useInventory() {
   return useQuery({
     queryKey: queryKeys.inventory.list(),
-    queryFn: () => api.get<InventoryItem[]>('/inventory'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('inventory').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as InventoryItem);
+    },
   });
 }
 
 export function useInventoryItem(id: string) {
   return useQuery({
     queryKey: queryKeys.inventory.detail(id),
-    queryFn: () => api.get<InventoryItem>(`/inventory/${id}`),
+    queryFn: async () => {
+      const row = await sb(supabase.from('inventory').select('*').eq('id', id).single());
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as InventoryItem;
+    },
     enabled: !!id,
   });
 }
 
 export function useCreateInventoryItem(callbacks?: MutationCallbacks<InventoryItem>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<InventoryItem>('/inventory', data),
+    mutationFn: async (data: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('inventory')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as InventoryItem;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateInventoryItem(callbacks?: MutationCallbacks<InventoryItem>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<InventoryItem> & { id: string }) =>
-      api.put<InventoryItem>(`/inventory/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<InventoryItem> & { id: string }) => {
+      const row = await sb(
+        supabase.from('inventory')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as InventoryItem;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/inventory/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('inventory').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -240,62 +301,77 @@ export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: 
 export function useCustomers() {
   return useQuery({
     queryKey: queryKeys.customers.list(),
-    queryFn: () => api.get<Customer[]>('/customers'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('customers').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Customer);
+    },
   });
 }
 
 export function useCustomer(id: string) {
   return useQuery({
     queryKey: queryKeys.customers.detail(id),
-    queryFn: () => api.get<Customer>(`/customers/${id}`),
+    queryFn: async () => {
+      const row = await sb(supabase.from('customers').select('*').eq('id', id).single());
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Customer;
+    },
     enabled: !!id,
   });
 }
 
 export function useCreateCustomer(callbacks?: MutationCallbacks<Customer>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Customer>('/customers', data),
+    mutationFn: async (data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('customers')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Customer;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateCustomer(callbacks?: MutationCallbacks<Customer>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Customer> & { id: string }) =>
-      api.put<Customer>(`/customers/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Customer> & { id: string }) => {
+      const row = await sb(
+        supabase.from('customers')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Customer;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/customers/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('customers').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -306,62 +382,77 @@ export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boole
 export function useBurials() {
   return useQuery({
     queryKey: queryKeys.burials.list(),
-    queryFn: () => api.get<Burial[]>('/burials'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('burials').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Burial);
+    },
   });
 }
 
 export function useBurial(id: string) {
   return useQuery({
     queryKey: queryKeys.burials.detail(id),
-    queryFn: () => api.get<Burial>(`/burials/${id}`),
+    queryFn: async () => {
+      const row = await sb(supabase.from('burials').select('*').eq('id', id).single());
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Burial;
+    },
     enabled: !!id,
   });
 }
 
 export function useCreateBurial(callbacks?: MutationCallbacks<Burial>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<Burial, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Burial>('/burials', data),
+    mutationFn: async (data: Omit<Burial, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('burials')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Burial;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateBurial(callbacks?: MutationCallbacks<Burial>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Burial> & { id: string }) =>
-      api.put<Burial>(`/burials/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Burial> & { id: string }) => {
+      const row = await sb(
+        supabase.from('burials')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Burial;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/burials/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('burials').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -369,65 +460,93 @@ export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean
 // CONTRACTS
 // ============================================
 
+type ContractRow = Record<string, unknown> & { contract_items?: Record<string, unknown>[] };
+
+function mapContract(row: ContractRow): Contract {
+  const { contract_items, ...rest } = row;
+  return {
+    ...toCamelCaseKeys(rest as Record<string, unknown>),
+    items: (contract_items ?? []).map(item => toCamelCaseKeys(item as Record<string, unknown>)),
+  } as unknown as Contract;
+}
+
 export function useContracts() {
   return useQuery({
     queryKey: queryKeys.contracts.list(),
-    queryFn: () => api.get<Contract[]>('/contracts'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('contracts').select('*, contract_items(*)').order('created_at', { ascending: false })
+      );
+      return (rows as ContractRow[]).map(mapContract);
+    },
   });
 }
 
 export function useContract(id: string) {
   return useQuery({
     queryKey: queryKeys.contracts.detail(id),
-    queryFn: () => api.get<Contract>(`/contracts/${id}`),
+    queryFn: async () => {
+      const row = await sb(
+        supabase.from('contracts').select('*, contract_items(*)').eq('id', id).single()
+      );
+      return mapContract(row as ContractRow);
+    },
     enabled: !!id,
   });
 }
 
 export function useCreateContract(callbacks?: MutationCallbacks<Contract>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<Contract, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Contract>('/contracts', data),
+    mutationFn: async (data: Omit<Contract, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const { items: _items, ...contractData } = data;
+      const row = await sb(
+        supabase.from('contracts')
+          .insert(toSnakeCaseKeys(contractData as Record<string, unknown>))
+          .select('*, contract_items(*)').single()
+      );
+      return mapContract(row as ContractRow);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateContract(callbacks?: MutationCallbacks<Contract>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Contract> & { id: string }) =>
-      api.put<Contract>(`/contracts/${id}`, data),
+    mutationFn: async ({ id, items: _items, ...data }: Partial<Contract> & { id: string }) => {
+      const row = await sb(
+        supabase.from('contracts')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select('*, contract_items(*)').single()
+      );
+      return mapContract(row as ContractRow);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/contracts/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('contracts').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -438,23 +557,31 @@ export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boole
 export function useDeposits() {
   return useQuery({
     queryKey: queryKeys.financial.deposits.list(),
-    queryFn: () => api.get<Deposit[]>('/financial/deposits'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('deposits').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Deposit);
+    },
   });
 }
 
 export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>) =>
-      api.post<Deposit>('/financial/deposits', data),
+    mutationFn: async (data: Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>) => {
+      const row = await sb(
+        supabase.from('deposits')
+          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Deposit;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.deposits.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -465,39 +592,52 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
 export function useReceivables() {
   return useQuery({
     queryKey: queryKeys.financial.receivables.list(),
-    queryFn: () => api.get<AccountsReceivable[]>('/financial/receivables'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('accounts_receivable').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as AccountsReceivable);
+    },
   });
 }
 
 export function useCreateReceivable(callbacks?: MutationCallbacks<AccountsReceivable>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<AccountsReceivable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>) =>
-      api.post<AccountsReceivable>('/financial/receivables', data),
+    mutationFn: async (
+      data: Omit<AccountsReceivable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>
+    ) => {
+      const row = await sb(
+        supabase.from('accounts_receivable')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsReceivable;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.receivables.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceivable>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) =>
-      api.put<AccountsReceivable>(`/financial/receivables/${id}`, data),
+    mutationFn: async ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) => {
+      const row = await sb(
+        supabase.from('accounts_receivable')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsReceivable;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.receivables.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -508,39 +648,52 @@ export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
 export function usePayables() {
   return useQuery({
     queryKey: queryKeys.financial.payables.list(),
-    queryFn: () => api.get<AccountsPayable[]>('/financial/payables'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('accounts_payable').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as AccountsPayable);
+    },
   });
 }
 
 export function useCreatePayable(callbacks?: MutationCallbacks<AccountsPayable>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: Omit<AccountsPayable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>) =>
-      api.post<AccountsPayable>('/financial/payables', data),
+    mutationFn: async (
+      data: Omit<AccountsPayable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>
+    ) => {
+      const row = await sb(
+        supabase.from('accounts_payable')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsPayable;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.payables.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
 export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) =>
-      api.put<AccountsPayable>(`/financial/payables/${id}`, data),
+    mutationFn: async ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) => {
+      const row = await sb(
+        supabase.from('accounts_payable')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsPayable;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.financial.payables.all });
       callbacks?.onSuccess?.(data);
     },
-    onError: (error: Error) => {
-      callbacks?.onError?.(error);
-    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 
@@ -551,14 +704,22 @@ export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
 export function useVendors() {
   return useQuery({
     queryKey: queryKeys.vendors.list(),
-    queryFn: () => api.get<Vendor[]>('/vendors'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('vendors').select('*').order('name', { ascending: true })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Vendor);
+    },
   });
 }
 
 export function useVendor(id: string) {
   return useQuery({
     queryKey: queryKeys.vendors.detail(id),
-    queryFn: () => api.get<Vendor>(`/vendors/${id}`),
+    queryFn: async () => {
+      const row = await sb(supabase.from('vendors').select('*').eq('id', id).single());
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Vendor;
+    },
     enabled: !!id,
   });
 }
@@ -566,8 +727,14 @@ export function useVendor(id: string) {
 export function useCreateVendor(callbacks?: MutationCallbacks<Vendor>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Vendor>('/vendors', data),
+    mutationFn: async (data: Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('vendors')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Vendor;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
       callbacks?.onSuccess?.(data);
@@ -579,8 +746,14 @@ export function useCreateVendor(callbacks?: MutationCallbacks<Vendor>) {
 export function useUpdateVendor(callbacks?: MutationCallbacks<Vendor>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Vendor> & { id: string }) =>
-      api.put<Vendor>(`/vendors/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Vendor> & { id: string }) => {
+      const row = await sb(
+        supabase.from('vendors')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Vendor;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
       callbacks?.onSuccess?.(data);
@@ -592,7 +765,11 @@ export function useUpdateVendor(callbacks?: MutationCallbacks<Vendor>) {
 export function useDeleteVendor(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/vendors/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('vendors').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
       callbacks?.onSuccess?.(data);
@@ -608,7 +785,14 @@ export function useDeleteVendor(callbacks?: MutationCallbacks<{ success: boolean
 export function usePaymentSchedule(contractId: string) {
   return useQuery({
     queryKey: queryKeys.paymentSchedule.byContract(contractId),
-    queryFn: () => api.get<PaymentScheduleEntry[]>(`/payment-schedule?contractId=${contractId}`),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('payment_schedule').select('*')
+          .eq('contract_id', contractId)
+          .order('due_date', { ascending: true })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as PaymentScheduleEntry);
+    },
     enabled: !!contractId,
   });
 }
@@ -616,8 +800,14 @@ export function usePaymentSchedule(contractId: string) {
 export function useCreatePaymentScheduleEntry(callbacks?: MutationCallbacks<PaymentScheduleEntry>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<PaymentScheduleEntry, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<PaymentScheduleEntry>('/payment-schedule', data),
+    mutationFn: async (data: Omit<PaymentScheduleEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('payment_schedule')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as PaymentScheduleEntry;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.paymentSchedule.all });
       callbacks?.onSuccess?.(data);
@@ -629,8 +819,14 @@ export function useCreatePaymentScheduleEntry(callbacks?: MutationCallbacks<Paym
 export function useUpdatePaymentScheduleEntry(callbacks?: MutationCallbacks<PaymentScheduleEntry>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<PaymentScheduleEntry> & { id: string }) =>
-      api.put<PaymentScheduleEntry>(`/payment-schedule/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<PaymentScheduleEntry> & { id: string }) => {
+      const row = await sb(
+        supabase.from('payment_schedule')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as PaymentScheduleEntry;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.paymentSchedule.all });
       callbacks?.onSuccess?.(data);
@@ -646,15 +842,26 @@ export function useUpdatePaymentScheduleEntry(callbacks?: MutationCallbacks<Paym
 export function useCemeteries() {
   return useQuery({
     queryKey: queryKeys.cemeteries.list(),
-    queryFn: () => api.get<Cemetery[]>('/cemeteries'),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('cemeteries').select('*').order('name', { ascending: true })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Cemetery);
+    },
   });
 }
 
 export function useCreateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<Cemetery, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Cemetery>('/cemeteries', data),
+    mutationFn: async (data: Omit<Cemetery, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('cemeteries')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Cemetery;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
       callbacks?.onSuccess?.(data);
@@ -666,8 +873,14 @@ export function useCreateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
 export function useUpdateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Cemetery> & { id: string }) =>
-      api.put<Cemetery>(`/cemeteries/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Cemetery> & { id: string }) => {
+      const row = await sb(
+        supabase.from('cemeteries')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Cemetery;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
       callbacks?.onSuccess?.(data);
@@ -679,7 +892,11 @@ export function useUpdateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
 export function useDeleteCemetery(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/cemeteries/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('cemeteries').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
       callbacks?.onSuccess?.(data);
@@ -691,7 +908,14 @@ export function useDeleteCemetery(callbacks?: MutationCallbacks<{ success: boole
 export function useSections(cemeteryId: string) {
   return useQuery({
     queryKey: queryKeys.sections.byCemetery(cemeteryId),
-    queryFn: () => api.get<Section[]>('/sections', { params: { cemeteryId } }),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('sections').select('*')
+          .eq('cemetery_id', cemeteryId)
+          .order('name', { ascending: true })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Section);
+    },
     enabled: !!cemeteryId,
   });
 }
@@ -699,8 +923,14 @@ export function useSections(cemeteryId: string) {
 export function useCreateSection(callbacks?: MutationCallbacks<Section>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<Section, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Section>('/sections', data),
+    mutationFn: async (data: Omit<Section, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('sections')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Section;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
       callbacks?.onSuccess?.(data);
@@ -712,8 +942,14 @@ export function useCreateSection(callbacks?: MutationCallbacks<Section>) {
 export function useUpdateSection(callbacks?: MutationCallbacks<Section>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Section> & { id: string }) =>
-      api.put<Section>(`/sections/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Section> & { id: string }) => {
+      const row = await sb(
+        supabase.from('sections')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Section;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
       callbacks?.onSuccess?.(data);
@@ -725,7 +961,11 @@ export function useUpdateSection(callbacks?: MutationCallbacks<Section>) {
 export function useDeleteSection(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/sections/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('sections').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
       callbacks?.onSuccess?.(data);
@@ -737,7 +977,14 @@ export function useDeleteSection(callbacks?: MutationCallbacks<{ success: boolea
 export function useLots(sectionId: string) {
   return useQuery({
     queryKey: queryKeys.lots.bySection(sectionId),
-    queryFn: () => api.get<Lot[]>('/lots', { params: { sectionId } }),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('lots').select('*')
+          .eq('section_id', sectionId)
+          .order('lot_number', { ascending: true })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Lot);
+    },
     enabled: !!sectionId,
   });
 }
@@ -745,8 +992,14 @@ export function useLots(sectionId: string) {
 export function useCreateLot(callbacks?: MutationCallbacks<Lot>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<Lot, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Lot>('/lots', data),
+    mutationFn: async (data: Omit<Lot, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('lots')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Lot;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
       callbacks?.onSuccess?.(data);
@@ -758,8 +1011,14 @@ export function useCreateLot(callbacks?: MutationCallbacks<Lot>) {
 export function useUpdateLot(callbacks?: MutationCallbacks<Lot>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Lot> & { id: string }) =>
-      api.put<Lot>(`/lots/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Lot> & { id: string }) => {
+      const row = await sb(
+        supabase.from('lots')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Lot;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
       callbacks?.onSuccess?.(data);
@@ -771,7 +1030,11 @@ export function useUpdateLot(callbacks?: MutationCallbacks<Lot>) {
 export function useDeleteLot(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/lots/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('lots').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
       callbacks?.onSuccess?.(data);
@@ -783,7 +1046,14 @@ export function useDeleteLot(callbacks?: MutationCallbacks<{ success: boolean }>
 export function useGraves(lotId: string) {
   return useQuery({
     queryKey: queryKeys.graves.byLot(lotId),
-    queryFn: () => api.get<Grave[]>('/graves', { params: { lotId } }),
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('graves').select('*')
+          .eq('lot_id', lotId)
+          .order('grave_number', { ascending: true })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Grave);
+    },
     enabled: !!lotId,
   });
 }
@@ -791,8 +1061,14 @@ export function useGraves(lotId: string) {
 export function useCreateGrave(callbacks?: MutationCallbacks<Grave>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<Grave, 'id' | 'createdAt' | 'updatedAt'>) =>
-      api.post<Grave>('/graves', data),
+    mutationFn: async (data: Omit<Grave, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('graves')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grave;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
       callbacks?.onSuccess?.(data);
@@ -804,8 +1080,14 @@ export function useCreateGrave(callbacks?: MutationCallbacks<Grave>) {
 export function useUpdateGrave(callbacks?: MutationCallbacks<Grave>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Grave> & { id: string }) =>
-      api.put<Grave>(`/graves/${id}`, data),
+    mutationFn: async ({ id, ...data }: Partial<Grave> & { id: string }) => {
+      const row = await sb(
+        supabase.from('graves')
+          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .eq('id', id).select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grave;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
       callbacks?.onSuccess?.(data);
@@ -817,7 +1099,11 @@ export function useUpdateGrave(callbacks?: MutationCallbacks<Grave>) {
 export function useDeleteGrave(callbacks?: MutationCallbacks<{ success: boolean }>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete<{ success: boolean }>(`/graves/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('graves').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
       callbacks?.onSuccess?.(data);
@@ -827,7 +1113,7 @@ export function useDeleteGrave(callbacks?: MutationCallbacks<{ success: boolean 
 }
 
 // ============================================
-// PUBLIC MEMORIAL (no auth — uses Supabase direct with anon RLS policy)
+// PUBLIC (UNAUTHENTICATED) — MEMORIAL PAGES
 // ============================================
 
 export function usePublicBurial(id: string) {
@@ -853,9 +1139,6 @@ export function usePublicBurial(id: string) {
 // UTILITY HOOKS
 // ============================================
 
-/**
- * Helper hook to get error message from any error
- */
 export function useErrorMessage(error: Error | null): string | null {
   if (!error) return null;
   return getErrorMessage(error);
