@@ -1,3 +1,9 @@
+/**
+ * Interactive cemetery plot map using MapLibre GL + react-map-gl.
+ * Tile source: ESRI World Imagery satellite (free, no API key required).
+ * Grave markers are color-coded by status (available/reserved/occupied/unavailable).
+ * Supports GPS drop-pin, search-by-plot, and satellite/street tile toggle.
+ */
 import { Map as MapLibreMap, Marker, NavigationControl, Popup, type MapRef, type MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import { useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
