@@ -536,41 +536,45 @@ export default function Login() {
               </motion.button>
             </motion.div>
 
-            {/* ── Demo ── */}
-            <motion.div variants={fadeUp} className="mt-3">
-              <motion.button
-                type="button"
-                onClick={handleDemo}
-                whileHover={{ scale: 1.005 }}
-                whileTap={{ scale: 0.995 }}
-                className="w-full flex items-center justify-center gap-2.5 py-3 px-5 text-[11px] uppercase font-medium transition-colors"
-                style={{
-                  color: 'rgba(26,26,26,0.45)',
-                  backgroundColor: 'transparent',
-                  letterSpacing: '0.22em',
-                  border: 'none',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = BRAND.green)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(26,26,26,0.45)')}
-              >
-                <Sparkles size={12} style={{ color: BRAND.gold }} />
-                Explore Demo
-              </motion.button>
-            </motion.div>
+            {/* ── Demo (dev-only) ── */}
+            {import.meta.env.DEV && (
+              <>
+                <motion.div variants={fadeUp} className="mt-3">
+                  <motion.button
+                    type="button"
+                    onClick={handleDemo}
+                    whileHover={{ scale: 1.005 }}
+                    whileTap={{ scale: 0.995 }}
+                    className="w-full flex items-center justify-center gap-2.5 py-3 px-5 text-[11px] uppercase font-medium transition-colors"
+                    style={{
+                      color: 'rgba(26,26,26,0.45)',
+                      backgroundColor: 'transparent',
+                      letterSpacing: '0.22em',
+                      border: 'none',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = BRAND.green)}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(26,26,26,0.45)')}
+                  >
+                    <Sparkles size={12} style={{ color: BRAND.gold }} />
+                    Explore Demo
+                  </motion.button>
+                </motion.div>
 
-            <motion.p
-              variants={fadeUp}
-              className="text-xs text-center mt-6"
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontStyle: 'italic',
-                color: 'rgba(26,26,26,0.4)',
-              }}
-            >
-              Staff demo: <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin@dmp.com</span>
-              {' / '}
-              <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin123</span>
-            </motion.p>
+                <motion.p
+                  variants={fadeUp}
+                  className="text-xs text-center mt-6"
+                  style={{
+                    fontFamily: 'var(--font-serif)',
+                    fontStyle: 'italic',
+                    color: 'rgba(26,26,26,0.4)',
+                  }}
+                >
+                  Staff demo: <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin@dmp.com</span>
+                  {' / '}
+                  <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin123</span>
+                </motion.p>
+              </>
+            )}
 
             <motion.div
               variants={fadeUp}
