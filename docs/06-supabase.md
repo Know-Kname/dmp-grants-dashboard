@@ -217,23 +217,28 @@ const supabase = createClient(
 );
 ```
 
-All queries go through `src/lib/api.ts`, which wraps the Supabase client:
+All queries live in `src/hooks/useData.ts` and call Supabase directly. A small
+`sb()` helper unwraps the `{ data, error }` shape and `toCamelCaseKeys` converts
+the snake_case response:
 
 ```ts
-// Example of what api.get('/burials') does under the hood:
-const { data, error } = await supabase
-  .from('burials')
-  .select('*')
-  .order('burial_date', { ascending: false });
+// Inside useBurials() — what every list hook looks like:
+const rows = await sb(
+  supabase.from('burials').select('*').order('burial_date', { ascending: false })
+);
+return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Burial);
 ```
 
-The `api.ts` wrapper:
-1. Calls the Supabase client method
-2. If `error` is non-null, throws a structured `ApiError`
-3. Transforms snake_case column names to camelCase on the response
-4. Returns the typed data
+The pattern:
+1. `supabase.from('table').select/insert/update/delete()` — RLS still applies
+2. `sb()` throws on `error`, returns `data` (non-null)
+3. `toCamelCaseKeys` recurses into the result; `toSnakeCaseKeys` recurses into
+   insert/update payloads
+4. React Query handles caching/refetching via `queryKey` invalidation
 
-React Query hooks in `src/hooks/useData.ts` call `api.ts` functions and manage caching.
+There is no Express/REST layer — `api.ts` only exports the error type hierarchy
+(`ApiRequestError`, `NetworkError`, `TimeoutError`) used by the retry policy in
+`query.tsx` and the user-facing message helpers in `errors.ts`.
 
 ---
 

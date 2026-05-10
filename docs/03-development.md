@@ -89,12 +89,16 @@ All data fetching and mutations go through `src/hooks/useData.ts`. It uses TanSt
 **Reading data (query):**
 
 ```ts
-// In useData.ts — add a new query:
+// In useData.ts — add a new query. Calls Supabase directly; no Express layer.
 export function useReports() {
   return useQuery({
-    queryKey: queryKeys.reports,   // add 'reports' to queryKeys in src/lib/query.tsx
-    queryFn: () => api.get<Report[]>('/reports'),
-    enabled: !isDemoMode(),
+    queryKey: queryKeys.reports.list(),   // add `reports` to queryKeys in src/lib/query.tsx
+    queryFn: async () => {
+      const rows = await sb(
+        supabase.from('reports').select('*').order('created_at', { ascending: false })
+      );
+      return (rows as Record<string, unknown>[]).map(r => toCamelCaseKeys(r) as unknown as Report);
+    },
   });
 }
 ```
@@ -102,13 +106,24 @@ export function useReports() {
 **Writing data (mutation):**
 
 ```ts
-// In useData.ts — add a mutation:
-export function useCreateReport(options?: UseMutationOptions<Report, Error, Partial<Report>>) {
-  const qc = useQueryClient();
+// In useData.ts — add a mutation. toSnakeCaseKeys converts on the way in,
+// toCamelCaseKeys on the way out.
+export function useCreateReport(callbacks?: MutationCallbacks<Report>) {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => api.post<Report>('/reports', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.reports }),
-    ...options,
+    mutationFn: async (data: Omit<Report, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const row = await sb(
+        supabase.from('reports')
+          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .select().single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Report;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+      callbacks?.onSuccess?.(data);
+    },
+    onError: (error: Error) => callbacks?.onError?.(error),
   });
 }
 ```
