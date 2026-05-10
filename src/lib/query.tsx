@@ -114,7 +114,6 @@ export const queryKeys = {
     all: ['inventory'] as const,
     list: () => [...queryKeys.inventory.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.inventory.all, 'detail', id] as const,
-    lowStock: () => [...queryKeys.inventory.all, 'low-stock'] as const,
   },
 
   // Customers
@@ -154,13 +153,6 @@ export const queryKeys = {
     },
   },
 
-  // Users
-  users: {
-    all: ['users'] as const,
-    list: () => [...queryKeys.users.all, 'list'] as const,
-    me: () => [...queryKeys.users.all, 'me'] as const,
-  },
-
   // Vendors
   vendors: {
     all: ['vendors'] as const,
@@ -172,7 +164,6 @@ export const queryKeys = {
   paymentSchedule: {
     all: ['payment-schedule'] as const,
     byContract: (contractId: string) => [...queryKeys.paymentSchedule.all, 'contract', contractId] as const,
-    detail: (id: string) => [...queryKeys.paymentSchedule.all, id] as const,
   },
 
   // Cemetery Hierarchy
@@ -184,16 +175,13 @@ export const queryKeys = {
   sections: {
     all: ['sections'] as const,
     byCemetery: (cemeteryId: string) => [...queryKeys.sections.all, 'cemetery', cemeteryId] as const,
-    detail: (id: string) => [...queryKeys.sections.all, 'detail', id] as const,
   },
   lots: {
     all: ['lots'] as const,
     bySection: (sectionId: string) => [...queryKeys.lots.all, 'section', sectionId] as const,
-    detail: (id: string) => [...queryKeys.lots.all, 'detail', id] as const,
   },
   graves: {
     all: ['graves'] as const,
     byLot: (lotId: string) => [...queryKeys.graves.all, 'lot', lotId] as const,
-    detail: (id: string) => [...queryKeys.graves.all, 'detail', id] as const,
   },
 };
