@@ -26,7 +26,7 @@ jobs:
           DEFAULT_BUMP: patch
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191  # v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v2
         with:
           tag_name: ${{ steps.bump.outputs.new_tag }}
           name: "Release ${{ steps.bump.outputs.new_tag }}"
