@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useGrants, useCreateGrant, useUpdateGrant, useDeleteGrant } from '../hooks/useData';
 import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
-import { formatCurrency, formatDateForInput, parseDateStr } from '../lib/utils';
+import { formatCurrency, formatDateForInput, formatStatus, parseDateStr } from '../lib/utils';
 import { Grant } from '../types';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner } from '../components/ui';
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
@@ -156,7 +156,7 @@ export default function Grants() {
       denied: 'danger',
       received: 'primary',
     };
-    return <Badge variant={variants[status]} dot>{status.replace('_', ' ')}</Badge>;
+    return <Badge variant={variants[status]} dot>{formatStatus(status)}</Badge>;
   };
 
   const getTypeBadge = (type: string) => {
