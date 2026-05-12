@@ -17,7 +17,7 @@ import {
 import { Card, CardHeader, CardBody, Badge } from '../components/ui';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
-import { formatCurrency, parseDateStr } from '../lib/utils';
+import { formatCurrency, formatStatus, parseDateStr } from '../lib/utils';
 
 const C = {
   green: BRAND.green,
@@ -143,7 +143,7 @@ export default function Dashboard() {
     const wos = workOrders.slice(0, 5).map(w => ({
       type: 'work_order' as const,
       title: w.title,
-      sub: w.status.replace('_', ' '),
+      sub: formatStatus(w.status),
       date: w.createdAt,
       status: w.status,
     }));
@@ -549,7 +549,7 @@ export default function Dashboard() {
                         }
                         size="sm"
                       >
-                        {a.status.replace('_', ' ')}
+                        {formatStatus(a.status)}
                       </Badge>
                     )}
                   </div>

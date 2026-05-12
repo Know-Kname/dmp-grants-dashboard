@@ -4,7 +4,7 @@ import {
   useUpdateWorkOrder, useDeleteWorkOrder,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
-import { formatDate, formatDateForInput } from '../lib/utils';
+import { formatDate, formatDateForInput, formatStatus } from '../lib/utils';
 import type { WorkOrder } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
@@ -291,14 +291,14 @@ export default function WorkOrders() {
                         <div className="text-sm text-foreground-muted truncate max-w-xs">{wo.description}</div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-foreground capitalize">
-                      {wo.type.replace('_', ' ')}
+                    <td className="px-6 py-4 text-sm text-foreground">
+                      {formatStatus(wo.type)}
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={PRIORITY_VARIANTS[wo.priority]} size="sm">{wo.priority}</Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={STATUS_VARIANTS[wo.status]}>{wo.status.replace('_', ' ')}</Badge>
+                      <Badge variant={STATUS_VARIANTS[wo.status]}>{formatStatus(wo.status)}</Badge>
                     </td>
                     <td className="px-6 py-4 text-sm text-foreground">
                       {wo.assignedTo || <span className="text-foreground-subtle">Unassigned</span>}
