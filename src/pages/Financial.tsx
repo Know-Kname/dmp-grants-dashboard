@@ -182,9 +182,16 @@ export default function Financial() {
       } as Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>);
     } else if (activeTab === 'receivables') {
       if (editingReceivable) {
+        const newAmountPaid = parseFloat(receivableEditForm.amountPaid) || 0;
+        const newStatus = newAmountPaid >= editingReceivable.amount
+          ? 'paid'
+          : newAmountPaid > 0
+          ? 'partial'
+          : editingReceivable.status; // preserve 'overdue' / 'pending'
         receivableUpdateMutation.mutate({
           id: editingReceivable.id,
-          amountPaid: parseFloat(receivableEditForm.amountPaid) || 0,
+          amountPaid: newAmountPaid,
+          status: newStatus,
         });
       } else {
         receivableCreateMutation.mutate({
@@ -196,9 +203,16 @@ export default function Financial() {
       }
     } else {
       if (editingPayable) {
+        const newAmountPaid = parseFloat(payableEditForm.amountPaid) || 0;
+        const newStatus = newAmountPaid >= editingPayable.amount
+          ? 'paid'
+          : newAmountPaid > 0
+          ? 'partial'
+          : editingPayable.status; // preserve 'overdue' / 'pending'
         payableUpdateMutation.mutate({
           id: editingPayable.id,
-          amountPaid: parseFloat(payableEditForm.amountPaid) || 0,
+          amountPaid: newAmountPaid,
+          status: newStatus,
         });
       } else {
         payableCreateMutation.mutate({
