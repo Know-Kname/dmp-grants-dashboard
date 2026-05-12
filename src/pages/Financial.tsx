@@ -550,6 +550,7 @@ export default function Financial() {
                   onChange={e => setReceivableForm(p => ({ ...p, customerId: e.target.value }))}
                   options={customers.map(c => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))}
                   placeholder="Select customer..."
+                  required
                 />
                 <Input label="Invoice #" value={receivableForm.invoiceNumber} onChange={e => setReceivableForm(p => ({ ...p, invoiceNumber: e.target.value }))} required />
               </div>
