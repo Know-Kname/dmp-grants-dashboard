@@ -129,7 +129,7 @@ export default function Financial() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentDeposits = deposits
-      .filter(d => parseDateStr(d.date as string) >= thirtyDaysAgo)
+      .filter(d => parseDateStr(d.date) >= thirtyDaysAgo)
       .reduce((sum, d) => sum + d.amount, 0);
     return { receivablesOutstanding, payablesDue, recentDeposits };
   }, [deposits, receivables, payables]);

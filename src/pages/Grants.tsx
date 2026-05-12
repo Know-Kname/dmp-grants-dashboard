@@ -115,7 +115,7 @@ export default function Grants() {
     if (editingGrant) {
       updateMutation.mutate({ id: editingGrant.id, ...payload });
     } else {
-      createMutation.mutate(payload as Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>);
+      createMutation.mutate(payload as Omit<Grant, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>);
     }
   };
 

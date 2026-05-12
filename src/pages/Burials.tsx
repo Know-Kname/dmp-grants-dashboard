@@ -65,7 +65,7 @@ export default function Burials() {
   const stats = useMemo(() => ({
     total: burials.length,
     thisMonth: burials.filter(b => {
-      try { return isThisMonth(parseDateStr(b.burialDate as string)); }
+      try { return isThisMonth(parseDateStr(b.burialDate)); }
       catch { return false; }
     }).length,
   }), [burials]);
