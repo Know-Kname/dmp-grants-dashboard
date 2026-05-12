@@ -62,6 +62,26 @@ async function sb<T>(
   return data!;
 }
 
+// Variant of sb() for DELETE operations that return no rows.
+async function sbDelete(
+  q: PromiseLike<{ error: { message: string; code?: string } | null; status?: number }>
+): Promise<{ success: true }> {
+  const { error, status } = await q;
+  if (error) {
+    const code = error.code ?? '';
+    let statusCode = status ?? 500;
+    if (POSTGREST_AUTH_CODES.has(code) || statusCode === 401 || statusCode === 403) {
+      statusCode = statusCode === 500 ? 401 : statusCode;
+    } else if (POSTGREST_NOT_FOUND_CODES.has(code) || statusCode === 404) {
+      statusCode = 404;
+    } else if (POSTGREST_CONFLICT_CODES.has(code) || statusCode === 409) {
+      statusCode = 409;
+    }
+    throw new ApiRequestError({ message: error.message, code: code || `HTTP_${statusCode}`, statusCode });
+  }
+  return { success: true };
+}
+
 // Get the current authenticated user's ID, throwing 401 if not signed in.
 async function uid(): Promise<string> {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -140,9 +160,7 @@ export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: bool
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('work_orders').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('work_orders').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
@@ -221,9 +239,7 @@ export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('grants').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('grants').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grants.all });
@@ -302,9 +318,7 @@ export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('inventory').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('inventory').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
@@ -383,9 +397,7 @@ export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boole
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('customers').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('customers').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
@@ -464,9 +476,7 @@ export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('burials').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('burials').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.burials.all });
@@ -600,9 +610,7 @@ export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boole
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('contracts').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('contracts').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
@@ -828,9 +836,7 @@ export function useDeleteVendor(callbacks?: MutationCallbacks<{ success: boolean
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('vendors').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('vendors').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vendors.all });
@@ -955,9 +961,7 @@ export function useDeleteCemetery(callbacks?: MutationCallbacks<{ success: boole
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('cemeteries').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('cemeteries').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cemeteries.all });
@@ -1024,9 +1028,7 @@ export function useDeleteSection(callbacks?: MutationCallbacks<{ success: boolea
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('sections').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('sections').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sections.all });
@@ -1093,9 +1095,7 @@ export function useDeleteLot(callbacks?: MutationCallbacks<{ success: boolean }>
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('lots').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('lots').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lots.all });
@@ -1162,9 +1162,7 @@ export function useDeleteGrave(callbacks?: MutationCallbacks<{ success: boolean 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('graves').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { success: true };
+      return await sbDelete(supabase.from('graves').delete().eq('id', id));
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.graves.all });
