@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../lib/toast';
 import { useConfirm } from '../lib/confirm';
+import { validateForm, customerFormSchema } from '../lib/schemas';
 
 type CustomerFormData = {
   firstName: string;
@@ -57,6 +58,7 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<CustomerFormData>(initialForm);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm) return customers;
@@ -75,6 +77,8 @@ export default function Customers() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const v = validateForm(customerFormSchema, formData);
+    if (v.success === false) { setFormErrors(v.errors); return; }
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -106,6 +110,7 @@ export default function Customers() {
       zipCode: c.zipCode || '',
       notes: c.notes || '',
     });
+    setFormErrors({});
     setShowModal(true);
   };
 
@@ -117,8 +122,10 @@ export default function Customers() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof CustomerFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const f = (field: keyof CustomerFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    if (formErrors[field]) setFormErrors(prev => ({ ...prev, [field]: '' }));
+  };
 
   return (
     <div className="space-y-6">
@@ -132,7 +139,7 @@ export default function Customers() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingCustomer(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingCustomer(null); setFormErrors({}); setShowModal(true); }}>
             New Customer
           </Button>
         </div>
@@ -293,12 +300,12 @@ export default function Customers() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingCustomer(null); }}
+        onClose={() => { setShowModal(false); setEditingCustomer(null); setFormErrors({}); }}
         title={editingCustomer ? 'Edit Customer' : 'New Customer'}
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setShowModal(false); setFormErrors({}); }}>Cancel</Button>
             <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
               {editingCustomer ? 'Save Changes' : 'Add Customer'}
             </Button>
@@ -307,20 +314,20 @@ export default function Customers() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" value={formData.firstName} onChange={f('firstName')} required />
-            <Input label="Last Name" value={formData.lastName} onChange={f('lastName')} required />
+            <Input label="First Name" value={formData.firstName} onChange={f('firstName')} error={formErrors.firstName} required />
+            <Input label="Last Name" value={formData.lastName} onChange={f('lastName')} error={formErrors.lastName} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Email" type="email" value={formData.email} onChange={f('email')} />
-            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} />
+            <Input label="Email" type="email" value={formData.email} onChange={f('email')} error={formErrors.email} />
+            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} error={formErrors.phone} />
           </div>
-          <Input label="Address" value={formData.address} onChange={f('address')} />
+          <Input label="Address" value={formData.address} onChange={f('address')} error={formErrors.address} />
           <div className="grid grid-cols-3 gap-4">
-            <Input label="City" value={formData.city} onChange={f('city')} />
-            <Input label="State" value={formData.state} onChange={f('state')} />
-            <Input label="ZIP Code" value={formData.zipCode} onChange={f('zipCode')} />
+            <Input label="City" value={formData.city} onChange={f('city')} error={formErrors.city} />
+            <Input label="State" value={formData.state} onChange={f('state')} error={formErrors.state} />
+            <Input label="ZIP Code" value={formData.zipCode} onChange={f('zipCode')} error={formErrors.zipCode} />
           </div>
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} error={formErrors.notes} rows={3} />
         </form>
       </Modal>
     </div>

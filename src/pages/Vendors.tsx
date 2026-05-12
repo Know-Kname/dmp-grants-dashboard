@@ -15,6 +15,7 @@ import {
   AlertCircle, RefreshCw, Mail, Phone,
 } from 'lucide-react';
 import { useConfirm } from '../lib/confirm';
+import { validateForm, vendorFormSchema } from '../lib/schemas';
 
 type VendorFormData = {
   name: string;
@@ -41,6 +42,7 @@ export default function Vendors() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<VendorFormData>(initialForm);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const filteredVendors = useMemo(() => {
     if (!searchTerm) return vendors;
@@ -59,6 +61,8 @@ export default function Vendors() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const v = validateForm(vendorFormSchema, formData);
+    if (v.success === false) { setFormErrors(v.errors); return; }
     const payload = {
       name: formData.name,
       contactName: formData.contactName || undefined,
@@ -84,6 +88,7 @@ export default function Vendors() {
       address: v.address || '',
       notes: v.notes || '',
     });
+    setFormErrors({});
     setShowModal(true);
   };
 
@@ -95,8 +100,10 @@ export default function Vendors() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof VendorFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const f = (field: keyof VendorFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    if (formErrors[field]) setFormErrors(prev => ({ ...prev, [field]: '' }));
+  };
 
   return (
     <div className="space-y-6">
@@ -110,7 +117,7 @@ export default function Vendors() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingVendor(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingVendor(null); setFormErrors({}); setShowModal(true); }}>
             New Vendor
           </Button>
         </div>
@@ -273,12 +280,12 @@ export default function Vendors() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingVendor(null); }}
+        onClose={() => { setShowModal(false); setEditingVendor(null); setFormErrors({}); }}
         title={editingVendor ? 'Edit Vendor' : 'New Vendor'}
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setShowModal(false); setFormErrors({}); }}>Cancel</Button>
             <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
               {editingVendor ? 'Save Changes' : 'Add Vendor'}
             </Button>
@@ -286,14 +293,14 @@ export default function Vendors() {
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Company Name" value={formData.name} onChange={f('name')} required />
+          <Input label="Company Name" value={formData.name} onChange={f('name')} error={formErrors.name} required />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Contact Name" value={formData.contactName} onChange={f('contactName')} />
-            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} />
+            <Input label="Contact Name" value={formData.contactName} onChange={f('contactName')} error={formErrors.contactName} />
+            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} error={formErrors.phone} />
           </div>
-          <Input label="Email" type="email" value={formData.email} onChange={f('email')} />
-          <Input label="Address" value={formData.address} onChange={f('address')} />
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Input label="Email" type="email" value={formData.email} onChange={f('email')} error={formErrors.email} />
+          <Input label="Address" value={formData.address} onChange={f('address')} error={formErrors.address} />
+          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} error={formErrors.notes} rows={3} />
         </form>
       </Modal>
     </div>

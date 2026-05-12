@@ -143,6 +143,23 @@ export const inventoryFormSchema = z.object({
 export type InventoryFormData = z.infer<typeof inventoryFormSchema>;
 
 // ============================================
+// VENDOR SCHEMAS
+// ============================================
+
+export const vendorFormSchema = z.object({
+  name: z.string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(255, 'Name must be less than 255 characters'),
+  contactName: z.string().max(255, 'Contact name must be less than 255 characters').optional().or(z.literal('')),
+  email: emailSchema.optional().or(z.literal('')),
+  phone: phoneSchema,
+  address: z.string().max(500, 'Address must be less than 500 characters').optional().or(z.literal('')),
+  notes: z.string().max(2000, 'Notes must be less than 2000 characters').optional().or(z.literal('')),
+});
+
+export type VendorFormData = z.infer<typeof vendorFormSchema>;
+
+// ============================================
 // CUSTOMER SCHEMAS
 // ============================================
 
