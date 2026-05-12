@@ -1182,14 +1182,15 @@ export function usePublicBurial(id: string) {
   return useQuery({
     queryKey: ['burials', 'memorial', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('burials')
-        .select('id, deceased_first_name, deceased_last_name, deceased_middle_name, date_of_birth, date_of_death, burial_date, plot_location, section, lot, grave, memorial_published')
-        .eq('id', id)
-        .eq('memorial_published', true)
-        .single();
-      if (error) throw new Error(error.message);
-      return toCamelCaseKeys(data) as unknown as Burial;
+      const row = await sb(
+        supabase
+          .from('burials')
+          .select('id, deceased_first_name, deceased_last_name, deceased_middle_name, date_of_birth, date_of_death, burial_date, plot_location, section, lot, grave, memorial_published')
+          .eq('id', id)
+          .eq('memorial_published', true)
+          .single()
+      );
+      return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Burial;
     },
     enabled: !!id,
     staleTime: 10 * 60 * 1000,

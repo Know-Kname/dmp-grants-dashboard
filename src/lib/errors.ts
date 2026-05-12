@@ -6,7 +6,9 @@ function friendlySupabaseMessage(raw: string): string {
     return 'This record already exists. Please use a unique value.';
   if (/new row violates row-level security policy/i.test(raw))
     return "You don't have permission to perform this action.";
-  if (/violates foreign key constraint/i.test(raw))
+  if (/update or delete on table.+violates foreign key constraint/i.test(raw))
+    return 'Cannot delete this record because other records depend on it.';
+  if (/insert or update on table.+violates foreign key constraint/i.test(raw))
     return 'Cannot save: a linked record was not found.';
   if (/null value in column.+violates not-null constraint/i.test(raw))
     return 'A required field is missing.';

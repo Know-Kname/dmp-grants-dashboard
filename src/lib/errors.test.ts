@@ -45,8 +45,11 @@ describe('error helpers', () => {
     const rls = new Error('new row violates row-level security policy for table "burials"');
     expect(getErrorMessage(rls)).toBe("You don't have permission to perform this action.");
 
-    const fk = new Error('insert or update on table "graves" violates foreign key constraint "graves_lot_id_fkey"');
-    expect(getErrorMessage(fk)).toBe('Cannot save: a linked record was not found.');
+    const fkInsert = new Error('insert or update on table "graves" violates foreign key constraint "graves_lot_id_fkey"');
+    expect(getErrorMessage(fkInsert)).toBe('Cannot save: a linked record was not found.');
+
+    const fkDelete = new Error('update or delete on table "contracts" violates foreign key constraint "contract_items_contract_id_fkey" on table "contract_items"');
+    expect(getErrorMessage(fkDelete)).toBe('Cannot delete this record because other records depend on it.');
 
     const jwt = new ApiRequestError({ message: 'JWT expired', code: 'PGRST301', statusCode: 401 });
     expect(getErrorMessage(jwt)).toBe('Your session has expired. Please sign in again.');
