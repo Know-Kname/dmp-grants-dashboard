@@ -37,4 +37,18 @@ describe('error helpers', () => {
     expect(getErrorDetails(new Error('Boom'))).toEqual([]);
     expect(getErrorRequestId(new Error('Boom'))).toBeNull();
   });
+
+  it('translates raw Supabase messages to friendly copy', () => {
+    const dup = new Error('duplicate key value violates unique constraint "contracts_pkey"');
+    expect(getErrorMessage(dup)).toBe('This record already exists. Please use a unique value.');
+
+    const rls = new Error('new row violates row-level security policy for table "burials"');
+    expect(getErrorMessage(rls)).toBe("You don't have permission to perform this action.");
+
+    const fk = new Error('insert or update on table "graves" violates foreign key constraint "graves_lot_id_fkey"');
+    expect(getErrorMessage(fk)).toBe('Cannot save: a linked record was not found.');
+
+    const jwt = new ApiRequestError({ message: 'JWT expired', code: 'PGRST301', statusCode: 401 });
+    expect(getErrorMessage(jwt)).toBe('Your session has expired. Please sign in again.');
+  });
 });
