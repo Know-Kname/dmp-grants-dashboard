@@ -5,7 +5,6 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getErrorMessage } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
@@ -1135,11 +1134,3 @@ export function usePublicBurial(id: string) {
   });
 }
 
-// ============================================
-// UTILITY HOOKS
-// ============================================
-
-export function useErrorMessage(error: Error | null): string | null {
-  if (!error) return null;
-  return getErrorMessage(error);
-}

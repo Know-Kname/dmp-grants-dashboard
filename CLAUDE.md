@@ -35,7 +35,7 @@ src/
   hooks/
     useData.ts   ALL React Query hooks for every module
   lib/
-    api.ts       Fetch wrapper (camelCase↔snake_case, error handling)
+    api.ts       Error type hierarchy (ApiRequestError, NetworkError, TimeoutError)
     auth.tsx     AuthProvider + useAuth hook (Supabase + demo mode)
     supabase.ts  Supabase client init
     gemini.ts    OpenRouter streaming client
@@ -115,8 +115,10 @@ regardless of the user's light/dark theme preference.
    and dispatches a `dmp-demo-change` CustomEvent. `AuthProvider` listens for this
    event and updates `isDemoActive` state reactively.
 3. **snake_case ↔ camelCase.** The Supabase DB uses snake_case columns.
-   `src/lib/api.ts` transparently transforms all keys on the way in and out so
-   TypeScript types always use camelCase.
+   Each hook in `src/hooks/useData.ts` calls `toSnakeCaseKeys` on insert/update
+   payloads and `toCamelCaseKeys` on the result, so TypeScript types always use
+   camelCase. The transformers live in `src/lib/utils.ts` and recurse into nested
+   objects/arrays (relevant for `payment_plan` JSONB and joined `contract_items`).
 4. **Query invalidation pattern.** After every mutation, the relevant queryKey is
    invalidated, triggering an automatic refetch. See `src/hooks/useData.ts`.
 

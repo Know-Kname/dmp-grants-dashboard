@@ -7,3 +7,7 @@ dist
 coverage
 .vscode
 .idea
+
+# Supabase CLI local artifacts
+supabase/.temp
+supabase/.branches
