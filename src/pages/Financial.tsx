@@ -3,7 +3,7 @@ import {
   useDeposits, useCreateDeposit,
   useReceivables, useCreateReceivable, useUpdateReceivable,
   usePayables, useCreatePayable, useUpdatePayable,
-  useVendors,
+  useVendors, useCustomers,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
 import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
@@ -76,6 +76,11 @@ export default function Financial() {
   const receivablesQuery = useReceivables();
   const payablesQuery = usePayables();
   const { data: vendors = [] } = useVendors();
+  const { data: customers = [] } = useCustomers();
+  const customerName = (id: string) => {
+    const c = customers.find(x => x.id === id);
+    return c ? `${c.firstName} ${c.lastName}` : id;
+  };
 
   const deposits = depositsQuery.data ?? [];
   const receivables = receivablesQuery.data ?? [];
@@ -429,7 +434,7 @@ export default function Financial() {
                         return (
                           <tr key={r.id} className="hover:bg-accent/40 transition-colors">
                             <td className="px-6 py-4 font-mono text-xs font-medium text-foreground">{r.invoiceNumber}</td>
-                            <td className="px-6 py-4 text-foreground-muted">{r.customerId}</td>
+                            <td className="px-6 py-4 text-foreground-muted">{customerName(r.customerId)}</td>
                             <td className="px-6 py-4 text-right text-foreground">{formatCurrency(r.amount)}</td>
                             <td className="px-6 py-4 text-right text-success">{formatCurrency(r.amountPaid)}</td>
                             <td className={cn('px-6 py-4 text-right font-medium', r.status === 'overdue' ? 'text-danger' : 'text-foreground-muted')}>
@@ -539,7 +544,13 @@ export default function Financial() {
           {activeTab === 'receivables' && !editingReceivable && (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Customer ID" value={receivableForm.customerId} onChange={e => setReceivableForm(p => ({ ...p, customerId: e.target.value }))} required />
+                <Select
+                  label="Customer"
+                  value={receivableForm.customerId}
+                  onChange={e => setReceivableForm(p => ({ ...p, customerId: e.target.value }))}
+                  options={customers.map(c => ({ value: c.id, label: `${c.firstName} ${c.lastName}` }))}
+                  placeholder="Select customer..."
+                />
                 <Input label="Invoice #" value={receivableForm.invoiceNumber} onChange={e => setReceivableForm(p => ({ ...p, invoiceNumber: e.target.value }))} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
