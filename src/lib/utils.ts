@@ -83,13 +83,21 @@ export function toCamelCaseKeys<T>(obj: T): T {
 // DATE UTILITIES
 // ============================================
 
+// Postgres `date` columns arrive as "YYYY-MM-DD" strings. Parsing them with
+// `new Date("YYYY-MM-DD")` treats them as UTC midnight, which shifts the
+// displayed date one day earlier in US/Eastern and other timezones behind UTC.
+// Appending "T00:00:00" (no TZ suffix) forces local-midnight parsing.
+function parseDateStr(date: Date | string): Date {
+  if (typeof date !== 'string') return date;
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00`) : new Date(date);
+}
+
 /**
  * Format a date for display
  */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('en-US', {
+  return parseDateStr(date).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -101,8 +109,11 @@ export function formatDate(date: Date | string | null | undefined): string {
  */
 export function formatDateForInput(date: Date | string | null | undefined): string {
   if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toISOString().split('T')[0];
+  const d = parseDateStr(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /**
