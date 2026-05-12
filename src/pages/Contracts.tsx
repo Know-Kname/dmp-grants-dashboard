@@ -123,6 +123,11 @@ export default function Contracts() {
   const [formData, setFormData] = useState<ContractFormData>(initialForm);
   const [lineItems, setLineItems] = useState<LineItemDraft[]>([]);
 
+  const customerName = (customerId: string) => {
+    const c = customers.find(x => x.id === customerId);
+    return c ? `${c.lastName}, ${c.firstName}` : customerId;
+  };
+
   const customerOptions = useMemo(() =>
     customers.map(c => ({ value: c.id, label: `${c.lastName}, ${c.firstName}` })),
     [customers]
@@ -148,7 +153,7 @@ export default function Contracts() {
       const s = searchTerm.toLowerCase();
       filtered = filtered.filter(c =>
         c.contractNumber.toLowerCase().includes(s) ||
-        c.customerId.toLowerCase().includes(s)
+        customerName(c.customerId).toLowerCase().includes(s)
       );
     }
     if (typeFilter !== 'all') filtered = filtered.filter(c => c.type === typeFilter);
@@ -229,11 +234,6 @@ export default function Contracts() {
 
   const f = (field: keyof ContractFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
-  const customerName = (customerId: string) => {
-    const c = customers.find(x => x.id === customerId);
-    return c ? `${c.lastName}, ${c.firstName}` : customerId;
-  };
 
   return (
     <div className="space-y-6">
