@@ -1,12 +1,31 @@
 import { isApiError } from './api';
 
+// Translate raw Supabase/PostgREST error messages to friendly UI copy.
+function friendlySupabaseMessage(raw: string): string {
+  if (/duplicate key value violates unique constraint/i.test(raw))
+    return 'This record already exists. Please use a unique value.';
+  if (/new row violates row-level security policy/i.test(raw))
+    return "You don't have permission to perform this action.";
+  if (/violates foreign key constraint/i.test(raw))
+    return 'Cannot save: a linked record was not found.';
+  if (/null value in column.+violates not-null constraint/i.test(raw))
+    return 'A required field is missing.';
+  if (/value too long for type character varying/i.test(raw))
+    return 'One of the fields exceeds the maximum allowed length.';
+  if (/JWT expired/i.test(raw) || /PGRST301/i.test(raw))
+    return 'Your session has expired. Please sign in again.';
+  if (/permission denied/i.test(raw) || /42501/.test(raw))
+    return "You don't have permission to perform this action.";
+  return raw;
+}
+
 export const getErrorMessage = (error: unknown, fallback = 'Something went wrong') => {
   if (isApiError(error)) {
-    return error.message || fallback;
+    return friendlySupabaseMessage(error.message) || fallback;
   }
 
   if (error instanceof Error && error.message) {
-    return error.message;
+    return friendlySupabaseMessage(error.message);
   }
 
   return fallback;
