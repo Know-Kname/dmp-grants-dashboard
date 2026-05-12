@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   useInventory, useCreateInventoryItem,
   useUpdateInventoryItem, useDeleteInventoryItem,
+  useVendors,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
 import { formatCurrency, cn } from '../lib/utils';
@@ -24,12 +25,13 @@ type InventoryFormData = {
   quantity: string;
   reorderPoint: string;
   unitPrice: string;
+  vendorId: string;
   location: string;
 };
 
 const initialForm: InventoryFormData = {
   name: '', category: 'supplies', sku: '',
-  quantity: '', reorderPoint: '', unitPrice: '', location: '',
+  quantity: '', reorderPoint: '', unitPrice: '', vendorId: '', location: '',
 };
 
 const CATEGORIES: { value: InventoryItem['category']; label: string }[] = [
@@ -43,6 +45,8 @@ const CATEGORIES: { value: InventoryItem['category']; label: string }[] = [
 
 export default function Inventory() {
   const { data: items = [], isLoading, error, refetch } = useInventory();
+  const { data: vendors = [] } = useVendors();
+  const vendorName = (id: string) => vendors.find(v => v.id === id)?.name ?? '—';
 
   const toast = useToast();
   const createMutation = useCreateInventoryItem({
@@ -99,6 +103,7 @@ export default function Inventory() {
       quantity: parseInt(formData.quantity, 10) || 0,
       reorderPoint: parseInt(formData.reorderPoint, 10) || 0,
       unitPrice: parseFloat(formData.unitPrice) || 0,
+      vendorId: formData.vendorId || undefined,
       location: formData.location || undefined,
     };
     if (editingItem) {
@@ -117,6 +122,7 @@ export default function Inventory() {
       quantity: String(item.quantity),
       reorderPoint: String(item.reorderPoint),
       unitPrice: String(item.unitPrice),
+      vendorId: item.vendorId || '',
       location: item.location || '',
     });
     setShowModal(true);
@@ -279,6 +285,7 @@ export default function Inventory() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Qty</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Reorder Pt</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Unit Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Vendor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Location</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
@@ -299,6 +306,7 @@ export default function Inventory() {
                       </td>
                       <td className="px-6 py-4 text-foreground-muted">{item.reorderPoint}</td>
                       <td className="px-6 py-4 text-foreground">{formatCurrency(item.unitPrice)}</td>
+                      <td className="px-6 py-4 text-foreground-muted">{item.vendorId ? vendorName(item.vendorId) : '—'}</td>
                       <td className="px-6 py-4 text-foreground-muted">{item.location || '—'}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button onClick={() => handleEdit(item)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
@@ -347,6 +355,12 @@ export default function Inventory() {
             <Input label="Unit Price ($)" type="number" min="0" step="0.01" value={formData.unitPrice} onChange={f('unitPrice')} required />
             <Input label="Storage Location" value={formData.location} onChange={f('location')} placeholder="Optional" />
           </div>
+          <Select
+            label="Vendor (optional)"
+            options={[{ value: '', label: 'No vendor' }, ...vendors.map(v => ({ value: v.id, label: v.name }))]}
+            value={formData.vendorId}
+            onChange={f('vendorId')}
+          />
         </form>
       </Modal>
     </div>

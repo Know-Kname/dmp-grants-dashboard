@@ -4,7 +4,7 @@
  * The VITE_OPENROUTER_API_KEY is visible in the browser bundle — see docs/09-security.md.
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Send, Sparkles, RotateCcw, Bot } from 'lucide-react';
+import { X, Send, Sparkles, RotateCcw, Bot, RefreshCw } from 'lucide-react';
 import { streamMessage, type ChatMessage } from '../lib/gemini';
 
 const DMP_GREEN = '#1a3d2b';
@@ -73,6 +73,31 @@ export default function AIAssistant() {
       send(input);
     }
   };
+
+  const retry = useCallback(async () => {
+    if (streaming || messages.length === 0) return;
+    setError(null);
+    setStreaming(true);
+    abortRef.current = false;
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    try {
+      let fullText = '';
+      for await (const chunk of streamMessage(messages)) {
+        if (abortRef.current) break;
+        fullText += chunk;
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: 'assistant', content: fullText };
+          return updated;
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setMessages(prev => prev.slice(0, -1));
+    } finally {
+      setStreaming(false);
+    }
+  }, [messages, streaming]);
 
   const reset = () => {
     abortRef.current = true;
@@ -216,8 +241,18 @@ export default function AIAssistant() {
                     </div>
                   ))}
                   {error && (
-                    <div className="text-xs text-danger bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-xl px-3 py-2">
-                      {error}
+                    <div className="text-xs text-danger bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                      <span>{error}</span>
+                      {messages[messages.length - 1]?.role === 'user' && (
+                        <button
+                          onClick={retry}
+                          className="shrink-0 flex items-center gap-1 font-medium hover:underline"
+                          title="Retry"
+                        >
+                          <RefreshCw size={11} />
+                          Retry
+                        </button>
+                      )}
                     </div>
                   )}
                   <div ref={bottomRef} />

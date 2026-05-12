@@ -591,6 +591,7 @@ export default function Financial() {
                   onChange={e => setPayableForm(p => ({ ...p, vendorId: e.target.value }))}
                   options={vendors.map(v => ({ value: v.id, label: v.name }))}
                   placeholder="Select vendor..."
+                  required
                 />
                 <Input label="Invoice #" value={payableForm.invoiceNumber} onChange={e => setPayableForm(p => ({ ...p, invoiceNumber: e.target.value }))} required />
               </div>
