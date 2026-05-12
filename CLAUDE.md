@@ -42,7 +42,8 @@ src/
     query.tsx    QueryClient config + all queryKeys
     toast.tsx    Toast notification system
     errors.ts    getErrorMessage / getErrorDetails / getErrorRequestId
-    utils.ts     formatCurrency, formatDate, formatDateForInput, cn()
+    utils.ts     formatCurrency, formatDate, formatDateForInput, parseDateStr, cn()
+    confirm.tsx  ConfirmProvider + useConfirm() promise-based modal dialog
     demo-data.ts Mock data + enableDemoMode / disableDemoMode
   config/
     company.ts   DMP name, 3 locations, phones, tagline (source of truth)
@@ -138,6 +139,13 @@ regardless of the user's light/dark theme preference.
 8. **Friendly error messages.** `getErrorMessage()` in `errors.ts` translates raw
    PostgREST messages (duplicate key, RLS denial, FK violation, JWT expiry, etc.)
    into plain English before displaying to staff.
+9. **Delete confirmations.** All delete operations use `useConfirm()` from
+   `lib/confirm.tsx` (a `ConfirmProvider`-backed promise modal) instead of the
+   native `window.confirm()`. Handler pattern: `const handleDelete = async (id) =>
+   { if (await confirm('...')) mutation.mutate(id); }`.
+10. **sbDelete() helper.** Companion to `sb()` for DELETE operations that return
+    no rows. Throws the same typed `ApiRequestError` on failure; returns
+    `{ success: true }` on success. Used by all 11 delete mutations in useData.ts.
 
 ---
 
