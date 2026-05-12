@@ -519,13 +519,33 @@ export function useCreateContract(callbacks?: MutationCallbacks<Contract>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: Omit<Contract, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const { items: _items, ...contractData } = data;
-      const row = await sb(
+      const { items, ...contractData } = data;
+      // Insert contract header
+      const contractRow = await sb(
         supabase.from('contracts')
           .insert(toSnakeCaseKeys(contractData as Record<string, unknown>))
-          .select('*, contract_items(*)').single()
+          .select().single()
       );
-      return mapContract(row as ContractRow);
+      const contractId = (contractRow as Record<string, unknown>).id as string;
+      // Insert line items if provided
+      if (items && items.length > 0) {
+        await sb(
+          supabase.from('contract_items').insert(
+            items.map(item => ({
+              contract_id: contractId,
+              description: item.description,
+              amount: item.amount,
+              ...(item.inventoryId ? { inventory_id: item.inventoryId } : {}),
+              ...(item.quantity != null ? { quantity: item.quantity } : {}),
+            }))
+          )
+        );
+      }
+      // Fetch complete contract with items
+      const fullRow = await sb(
+        supabase.from('contracts').select('*, contract_items(*)').eq('id', contractId).single()
+      );
+      return mapContract(fullRow as ContractRow);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
@@ -538,13 +558,35 @@ export function useCreateContract(callbacks?: MutationCallbacks<Contract>) {
 export function useUpdateContract(callbacks?: MutationCallbacks<Contract>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, items: _items, ...data }: Partial<Contract> & { id: string }) => {
-      const row = await sb(
+    mutationFn: async ({ id, items, ...data }: Partial<Contract> & { id: string }) => {
+      // Update contract header
+      await sb(
         supabase.from('contracts')
           .update(toSnakeCaseKeys(data as Record<string, unknown>))
-          .eq('id', id).select('*, contract_items(*)').single()
+          .eq('id', id)
       );
-      return mapContract(row as ContractRow);
+      // Replace items: delete existing then re-insert
+      if (items !== undefined) {
+        await sb(supabase.from('contract_items').delete().eq('contract_id', id));
+        if (items.length > 0) {
+          await sb(
+            supabase.from('contract_items').insert(
+              items.map(item => ({
+                contract_id: id,
+                description: item.description,
+                amount: item.amount,
+                ...(item.inventoryId ? { inventory_id: item.inventoryId } : {}),
+                ...(item.quantity != null ? { quantity: item.quantity } : {}),
+              }))
+            )
+          );
+        }
+      }
+      // Fetch complete updated contract with items
+      const fullRow = await sb(
+        supabase.from('contracts').select('*, contract_items(*)').eq('id', id).single()
+      );
+      return mapContract(fullRow as ContractRow);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
