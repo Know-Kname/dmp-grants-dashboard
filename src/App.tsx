@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { QueryProvider } from './lib/query';
 import { ToastProvider } from './lib/toast';
+import { ConfirmProvider } from './lib/confirm';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -81,9 +82,11 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
-              <ErrorBoundary>
-                <AppRoutes />
-              </ErrorBoundary>
+              <ConfirmProvider>
+                <ErrorBoundary>
+                  <AppRoutes />
+                </ErrorBoundary>
+              </ConfirmProvider>
             </ToastProvider>
           </AuthProvider>
         </ThemeProvider>

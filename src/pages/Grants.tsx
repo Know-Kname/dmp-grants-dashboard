@@ -7,6 +7,7 @@ import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptySta
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '../lib/toast';
+import { useConfirm } from '../lib/confirm';
 
 type GrantFormData = {
   title: string;
@@ -51,6 +52,8 @@ export default function Grants() {
     onSuccess: () => toast.success('Grant removed'),
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
   });
+
+  const { confirm } = useConfirm();
 
   // Local state
   const [showModal, setShowModal] = useState(false);
@@ -135,8 +138,8 @@ export default function Grants() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this grant/opportunity?')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this grant/opportunity? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };

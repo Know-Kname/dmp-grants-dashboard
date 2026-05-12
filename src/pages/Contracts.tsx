@@ -16,6 +16,7 @@ import {
   AlertCircle, RefreshCw, DollarSign, TrendingUp, X,
   CalendarDays,
 } from 'lucide-react';
+import { useConfirm } from '../lib/confirm';
 
 type ContractFormData = {
   contractNumber: string;
@@ -114,6 +115,7 @@ export default function Contracts() {
   const createMutation = useCreateContract({ onSuccess: () => { setShowModal(false); setFormData(initialForm); setLineItems([]); } });
   const updateMutation = useUpdateContract({ onSuccess: () => { setShowModal(false); setEditingContract(null); setFormData(initialForm); setLineItems([]); } });
   const deleteMutation = useDeleteContract();
+  const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
@@ -206,8 +208,8 @@ export default function Contracts() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this contract? This cannot be undone.')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this contract? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };

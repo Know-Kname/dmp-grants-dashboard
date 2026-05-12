@@ -14,6 +14,7 @@ import {
   Plus, Search, Building2, Edit, Trash2,
   AlertCircle, RefreshCw, Mail, Phone,
 } from 'lucide-react';
+import { useConfirm } from '../lib/confirm';
 
 type VendorFormData = {
   name: string;
@@ -34,6 +35,7 @@ export default function Vendors() {
   const createMutation = useCreateVendor({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
   const updateMutation = useUpdateVendor({ onSuccess: () => { setShowModal(false); setEditingVendor(null); setFormData(initialForm); } });
   const deleteMutation = useDeleteVendor();
+  const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
@@ -85,8 +87,8 @@ export default function Vendors() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this vendor? This cannot be undone.')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this vendor? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };

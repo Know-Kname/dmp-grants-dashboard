@@ -15,6 +15,7 @@ import {
   AlertCircle, RefreshCw, AlertTriangle, DollarSign,
 } from 'lucide-react';
 import { useToast } from '../lib/toast';
+import { useConfirm } from '../lib/confirm';
 
 type InventoryFormData = {
   name: string;
@@ -56,6 +57,8 @@ export default function Inventory() {
     onSuccess: () => toast.success('Item removed'),
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
   });
+
+  const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -119,8 +122,8 @@ export default function Inventory() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this inventory item? This cannot be undone.')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this inventory item? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };

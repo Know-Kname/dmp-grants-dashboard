@@ -12,6 +12,7 @@ import {
 } from '../components/ui';
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
+import { useConfirm } from '../lib/confirm';
 
 type WorkOrderFormData = {
   title: string;
@@ -74,6 +75,7 @@ export default function WorkOrders() {
   const createMutation = useCreateWorkOrder({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
   const updateMutation = useUpdateWorkOrder({ onSuccess: () => { setShowModal(false); setEditingOrder(null); setFormData(initialForm); } });
   const deleteMutation = useDeleteWorkOrder();
+  const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
@@ -137,8 +139,8 @@ export default function WorkOrders() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this work order? This cannot be undone.')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this work order? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };

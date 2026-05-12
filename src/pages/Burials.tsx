@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
 import QRCode from 'react-qr-code';
+import { useConfirm } from '../lib/confirm';
 
 type BurialFormData = {
   deceasedFirstName: string;
@@ -55,6 +56,7 @@ export default function Burials() {
   const createMutation = useCreateBurial({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
   const updateMutation = useUpdateBurial({ onSuccess: () => { setShowModal(false); setEditingBurial(null); setFormData(initialForm); } });
   const deleteMutation = useDeleteBurial();
+  const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
@@ -137,8 +139,8 @@ export default function Burials() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this burial record? This cannot be undone.')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this burial record? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };

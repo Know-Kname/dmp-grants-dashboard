@@ -15,6 +15,7 @@ import {
   AlertCircle, RefreshCw, Mail, Phone,
 } from 'lucide-react';
 import { useToast } from '../lib/toast';
+import { useConfirm } from '../lib/confirm';
 
 type CustomerFormData = {
   firstName: string;
@@ -49,6 +50,8 @@ export default function Customers() {
     onSuccess: () => toast.success('Customer removed'),
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
   });
+
+  const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -106,8 +109,8 @@ export default function Customers() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this customer? This cannot be undone.')) {
+  const handleDelete = async (id: string) => {
+    if (await confirm('Delete this customer? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };
