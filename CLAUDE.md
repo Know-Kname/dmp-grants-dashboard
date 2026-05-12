@@ -113,14 +113,31 @@ regardless of the user's light/dark theme preference.
    calls Supabase directly using `@supabase/supabase-js`.
 2. **Demo mode bypass.** `enableDemoMode()` (in `lib/demo-data.ts`) sets localStorage
    and dispatches a `dmp-demo-change` CustomEvent. `AuthProvider` listens for this
-   event and updates `isDemoActive` state reactively.
+   event and updates `isDemoActive` state reactively. Demo mode is DEV-only
+   (`import.meta.env.DEV` gates the button in Login.tsx).
 3. **snake_case ↔ camelCase.** The Supabase DB uses snake_case columns.
    Each hook in `src/hooks/useData.ts` calls `toSnakeCaseKeys` on insert/update
    payloads and `toCamelCaseKeys` on the result, so TypeScript types always use
    camelCase. The transformers live in `src/lib/utils.ts` and recurse into nested
-   objects/arrays (relevant for `payment_plan` JSONB and joined `contract_items`).
+   objects/arrays (relevant for joined `contract_items`).
 4. **Query invalidation pattern.** After every mutation, the relevant queryKey is
    invalidated, triggering an automatic refetch. See `src/hooks/useData.ts`.
+5. **Typed Supabase errors.** The `sb()` helper in `useData.ts` wraps every
+   Supabase query. On error it throws `ApiRequestError` (from `lib/api.ts`) with
+   the PostgREST HTTP status code mapped from the error's `code` field (PGRST301
+   → 401, PGRST116 → 404, 42501 → 403, 23505/23503 → 409). This lets
+   `query.tsx`'s retry logic skip auth/not-found/conflict errors automatically.
+   `uid()` throws a 401 `ApiRequestError` when no session exists rather than
+   falling back to `'unknown'`.
+6. **Contract items.** `contract_items` is a child table of `contracts`. The
+   `useCreateContract` and `useUpdateContract` hooks insert/replace items after
+   the header operation (delete-all + re-insert on update).
+7. **Date-only strings.** Postgres `date` columns arrive as `"YYYY-MM-DD"`.
+   `parseDateStr()` in `utils.ts` appends `T00:00:00` before `new Date()` to
+   prevent UTC-to-local timezone shift (e.g., May 12 showing as May 11 in EDT).
+8. **Friendly error messages.** `getErrorMessage()` in `errors.ts` translates raw
+   PostgREST messages (duplicate key, RLS denial, FK violation, JWT expiry, etc.)
+   into plain English before displaying to staff.
 
 ---
 
