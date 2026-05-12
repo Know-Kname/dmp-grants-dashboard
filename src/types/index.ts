@@ -142,6 +142,7 @@ export interface Grant {
   status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
   applicationDate?: string;
   notes?: string;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
 }

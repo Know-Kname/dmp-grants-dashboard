@@ -182,7 +182,7 @@ export function useGrant(id: string) {
 export function useCreateGrant(callbacks?: MutationCallbacks<Grant>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>) => {
+    mutationFn: async (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('grants')
           .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
