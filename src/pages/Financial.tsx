@@ -6,7 +6,7 @@ import {
   useVendors, useCustomers,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
-import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
+import { formatCurrency, formatDate, formatStatus, parseDateStr, cn } from '../lib/utils';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
@@ -129,7 +129,7 @@ export default function Financial() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentDeposits = deposits
-      .filter(d => new Date(d.date as string) >= thirtyDaysAgo)
+      .filter(d => parseDateStr(d.date as string) >= thirtyDaysAgo)
       .reduce((sum, d) => sum + d.amount, 0);
     return { receivablesOutstanding, payablesDue, recentDeposits };
   }, [deposits, receivables, payables]);

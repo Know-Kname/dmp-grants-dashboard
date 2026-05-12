@@ -4,7 +4,7 @@ import {
   useUpdateBurial, useDeleteBurial,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
-import { formatDate, formatDateForInput } from '../lib/utils';
+import { formatDate, formatDateForInput, parseDateStr } from '../lib/utils';
 import type { Burial } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
@@ -65,7 +65,7 @@ export default function Burials() {
   const stats = useMemo(() => ({
     total: burials.length,
     thisMonth: burials.filter(b => {
-      try { return isThisMonth(new Date(b.burialDate as string)); }
+      try { return isThisMonth(parseDateStr(b.burialDate as string)); }
       catch { return false; }
     }).length,
   }), [burials]);

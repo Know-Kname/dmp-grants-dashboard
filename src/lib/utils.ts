@@ -87,7 +87,7 @@ export function toCamelCaseKeys<T>(obj: T): T {
 // `new Date("YYYY-MM-DD")` treats them as UTC midnight, which shifts the
 // displayed date one day earlier in US/Eastern and other timezones behind UTC.
 // Appending "T00:00:00" (no TZ suffix) forces local-midnight parsing.
-function parseDateStr(date: Date | string): Date {
+export function parseDateStr(date: Date | string): Date {
   if (typeof date !== 'string') return date;
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00`) : new Date(date);
 }

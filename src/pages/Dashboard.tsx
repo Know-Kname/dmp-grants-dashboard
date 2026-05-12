@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { format, subMonths, startOfMonth, parseISO } from 'date-fns';
+import { format, subMonths, startOfMonth } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
   TrendingUp, BookOpen, FileText, Activity, Zap,
@@ -17,7 +17,7 @@ import {
 import { Card, CardHeader, CardBody, Badge } from '../components/ui';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, parseDateStr } from '../lib/utils';
 
 const C = {
   green: BRAND.green,
@@ -76,7 +76,7 @@ export default function Dashboard() {
     const thisYear = now.getFullYear();
 
     const burialsThisMonth = burials.filter(b => b.burialDate.startsWith(thisMonthKey)).length;
-    const burialsYTD = burials.filter(b => parseISO(b.burialDate).getFullYear() === thisYear).length;
+    const burialsYTD = burials.filter(b => b.burialDate.startsWith(String(thisYear))).length;
 
     const activeContracts = contracts.filter(c => c.status === 'active');
     const contractsValue = activeContracts.reduce((s, c) => s + c.totalAmount, 0);
@@ -88,7 +88,7 @@ export default function Dashboard() {
     const lowStock = inventory.filter(i => i.quantity <= i.reorderPoint).length;
 
     const revenue30d = deposits
-      .filter(d => parseISO(d.date) >= thirtyDaysAgo)
+      .filter(d => parseDateStr(d.date) >= thirtyDaysAgo)
       .reduce((s, d) => s + d.amount, 0);
 
     return {
@@ -155,7 +155,7 @@ export default function Dashboard() {
       status: undefined as string | undefined,
     }));
     return [...wos, ...bs]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => parseDateStr(b.date).getTime() - parseDateStr(a.date).getTime())
       .slice(0, 6);
   }, [workOrders, burials]);
 
@@ -538,7 +538,7 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{a.title}</p>
                       <p className="text-xs text-foreground-muted mt-0.5 capitalize">
-                        {a.sub} · {format(new Date(a.date), 'MMM d')}
+                        {a.sub} · {format(parseDateStr(a.date), 'MMM d')}
                       </p>
                     </div>
                     {a.status && (

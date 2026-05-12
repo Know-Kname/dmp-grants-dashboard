@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useGrants, useCreateGrant, useUpdateGrant, useDeleteGrant } from '../hooks/useData';
 import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
-import { formatCurrency, formatDateForInput } from '../lib/utils';
+import { formatCurrency, formatDateForInput, parseDateStr } from '../lib/utils';
 import { Grant } from '../types';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner } from '../components/ui';
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
@@ -369,12 +369,12 @@ export default function Grants() {
                       {grant.deadline && (
                         <div className="flex items-center gap-1">
                           <Calendar size={14} />
-                          <span>Deadline: {format(new Date(grant.deadline), 'MMM d, yyyy')}</span>
+                          <span>Deadline: {format(parseDateStr(grant.deadline), 'MMM d, yyyy')}</span>
                         </div>
                       )}
                       {grant.applicationDate && (
                         <div className="text-xs">
-                          Applied: {format(new Date(grant.applicationDate), 'MMM d, yyyy')}
+                          Applied: {format(parseDateStr(grant.applicationDate), 'MMM d, yyyy')}
                         </div>
                       )}
                     </div>

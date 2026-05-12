@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCurrency, formatDate, formatDateForInput, formatStatus, toCamelCaseKeys, toSnakeCaseKeys } from './utils';
+import { formatCurrency, formatDate, formatDateForInput, formatStatus, parseDateStr, toCamelCaseKeys, toSnakeCaseKeys } from './utils';
 
 describe('utils', () => {
   it('converts object keys to snake_case', () => {
@@ -46,5 +46,17 @@ describe('utils', () => {
     // Only test the day/month portion to stay timezone-independent.
     expect(formatDate('2026-05-12')).toContain('12');
     expect(formatDate('2026-05-12')).toContain('2026');
+  });
+
+  it('parseDateStr preserves the same calendar day for date-only strings', () => {
+    const d = parseDateStr('2026-05-12');
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(4); // 0-indexed May
+    expect(d.getDate()).toBe(12);
+  });
+
+  it('parseDateStr passes Date objects through unchanged', () => {
+    const original = new Date(2026, 4, 12, 10, 30);
+    expect(parseDateStr(original)).toBe(original);
   });
 });
