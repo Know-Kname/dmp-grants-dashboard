@@ -13,13 +13,19 @@ vi.mock('../lib/auth', () => ({
 }));
 
 const baseAuth = {
-  login: vi.fn(),
-  signInWithGoogle: vi.fn(),
-  logout: vi.fn(),
-  isAuthenticated: false,
-  isLoading: false,
+  user: null,
   currentUser: null,
-  isDemoActive: false,
+  session: null,
+  isLoading: false,
+  isAuthenticated: false,
+  isDemo: false,
+  login: vi.fn(),
+  logout: vi.fn(),
+  signIn: vi.fn(),
+  signInWithGoogle: vi.fn(),
+  signOut: vi.fn(),
+  signUp: vi.fn(),
+  resetPassword: vi.fn(),
 };
 
 const renderLogin = () =>

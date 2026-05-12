@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
+import { ApiRequestError } from '../lib/api';
 import type {
   WorkOrder,
   Grant,
@@ -35,19 +36,39 @@ interface MutationCallbacks<T> {
   onError?: (error: Error) => void;
 }
 
-// Unwrap Supabase result: throw on error, return data (non-null asserted)
+// PostgREST/PostgreSQL codes that map to specific HTTP semantics
+const POSTGREST_AUTH_CODES = new Set(['PGRST301', 'PGRST302', '42501']);
+const POSTGREST_NOT_FOUND_CODES = new Set(['PGRST116']);
+const POSTGREST_CONFLICT_CODES = new Set(['23505', '23503']);
+
+// Unwrap Supabase result, throwing ApiRequestError so React Query retry logic
+// can skip auth/not-found/validation errors instead of retrying them needlessly.
 async function sb<T>(
-  q: PromiseLike<{ data: T | null; error: { message: string } | null }>
+  q: PromiseLike<{ data: T | null; error: { message: string; code?: string } | null; status?: number }>
 ): Promise<T> {
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  const { data, error, status } = await q;
+  if (error) {
+    const code = error.code ?? '';
+    let statusCode = status ?? 500;
+    if (POSTGREST_AUTH_CODES.has(code) || statusCode === 401 || statusCode === 403) {
+      statusCode = statusCode === 500 ? 401 : statusCode;
+    } else if (POSTGREST_NOT_FOUND_CODES.has(code) || statusCode === 404) {
+      statusCode = 404;
+    } else if (POSTGREST_CONFLICT_CODES.has(code) || statusCode === 409) {
+      statusCode = 409;
+    }
+    throw new ApiRequestError({ message: error.message, code: code || `HTTP_${statusCode}`, statusCode });
+  }
   return data!;
 }
 
-// Get the current authenticated user's ID (falls back to 'unknown' for demo/anon)
+// Get the current authenticated user's ID, throwing 401 if not signed in.
 async function uid(): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? 'unknown';
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    throw new ApiRequestError({ message: 'Authentication required', code: 'UNAUTHORIZED', statusCode: 401 });
+  }
+  return user.id;
 }
 
 // ============================================

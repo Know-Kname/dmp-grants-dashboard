@@ -40,7 +40,7 @@ export class ApiRequestError extends Error {
   }
 
   isAuthError(): boolean {
-    return this.statusCode === 401 || this.code === 'UNAUTHORIZED';
+    return this.statusCode === 401 || this.statusCode === 403 || this.code === 'UNAUTHORIZED';
   }
 
   isValidationError(): boolean {
