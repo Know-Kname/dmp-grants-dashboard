@@ -4,13 +4,13 @@ import {
   useUpdateWorkOrder, useDeleteWorkOrder,
 } from '../hooks/useData';
 import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
+import { formatDate, formatDateForInput } from '../lib/utils';
 import type { WorkOrder } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
   Badge, EmptyState, LoadingSpinner,
 } from '../components/ui';
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
 import { isThisMonth } from 'date-fns';
 
 type WorkOrderFormData = {
@@ -132,7 +132,7 @@ export default function WorkOrders() {
       type: wo.type,
       priority: wo.priority,
       assignedTo: wo.assignedTo || '',
-      dueDate: wo.dueDate ? format(new Date(wo.dueDate), 'yyyy-MM-dd') : '',
+      dueDate: formatDateForInput(wo.dueDate),
     });
     setShowModal(true);
   };
@@ -305,7 +305,7 @@ export default function WorkOrders() {
                       {wo.dueDate ? (
                         <div className="flex items-center gap-1.5">
                           <Calendar size={14} />
-                          {format(new Date(wo.dueDate), 'MMM d, yyyy')}
+                          {formatDate(wo.dueDate)}
                         </div>
                       ) : '—'}
                     </td>
