@@ -28,37 +28,6 @@ Help staff with questions about:
 
 Keep answers concise, practical, and professional. You are speaking to DMP internal staff.`;
 
-export async function sendMessage(messages: ChatMessage[]): Promise<string> {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dmpgrants.vercel.app',
-      'X-Title': 'DMP Cemetery Management System',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages,
-      ],
-      max_tokens: 1024,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`AI request failed: ${res.status} — ${err}`);
-  }
-
-  const data = await res.json() as {
-    choices: Array<{ message: { content: string } }>;
-  };
-  return data.choices[0]?.message?.content ?? 'No response received.';
-}
-
 export async function* streamMessage(messages: ChatMessage[]): AsyncGenerator<string> {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -81,7 +50,8 @@ export async function* streamMessage(messages: ChatMessage[]): AsyncGenerator<st
   });
 
   if (!res.ok || !res.body) {
-    throw new Error(`AI request failed: ${res.status}`);
+    const detail = res.body ? await res.text() : '';
+    throw new Error(`AI request failed: ${res.status}${detail ? ` — ${detail}` : ''}`);
   }
 
   const reader = res.body.getReader();

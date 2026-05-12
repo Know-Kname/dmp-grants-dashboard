@@ -38,6 +38,10 @@ export function createQueryClient(): QueryClient {
           if (isApiError(error) && error.isNotFound()) {
             return false;
           }
+          // Don't retry on conflict (duplicate key, FK violation)
+          if (isApiError(error) && error.isConflict()) {
+            return false;
+          }
           // Retry network errors up to 3 times
           if (isNetworkError(error)) {
             return failureCount < 3;
