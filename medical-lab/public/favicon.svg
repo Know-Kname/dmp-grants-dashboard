@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#0f766e"/>
+  <!-- Flask / beaker icon -->
+  <path d="M12 6h8M13 6v8l-5 10h16L19 14V6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="14" cy="18" r="1.5" fill="#5eead4"/>
+  <circle cx="18" cy="20" r="1" fill="#5eead4"/>
+</svg>

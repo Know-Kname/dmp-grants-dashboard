@@ -1,0 +1,17 @@
+{
+  "name": "LabCore LIMS",
+  "short_name": "LabCore",
+  "description": "Laboratory Information Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

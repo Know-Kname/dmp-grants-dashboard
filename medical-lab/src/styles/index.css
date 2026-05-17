@@ -1,0 +1,390 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * LabCore LIMS Design System
+ * Clinical teal/blue palette with full dark mode support.
+ */
+
+@layer base {
+  :root {
+    /* ========================================
+       COLOR PRIMITIVES (HSL Format)
+       ======================================== */
+
+    /* Slate - Professional neutral tones */
+    --slate-50: 210 40% 98%;
+    --slate-100: 210 40% 96%;
+    --slate-200: 214 32% 91%;
+    --slate-300: 213 27% 84%;
+    --slate-400: 215 20% 65%;
+    --slate-500: 215 16% 47%;
+    --slate-600: 215 19% 35%;
+    --slate-700: 215 25% 27%;
+    --slate-800: 217 33% 17%;
+    --slate-900: 222 47% 11%;
+    --slate-950: 229 84% 5%;
+
+    /* Primary - Clinical Teal (LabCore brand) */
+    --primary-50: 166 76% 97%;
+    --primary-100: 167 85% 89%;
+    --primary-200: 168 84% 78%;
+    --primary-300: 171 77% 64%;
+    --primary-400: 172 66% 50%;
+    --primary-500: 173 80% 40%;
+    --primary-600: 175 84% 32%;
+    --primary-700: 175 77% 26%;
+    --primary-800: 176 69% 22%;
+    --primary-900: 176 61% 19%;
+    --primary-950: 179 75% 11%;
+
+    /* Success - Emerald */
+    --success-50: 152 81% 96%;
+    --success-100: 149 80% 90%;
+    --success-500: 160 84% 39%;
+    --success-600: 161 94% 30%;
+    --success-700: 163 94% 24%;
+    --success-950: 166 91% 9%;
+
+    /* Warning - Amber */
+    --warning-50: 48 100% 96%;
+    --warning-100: 48 96% 89%;
+    --warning-500: 38 92% 50%;
+    --warning-600: 32 95% 44%;
+    --warning-700: 26 90% 37%;
+    --warning-950: 21 92% 14%;
+
+    /* Danger - Rose */
+    --danger-50: 355 100% 97%;
+    --danger-100: 356 100% 94%;
+    --danger-500: 350 89% 60%;
+    --danger-600: 347 77% 50%;
+    --danger-700: 345 83% 41%;
+    --danger-950: 343 88% 16%;
+
+    /* Info - Cyan */
+    --info-50: 183 100% 96%;
+    --info-100: 185 96% 90%;
+    --info-500: 189 94% 43%;
+    --info-600: 192 91% 36%;
+    --info-700: 193 82% 31%;
+    --info-950: 197 79% 15%;
+
+    /* ========================================
+       SEMANTIC TOKENS - LIGHT MODE
+       ======================================== */
+
+    --background: 0 0% 100%;
+    --background-subtle: var(--slate-50);
+    --background-muted: var(--slate-100);
+    --background-elevated: 0 0% 100%;
+
+    --foreground: var(--slate-900);
+    --foreground-muted: var(--slate-500);
+    --foreground-subtle: var(--slate-400);
+
+    --card: 0 0% 100%;
+    --card-foreground: var(--slate-900);
+    --card-hover: var(--slate-50);
+
+    --border: var(--slate-200);
+    --border-hover: var(--slate-300);
+    --border-focus: var(--primary-500);
+
+    --input: var(--slate-200);
+    --input-focus: var(--primary-500);
+
+    --primary: var(--primary-600);
+    --primary-hover: var(--primary-700);
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: var(--slate-100);
+    --secondary-hover: var(--slate-200);
+    --secondary-foreground: var(--slate-900);
+
+    --accent: var(--slate-100);
+    --accent-foreground: var(--slate-900);
+
+    --destructive: var(--danger-600);
+    --destructive-hover: var(--danger-700);
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: var(--primary-500);
+    --ring-offset: 0 0% 100%;
+
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: var(--slate-600);
+    --sidebar-active: var(--primary-50);
+    --sidebar-active-foreground: var(--primary-700);
+    --sidebar-hover: var(--slate-50);
+
+    /* ========================================
+       SIZING & SPACING
+       ======================================== */
+    --touch-target-min: 44px;
+
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-full: 9999px;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+    --transition-fast: 150ms;
+    --transition-base: 200ms;
+    --transition-slow: 300ms;
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* LabCore brand (sidebar stays teal regardless of theme) */
+    --lc-teal: #0f766e;
+    --lc-teal-deep: #0d5e57;
+    --lc-teal-light: #5eead4;
+  }
+
+  /* ========================================
+     DARK MODE SEMANTIC TOKENS
+     ======================================== */
+  .dark {
+    color-scheme: dark;
+
+    --background: var(--slate-950);
+    --background-subtle: var(--slate-900);
+    --background-muted: var(--slate-800);
+    --background-elevated: var(--slate-900);
+
+    --foreground: var(--slate-50);
+    --foreground-muted: var(--slate-400);
+    --foreground-subtle: var(--slate-500);
+
+    --card: var(--slate-900);
+    --card-foreground: var(--slate-50);
+    --card-hover: var(--slate-800);
+
+    --border: var(--slate-800);
+    --border-hover: var(--slate-700);
+    --border-focus: var(--primary-500);
+
+    --input: var(--slate-800);
+    --input-focus: var(--primary-500);
+
+    --primary: var(--primary-500);
+    --primary-hover: var(--primary-400);
+    --primary-foreground: var(--slate-950);
+
+    --secondary: var(--slate-800);
+    --secondary-hover: var(--slate-700);
+    --secondary-foreground: var(--slate-100);
+
+    --accent: var(--slate-800);
+    --accent-foreground: var(--slate-100);
+
+    --destructive: var(--danger-500);
+    --destructive-hover: var(--danger-400);
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: var(--primary-400);
+    --ring-offset: var(--slate-950);
+
+    --sidebar: var(--slate-900);
+    --sidebar-foreground: var(--slate-400);
+    --sidebar-active: var(--primary-950);
+    --sidebar-active-foreground: var(--primary-400);
+    --sidebar-hover: var(--slate-800);
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ========================================
+   INTERACTION STYLES
+   ======================================== */
+
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button, a[role="button"], [role="button"] {
+  min-height: var(--touch-target-min);
+}
+
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 1024px) {
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    min-width: 600px;
+  }
+}
+
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* ========================================
+   PRINT
+   ======================================== */
+@media print {
+  nav, aside, button, .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+
+.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+@keyframes skeleton-loading {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--background-muted)) 25%,
+    hsl(var(--border)) 50%,
+    hsl(var(--background-muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in var(--transition-base) var(--ease-out);
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up var(--transition-slow) var(--ease-out);
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in {
+  animation: scale-in var(--transition-base) var(--ease-out);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ========================================
+   SCROLLBAR
+   ======================================== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track {
+  background: hsl(var(--background-muted));
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--foreground-subtle));
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground-muted));
+}
+
+/* ========================================
+   UTILITY
+   ======================================== */
+.glass {
+  background: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-400)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Login page brand-teal buttons — fixed color regardless of theme */
+.login-submit {
+  background-color: var(--lc-teal);
+}
+.login-submit:not(:disabled):hover {
+  background-color: var(--lc-teal-deep);
+}
+
+.login-demo {
+  border-color: rgba(94, 234, 212, 0.4);
+  background-color: rgba(94, 234, 212, 0.05);
+}
+.login-demo:hover {
+  border-color: var(--lc-teal-light);
+  background-color: rgba(94, 234, 212, 0.1);
+}
