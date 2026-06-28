@@ -22,16 +22,19 @@ export function toCamelCase(str: string): string {
 }
 
 /**
- * Recursively convert object keys from camelCase to snake_case
- * Handles nested objects and arrays
+ * Recursively transform object keys using the supplied key mapper.
+ * Handles nested objects and arrays, preserves Date instances, and tracks
+ * visited objects with a WeakSet so circular references don't recurse forever.
  */
-export function toSnakeCaseKeys<T>(obj: T): T {
+function transformKeys<T>(obj: T, mapKey: (key: string) => string, seen: WeakSet<object>): T {
   if (obj === null || obj === undefined) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => toSnakeCaseKeys(item)) as T;
+    if (seen.has(obj)) return obj;
+    seen.add(obj);
+    return obj.map((item) => transformKeys(item, mapKey, seen)) as T;
   }
 
   if (obj instanceof Date) {
@@ -39,10 +42,11 @@ export function toSnakeCaseKeys<T>(obj: T): T {
   }
 
   if (typeof obj === 'object') {
+    if (seen.has(obj as object)) return obj;
+    seen.add(obj as object);
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      const snakeKey = toSnakeCase(key);
-      result[snakeKey] = toSnakeCaseKeys(value);
+      result[mapKey(key)] = transformKeys(value, mapKey, seen);
     }
     return result as T;
   }
@@ -51,32 +55,19 @@ export function toSnakeCaseKeys<T>(obj: T): T {
 }
 
 /**
+ * Recursively convert object keys from camelCase to snake_case
+ * Handles nested objects and arrays
+ */
+export function toSnakeCaseKeys<T>(obj: T): T {
+  return transformKeys(obj, toSnakeCase, new WeakSet());
+}
+
+/**
  * Recursively convert object keys from snake_case to camelCase
  * Handles nested objects and arrays
  */
 export function toCamelCaseKeys<T>(obj: T): T {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => toCamelCaseKeys(item)) as T;
-  }
-
-  if (obj instanceof Date) {
-    return obj as T;
-  }
-
-  if (typeof obj === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      const camelKey = toCamelCase(key);
-      result[camelKey] = toCamelCaseKeys(value);
-    }
-    return result as T;
-  }
-
-  return obj;
+  return transformKeys(obj, toCamelCase, new WeakSet());
 }
 
 // ============================================

@@ -53,7 +53,8 @@ Not all "secrets" are equally sensitive. Here's the full breakdown:
 |---|---|---|---|
 | `VITE_SUPABASE_URL` | Frontend JS bundle (public) | 🟢 Safe to expose | It's just a URL — like a street address. No harm in knowing it. |
 | `VITE_SUPABASE_ANON_KEY` | Frontend JS bundle (public) | 🟡 Designed to be public | The *anon* key is the public key. It grants only what RLS permits. Supabase expects it to be public. |
-| `VITE_OPENROUTER_API_KEY` | Frontend JS bundle (embedded) | 🔴 Secret in spirit | A determined user could extract it from DevTools. For an internal tool, the risk is acceptable; rotate it if you suspect abuse. |
+| `OPENROUTER_API_KEY` | Vercel server env (Edge Function only) | 🟢 Stays server-side | Used by the `/api/chat` Edge Function. Never shipped to the browser. Set this in production. |
+| `VITE_OPENROUTER_API_KEY` | Local dev only (optional) | 🟡 Dev convenience | Lets `npm run dev` call OpenRouter directly when no Edge Function is running. Gated behind `import.meta.env.DEV`, so it is stripped from production builds. Do **not** set it in Vercel. |
 | Supabase `service_role` key | **Never in frontend** | 🔴 Extremely sensitive | Bypasses RLS entirely. Treat like a database root password. |
 | Supabase database password | **Never in frontend** | 🔴 Extremely sensitive | Direct PostgreSQL access. Never expose. |
 | GitHub Actions secrets | GitHub Settings → Secrets | 🔴 CI-only | Used by workflows, never in application code. |
@@ -285,7 +286,7 @@ The OWASP Top 10 is the industry standard list of the most critical web security
 ### Current gaps worth noting
 
 - **No CSP header** — A CSP would provide defense-in-depth against XSS. Currently absent.
-- **OpenRouter key in frontend bundle** — Acceptable for an internal tool, but a server-side proxy would be the ideal architecture.
+- **OpenRouter key** — Now proxied server-side via the `/api/chat` Edge Function (`OPENROUTER_API_KEY`); the key is no longer in the frontend bundle.
 - **No rate limiting on login** — Supabase has some built-in protection, but adding `fail2ban`-style IP blocking for repeated failed logins is not configured.
 - **No audit log** — Who edited a burial record when? Currently no audit trail. This matters for a funeral home where data changes may have legal implications.
 
@@ -300,9 +301,9 @@ Key rotation = generating a new key and replacing the old one. Do this whenever 
 1. Go to [openrouter.ai](https://openrouter.ai) → sign in → Keys page.
 2. Click **"Create Key"** to generate a new key.
 3. Copy the new key.
-4. Update Vercel: Vercel → dmpgrants → Settings → Environment Variables → `VITE_OPENROUTER_API_KEY` → Edit → paste new value → Save.
+4. Update Vercel: Vercel → dmpgrants → Settings → Environment Variables → `OPENROUTER_API_KEY` → Edit → paste new value → Save.
 5. Trigger a redeploy (Vercel → Deployments → latest → three-dot → Redeploy).
-6. Update your local `.env.local` with the new key.
+6. Update your local `.env.local` (`VITE_OPENROUTER_API_KEY` for dev-direct, optional) with the new key.
 7. On the OpenRouter Keys page, **delete the old key**.
 8. Verify the AI assistant works in the live app.
 
@@ -367,7 +368,9 @@ Listed in priority order:
 
 1. **Content Security Policy (CSP)** — Whitelist only `*.supabase.co` and `openrouter.ai` as script/fetch destinations. Most impactful XSS mitigation.
 
-2. **Server-side AI proxy** — Move the OpenRouter call to a Vercel Edge Function or serverless function. The API key would live in a server-side env var (not baked into the JS bundle). Requires a small backend.
+2. ~~**Server-side AI proxy**~~ ✅ **Done** — OpenRouter calls now route through the
+   `/api/chat` Vercel Edge Function (`api/chat.ts`), with the key in the server-only
+   `OPENROUTER_API_KEY` env var instead of the JS bundle.
 
 3. **Audit log table** — Add a `change_log` table in Supabase with triggers that record `(user_id, table_name, row_id, operation, old_values, new_values, timestamp)` for every INSERT/UPDATE/DELETE. Critical for a legal/compliance context.
 

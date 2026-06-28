@@ -1,17 +1,21 @@
 /**
- * AI chat client via OpenRouter → Gemini 2.5 Pro (google/gemini-2.5-pro).
- * Streams responses using the OpenAI-compatible chat completions endpoint.
- * VITE_OPENROUTER_API_KEY is visible in the browser bundle — see docs/09-security.md
- * for the Vercel Edge Function proxy pattern to move the key server-side.
+ * AI chat client for the DMP assistant (Gemini 2.5 Pro via OpenRouter).
+ *
+ * In production the browser calls our own /api/chat Edge Function, which holds
+ * the OpenRouter key server-side — the key is never shipped in the client bundle.
+ *
+ * For local `npm run dev` (where the Edge Function isn't running) we fall back to
+ * calling OpenRouter directly, but ONLY when import.meta.env.DEV is true AND a
+ * VITE_OPENROUTER_API_KEY is provided. Production builds set DEV=false, so this
+ * branch is dead code there and no key is embedded. Use `vercel dev` to exercise
+ * the real proxy locally.
  */
-const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_API_KEY as string;
+const PROXY_URL = '/api/chat';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'google/gemini-2.5-pro';
 
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
+// Only used by the dev-only direct path. The production system prompt lives
+// server-side in api/chat.ts — keep the two copies in sync if it changes.
 const SYSTEM_PROMPT = `You are an AI assistant embedded in Detroit Memorial Park's internal Cemetery Management System (CMS). Detroit Memorial Park Association has operated since 1925 and manages three Michigan cemetery locations:
 - DMP East: 4280 E. Thirteen Mile Rd, Warren, MI 48092 — (586) 751-1313
 - DMP West: 25062 Plymouth Road, Redford, MI 48239 — (313) 533-1302
@@ -28,25 +32,53 @@ Help staff with questions about:
 
 Keep answers concise, practical, and professional. You are speaking to DMP internal staff.`;
 
-export async function sendMessage(messages: ChatMessage[]): Promise<string> {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dmpgrants.vercel.app',
-      'X-Title': 'DMP Cemetery Management System',
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// Build the fetch target + request init for either the proxy or the dev-direct path.
+// The dev-direct branch is wrapped in `import.meta.env.DEV` so esbuild strips it
+// — along with any inlined VITE_OPENROUTER_API_KEY value — from production builds.
+function buildRequest(messages: ChatMessage[], stream: boolean): { url: string; init: RequestInit } {
+  if (import.meta.env.DEV) {
+    const devKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
+    if (devKey) {
+      return {
+        url: OPENROUTER_URL,
+        init: {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${devKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://dmpgrants.vercel.app',
+            'X-Title': 'DMP Cemetery Management System',
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+            max_tokens: 1024,
+            temperature: 0.7,
+            stream,
+          }),
+        },
+      };
+    }
+  }
+
+  return {
+    url: PROXY_URL,
+    init: {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, stream }),
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages,
-      ],
-      max_tokens: 1024,
-      temperature: 0.7,
-    }),
-  });
+  };
+}
+
+export async function sendMessage(messages: ChatMessage[]): Promise<string> {
+  const { url, init } = buildRequest(messages, false);
+  const res = await fetch(url, init);
 
   if (!res.ok) {
     const err = await res.text();
@@ -60,25 +92,8 @@ export async function sendMessage(messages: ChatMessage[]): Promise<string> {
 }
 
 export async function* streamMessage(messages: ChatMessage[]): AsyncGenerator<string> {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dmpgrants.vercel.app',
-      'X-Title': 'DMP Cemetery Management System',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages,
-      ],
-      max_tokens: 1024,
-      temperature: 0.7,
-      stream: true,
-    }),
-  });
+  const { url, init } = buildRequest(messages, true);
+  const res = await fetch(url, init);
 
   if (!res.ok || !res.body) {
     throw new Error(`AI request failed: ${res.status}`);
