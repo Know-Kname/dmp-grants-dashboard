@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useGrants, useCreateGrant, useUpdateGrant, useDeleteGrant } from '../hooks/useData';
-import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
+import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, formatDateForInput } from '../lib/utils';
 import { Grant } from '../types';
-import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner } from '../components/ui';
-import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner, PageError, StatCard } from '../components/ui';
+import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '../lib/toast';
 
@@ -170,8 +170,6 @@ export default function Grants() {
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   const combinedError = error || mutationError;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   return (
     <div className="space-y-6">
@@ -205,67 +203,13 @@ export default function Grants() {
       </div>
 
       {/* Error display */}
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">
-              {getErrorMessage(combinedError)}
-            </p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((detail, index) => (
-                  <li key={`${detail}-${index}`}>{detail}</li>
-                ))}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Available Funding</p>
-                <p className="text-2xl font-bold text-info">{formatCurrency(totals.available)}</p>
-              </div>
-              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
-                <Gift className="text-info" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Applied For</p>
-                <p className="text-2xl font-bold text-warning">{formatCurrency(totals.applied)}</p>
-              </div>
-              <div className="p-3 bg-warning-100 dark:bg-warning-950 rounded-lg">
-                <Calendar className="text-warning" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Received</p>
-                <p className="text-2xl font-bold text-success">{formatCurrency(totals.received)}</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <DollarSign className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard label="Available Funding" value={formatCurrency(totals.available)} icon={Gift} tone="info" />
+        <StatCard label="Applied For" value={formatCurrency(totals.applied)} icon={Calendar} tone="warning" />
+        <StatCard label="Received" value={formatCurrency(totals.received)} icon={DollarSign} tone="success" />
       </div>
 
       {/* Filters */}

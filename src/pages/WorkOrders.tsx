@@ -3,12 +3,10 @@ import {
   useWorkOrders, useCreateWorkOrder,
   useUpdateWorkOrder, useDeleteWorkOrder,
 } from '../hooks/useData';
-import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
 import type { WorkOrder } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
-  Badge, EmptyState, LoadingSpinner,
-} from '../components/ui';
+  Badge, EmptyState, LoadingSpinner, PageError, StatCard } from '../components/ui';
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { isThisMonth } from 'date-fns';
@@ -104,8 +102,6 @@ export default function WorkOrders() {
   }, [workOrders, searchTerm, statusFilter]);
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,62 +161,12 @@ export default function WorkOrders() {
         </div>
       </div>
 
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Orders</p>
-                <p className="text-2xl font-bold text-primary">{stats.total.toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-primary-100 dark:bg-primary-950 rounded-lg">
-                <ClipboardList className="text-primary" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Open / In Progress</p>
-                <p className="text-2xl font-bold text-warning">{stats.open}</p>
-              </div>
-              <div className="p-3 bg-warning-100 dark:bg-warning-950 rounded-lg">
-                <AlertCircle className="text-warning" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Created This Month</p>
-                <p className="text-2xl font-bold text-info">{stats.thisMonth}</p>
-              </div>
-              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
-                <Calendar className="text-info" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard label="Total Orders" value={stats.total.toLocaleString()} icon={ClipboardList} tone="primary" />
+        <StatCard label="Open / In Progress" value={stats.open} icon={AlertCircle} tone="warning" />
+        <StatCard label="Created This Month" value={stats.thisMonth} icon={Calendar} tone="info" />
       </div>
 
       <Card>

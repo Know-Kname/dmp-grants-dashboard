@@ -4,18 +4,12 @@ import {
   useUpdateContract, useDeleteContract,
   useCustomers, usePaymentSchedule,
 } from '../hooks/useData';
-import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
 import { formatCurrency, formatDate, formatDateForInput, cn } from '../lib/utils';
 import type { Contract, ContractItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,
-  Badge, EmptyState, LoadingSpinner,
-} from '../components/ui';
-import {
-  Plus, Search, FileText, Edit, Trash2,
-  AlertCircle, RefreshCw, DollarSign, TrendingUp, X,
-  CalendarDays,
-} from 'lucide-react';
+  Badge, EmptyState, LoadingSpinner, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
+import { Plus, Search, FileText, Edit, Trash2, RefreshCw, DollarSign, TrendingUp, X, CalendarDays } from 'lucide-react';
 
 type ContractFormData = {
   contractNumber: string;
@@ -157,8 +151,6 @@ export default function Contracts() {
   }, [contracts, searchTerm, typeFilter, statusFilter]);
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,76 +246,14 @@ export default function Contracts() {
       </div>
 
       {/* Error */}
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Contracts</p>
-                <p className="text-2xl font-bold text-info">{stats.total}</p>
-              </div>
-              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
-                <FileText className="text-info" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Active</p>
-                <p className="text-2xl font-bold text-success">{stats.active}</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <TrendingUp className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Value</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(stats.totalValue)}</p>
-              </div>
-              <div className="p-3 bg-primary-100 dark:bg-primary-950 rounded-lg">
-                <DollarSign className="text-primary" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Received</p>
-                <p className="text-2xl font-bold text-success">{formatCurrency(stats.amountReceived)}</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <DollarSign className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard label="Total Contracts" value={stats.total} icon={FileText} tone="info" />
+        <StatCard label="Active" value={stats.active} icon={TrendingUp} tone="success" />
+        <StatCard label="Total Value" value={formatCurrency(stats.totalValue)} icon={DollarSign} tone="primary" />
+        <StatCard label="Received" value={formatCurrency(stats.amountReceived)} icon={DollarSign} tone="success" />
       </div>
 
       {/* Filters + Status Tabs */}
@@ -392,14 +322,14 @@ export default function Contracts() {
             <table className="w-full text-sm">
               <thead className="bg-background-subtle border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Contract #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Customer</th>
+                  <th className={TABLE_HEAD_CLASS}>Contract #</th>
+                  <th className={TABLE_HEAD_CLASS}>Type</th>
+                  <th className={TABLE_HEAD_CLASS}>Customer</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Total</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Balance</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Signed</th>
+                  <th className={TABLE_HEAD_CLASS}>Status</th>
+                  <th className={TABLE_HEAD_CLASS}>Signed</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>

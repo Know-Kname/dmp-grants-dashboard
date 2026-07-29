@@ -5,17 +5,13 @@ import {
   usePayables, useCreatePayable, useUpdatePayable,
   useVendors,
 } from '../hooks/useData';
-import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
+import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
-  Badge, EmptyState, LoadingSpinner,
-} from '../components/ui';
-import {
-  Plus, DollarSign, TrendingUp, TrendingDown,
-  AlertCircle, RefreshCw, Edit, CreditCard, ArrowRightLeft, FileText,
-} from 'lucide-react';
+  Badge, EmptyState, LoadingSpinner, PageError, TABLE_HEAD_CLASS } from '../components/ui';
+import { Plus, DollarSign, TrendingUp, TrendingDown, RefreshCw, Edit, CreditCard, ArrowRightLeft, FileText } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
 type ActiveTab = 'deposits' | 'receivables' | 'payables';
@@ -134,8 +130,6 @@ export default function Financial() {
     depositCreateMutation.error ||
     receivableCreateMutation.error || receivableUpdateMutation.error ||
     payableCreateMutation.error || payableUpdateMutation.error;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   const isLoading = activeTab === 'deposits' ? depositsQuery.isLoading
     : activeTab === 'receivables' ? receivablesQuery.isLoading
@@ -247,21 +241,7 @@ export default function Financial() {
       </div>
 
       {/* Error */}
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       {/* Summary stats — always visible (QuickBooks style) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -358,11 +338,11 @@ export default function Financial() {
                   <table className="w-full text-sm">
                     <thead className="bg-background-subtle border-b border-border">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Method</th>
+                        <th className={TABLE_HEAD_CLASS}>Date</th>
+                        <th className={TABLE_HEAD_CLASS}>Method</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Reference</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Notes</th>
+                        <th className={TABLE_HEAD_CLASS}>Reference</th>
+                        <th className={TABLE_HEAD_CLASS}>Notes</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -399,13 +379,13 @@ export default function Financial() {
                   <table className="w-full text-sm">
                     <thead className="bg-background-subtle border-b border-border">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Invoice #</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Customer</th>
+                        <th className={TABLE_HEAD_CLASS}>Invoice #</th>
+                        <th className={TABLE_HEAD_CLASS}>Customer</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Balance</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Due Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                        <th className={TABLE_HEAD_CLASS}>Due Date</th>
+                        <th className={TABLE_HEAD_CLASS}>Status</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
@@ -448,13 +428,13 @@ export default function Financial() {
                   <table className="w-full text-sm">
                     <thead className="bg-background-subtle border-b border-border">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Invoice #</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Vendor</th>
+                        <th className={TABLE_HEAD_CLASS}>Invoice #</th>
+                        <th className={TABLE_HEAD_CLASS}>Vendor</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Balance</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Due Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                        <th className={TABLE_HEAD_CLASS}>Due Date</th>
+                        <th className={TABLE_HEAD_CLASS}>Status</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>

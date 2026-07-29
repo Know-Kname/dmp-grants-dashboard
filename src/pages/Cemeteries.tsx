@@ -9,8 +9,7 @@ import { getErrorMessage } from '../lib/errors';
 import type { Cemetery, Section, Lot, Grave } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
-  Badge, EmptyState, LoadingSpinner,
-} from '../components/ui';
+  Badge, EmptyState, LoadingSpinner, TABLE_HEAD_CLASS } from '../components/ui';
 const CemeteryMap = lazy(() => import('../components/CemeteryMap'));
 import {
   Plus, Map, ChevronRight, ArrowLeft, Edit, Trash2,
@@ -353,8 +352,8 @@ export default function Cemeteries() {
                 <table className="w-full text-sm">
                   <thead className="bg-background-subtle border-b border-border">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Lot #</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Description</th>
+                      <th className={TABLE_HEAD_CLASS}>Lot #</th>
+                      <th className={TABLE_HEAD_CLASS}>Description</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -443,10 +442,10 @@ export default function Cemeteries() {
                 <table className="w-full text-sm">
                   <thead className="bg-background-subtle border-b border-border">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Grave #</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Coordinates</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Notes</th>
+                      <th className={TABLE_HEAD_CLASS}>Grave #</th>
+                      <th className={TABLE_HEAD_CLASS}>Status</th>
+                      <th className={TABLE_HEAD_CLASS}>Coordinates</th>
+                      <th className={TABLE_HEAD_CLASS}>Notes</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>

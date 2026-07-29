@@ -3,17 +3,13 @@ import {
   useInventory, useCreateInventoryItem,
   useUpdateInventoryItem, useDeleteInventoryItem,
 } from '../hooks/useData';
-import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
+import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, cn } from '../lib/utils';
 import type { InventoryItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,
-  Badge, EmptyState, LoadingSpinner,
-} from '../components/ui';
-import {
-  Plus, Search, Package, Edit, Trash2,
-  AlertCircle, RefreshCw, AlertTriangle, DollarSign,
-} from 'lucide-react';
+  Badge, EmptyState, LoadingSpinner, PageError, TABLE_HEAD_CLASS } from '../components/ui';
+import { Plus, Search, Package, Edit, Trash2, RefreshCw, AlertTriangle, DollarSign } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
 type InventoryFormData = {
@@ -84,8 +80,6 @@ export default function Inventory() {
   }, [items, searchTerm, categoryFilter, lowStockOnly]);
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,21 +143,7 @@ export default function Inventory() {
       </div>
 
       {/* Error */}
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       {/* Stats — urgency first */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -270,13 +250,13 @@ export default function Inventory() {
             <table className="w-full text-sm">
               <thead className="bg-background-subtle border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">SKU</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Qty</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Reorder Pt</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Unit Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Location</th>
+                  <th className={TABLE_HEAD_CLASS}>Name</th>
+                  <th className={TABLE_HEAD_CLASS}>Category</th>
+                  <th className={TABLE_HEAD_CLASS}>SKU</th>
+                  <th className={TABLE_HEAD_CLASS}>Qty</th>
+                  <th className={TABLE_HEAD_CLASS}>Reorder Pt</th>
+                  <th className={TABLE_HEAD_CLASS}>Unit Price</th>
+                  <th className={TABLE_HEAD_CLASS}>Location</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
