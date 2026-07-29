@@ -12,9 +12,9 @@ module.exports = {
   rules: {
     'react-refresh/only-export-components': 'off',
     'react-hooks/exhaustive-deps': 'off',
-    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-    '@typescript-eslint/ban-ts-comment': 'off',
+    '@typescript-eslint/ban-ts-comment': 'error',
     '@typescript-eslint/no-non-null-assertion': 'off',
     '@typescript-eslint/no-inferrable-types': 'off',
     '@typescript-eslint/no-empty-function': 'off',
