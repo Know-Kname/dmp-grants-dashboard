@@ -128,6 +128,16 @@ export const queryKeys = {
     all: ['burials'] as const,
     list: () => [...queryKeys.burials.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.burials.all, 'detail', id] as const,
+    /**
+     * Public memorial page (`/memorial/:id`), which reads a narrowed column set
+     * for published burials only.
+     *
+     * Derived from `.all` so a burial mutation invalidates it along with
+     * everything else. It previously used a hand-written `['burials','memorial',id]`
+     * literal that happened to share the same prefix — correct only by
+     * coincidence, and silently broken if `.all` were ever renamed.
+     */
+    memorial: (id: string) => [...queryKeys.burials.all, 'memorial', id] as const,
   },
 
   // Contracts
