@@ -10,14 +10,14 @@
 /**
  * Convert a string from camelCase to snake_case
  */
-export function toSnakeCase(str: string): string {
+function toSnakeCase(str: string): string {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
 /**
  * Convert a string from snake_case to camelCase
  */
-export function toCamelCase(str: string): string {
+function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
@@ -193,7 +193,7 @@ export function formatCurrency(amount: number | null | undefined): string {
 /**
  * Capitalize first letter of a string
  */
-export function capitalize(str: string): string {
+function capitalize(str: string): string {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
@@ -215,41 +215,11 @@ export function formatStatus(status: string): string {
 // ============================================
 
 /**
- * Check if a value is a non-null object
- */
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
  * Check if a value is a valid UUID
  */
 export function isUUID(value: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(value);
-}
-
-// ============================================
-// DEBOUNCE / THROTTLE
-// ============================================
-
-/**
- * Debounce a function
- */
-export function debounce<T extends (...args: unknown[]) => unknown>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return function (this: unknown, ...args: Parameters<T>) {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func.apply(this, args);
-    }, wait);
-  };
 }
 
 // ============================================

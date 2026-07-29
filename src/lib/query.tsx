@@ -5,7 +5,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
-import { isApiError, isNetworkError } from './api';
+import { isApiError } from './api';
 
 // Default stale time: 5 minutes
 const DEFAULT_STALE_TIME = 5 * 60 * 1000;
@@ -38,11 +38,8 @@ export function createQueryClient(): QueryClient {
           if (isApiError(error) && error.isNotFound()) {
             return false;
           }
-          // Retry network errors up to 3 times
-          if (isNetworkError(error)) {
-            return failureCount < 3;
-          }
-          // Default: retry twice
+          // Everything else — including connection failures, which Supabase
+          // surfaces as a plain Error — retries twice.
           return failureCount < 2;
         },
         // Exponential backoff for retries

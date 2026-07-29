@@ -10,16 +10,26 @@
  * branch is dead code there and no key is embedded. Use `vercel dev` to exercise
  * the real proxy locally.
  */
+import { COMPANY } from '../config/company';
+
 const PROXY_URL = '/api/chat';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'google/gemini-2.5-pro';
 
+/**
+ * Location roster for the system prompt, derived from `COMPANY` rather than
+ * retyped. The addresses and phone numbers previously appeared here as literals
+ * that duplicated `config/company.ts`, kept in step by hand.
+ */
+const LOCATION_LINES = Object.values(COMPANY.locations)
+  .map((location) => `- ${location.name}: ${location.fullAddress} — ${location.phone}`)
+  .join('\n');
+
 // Only used by the dev-only direct path. The production system prompt lives
-// server-side in api/chat.ts — keep the two copies in sync if it changes.
-const SYSTEM_PROMPT = `You are an AI assistant embedded in Detroit Memorial Park's internal Cemetery Management System (CMS). Detroit Memorial Park Association has operated since 1925 and manages three Michigan cemetery locations:
-- DMP East: 4280 E. Thirteen Mile Rd, Warren, MI 48092 — (586) 751-1313
-- DMP West: 25062 Plymouth Road, Redford, MI 48239 — (313) 533-1302
-- Gracelawn Cemetery: 5710 N. Saginaw Street, Flint, MI 48505 — (810) 785-7890
+// server-side in api/chat.ts, which cannot import from src/ (it is a Vercel Edge
+// Function with its own bundle) — so that copy still spells the details out.
+const SYSTEM_PROMPT = `You are an AI assistant embedded in ${COMPANY.shortName}'s internal Cemetery Management System (CMS). ${COMPANY.name} has operated since ${COMPANY.established} and manages three Michigan cemetery locations:
+${LOCATION_LINES}
 
 The CMS tracks: burials, work orders, inventory, financial records (deposits, accounts receivable/payable), contracts, customers, and grants.
 
