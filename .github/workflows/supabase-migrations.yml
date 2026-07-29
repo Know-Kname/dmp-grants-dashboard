@@ -19,7 +19,18 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@78e2f5c76c9df4afd4b7ed5cac1c5b2b0b8e7c71  # v1
+        # Pinned to the v1 tag rather than a commit SHA, unlike the checkout step
+        # above. The SHA that was here (78e2f5c...) does not correspond to any
+        # commit in supabase/setup-cli — "Unable to resolve action" on the very
+        # first step, before checkout even runs. That means this workflow has
+        # failed on every run in its history (confirmed: runs #1, #2, and the
+        # run triggered by merging #83 all fail identically). This session
+        # could not independently verify a replacement SHA against a second
+        # source (GitHub API access is scoped to this repo only), so it uses the
+        # tag the original comment already named rather than guess a new SHA
+        # that might be equally wrong. Re-pin to a verified commit SHA when
+        # someone can confirm one against supabase/setup-cli's actual releases.
+        uses: supabase/setup-cli@v1
         with:
           version: latest
 

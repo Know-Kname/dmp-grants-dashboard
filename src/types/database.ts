@@ -1,8 +1,7 @@
 /**
  * Supabase schema types.
  *
- * GENERATED FILE — do not hand-edit except for the marked pending-migration
- * block below. Regenerate with either:
+ * GENERATED FILE — do not hand-edit. Regenerate with either:
  *
  *   supabase gen types typescript --linked > src/types/database.ts
  *
@@ -15,7 +14,7 @@
  * boundary between the two. Both are needed — this file keeps the schema honest,
  * `index.ts` keeps the components readable.
  *
- * Last generated: 2026-07-29 (16 tables).
+ * Last generated: 2026-07-29 (16 tables, post grants.created_by migration).
  */
 
 export type Json =
@@ -427,13 +426,7 @@ export type Database = {
           amount: number | null
           application_date: string | null
           created_at: string | null
-          // ─── PENDING MIGRATION ───────────────────────────────────────────
-          // Added by supabase/migrations/20260729120000_add_grants_created_by.sql,
-          // which deploys on merge to main. Hand-added here because the schema
-          // was generated before that migration ran; a regeneration afterwards
-          // produces these three entries naturally and this note can go.
           created_by: string | null
-          // ─────────────────────────────────────────────────────────────────
           deadline: string | null
           description: string | null
           id: string

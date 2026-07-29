@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════
--- Migration: 20260729120000_add_grants_created_by.sql
+-- Migration: 20260729232842_add_grants_created_by.sql
 -- Description: Adds the created_by column the application already writes to
 --              grants. useCreateGrant has been inserting created_by since the
 --              hook was authored, but the column was never added, so every
@@ -24,6 +24,15 @@
 --     placeholder, so inserts must be allowed to leave it NULL.
 --   * grants is empty at time of writing, so there is no backfill and no lock
 --     concern.
+--   * Applied directly via the Supabase MCP (see PR #83 / CHANGELOG) because the
+--     "Deploy Supabase Migrations" GitHub Actions workflow cannot run at all —
+--     its supabase/setup-cli step is pinned to a SHA that does not exist, so it
+--     fails at the "resolve action" step before checking out any code, on every
+--     run in this repo's history. Filed and fixed separately in this same commit.
+--     Applying via MCP assigns its own timestamp, which is why this file's name
+--     no longer matches its original authoring time — renamed to match what
+--     Supabase actually recorded, per the reconciliation pattern already
+--     established in 20260506013408/013416/013429.
 -- ═══════════════════════════════════════════════════════════════════
 
 ALTER TABLE grants ADD COLUMN IF NOT EXISTS created_by uuid;
