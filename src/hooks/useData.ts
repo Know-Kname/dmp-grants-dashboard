@@ -182,13 +182,28 @@ export function useWorkOrders() {
   });
 }
 
+/**
+ * Status every newly created work order opens in.
+ *
+ * `work_orders.status` is NOT NULL with no database default, and the create form
+ * has no status field — status is something staff change later, not something
+ * they pick up front. Nothing supplied it, so every work-order insert violated
+ * the constraint; the old `as Omit<WorkOrder, ...>` cast on the payload hid the
+ * omission from the compiler.
+ */
+const NEW_WORK_ORDER_STATUS = 'pending' satisfies WorkOrder['status'];
+
 export function useCreateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: Omit<CreateInput<WorkOrder>, 'createdBy'>) => {
+    mutationFn: async (data: Omit<CreateInput<WorkOrder>, 'createdBy' | 'status'>) => {
       const row = await sb(
         supabase.from('work_orders')
-          .insert({ ...toSnakeCaseKeys(data), ...(await createdByFields()) })
+          .insert({
+            ...toSnakeCaseKeys(data),
+            status: NEW_WORK_ORDER_STATUS,
+            ...(await createdByFields()),
+          })
           .select().single()
       );
       return fromRow<WorkOrder>(row);

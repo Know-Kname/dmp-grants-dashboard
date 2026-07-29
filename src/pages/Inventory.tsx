@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useInventory, useCreateInventoryItem,
   useUpdateInventoryItem, useDeleteInventoryItem,
 } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { inventoryFormSchema } from '../lib/schemas';
 import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, cn } from '../lib/utils';
 import type { InventoryItem } from '../types';
@@ -12,15 +15,8 @@ import {
 import { Plus, Search, Package, Edit, Trash2, RefreshCw, AlertTriangle, DollarSign } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
-type InventoryFormData = {
-  name: string;
-  category: InventoryItem['category'];
-  sku: string;
-  quantity: string;
-  reorderPoint: string;
-  unitPrice: string;
-  location: string;
-};
+/** Live form state — the input side of `inventoryFormSchema`, so the two cannot drift. */
+type InventoryFormData = z.input<typeof inventoryFormSchema>;
 
 const initialForm: InventoryFormData = {
   name: '', category: 'supplies', sku: '',
@@ -41,11 +37,11 @@ export default function Inventory() {
 
   const toast = useToast();
   const createMutation = useCreateInventoryItem({
-    onSuccess: () => { toast.success('Item created'); setShowModal(false); setFormData(initialForm); },
+    onSuccess: () => { toast.success('Item created'); setShowModal(false); form.reset(initialForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to create item'),
   });
   const updateMutation = useUpdateInventoryItem({
-    onSuccess: () => { toast.success('Item updated'); setShowModal(false); setEditingItem(null); setFormData(initialForm); },
+    onSuccess: () => { toast.success('Item updated'); setShowModal(false); setEditingItem(null); form.reset(initialForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update item'),
   });
   const deleteMutation = useDeleteInventoryItem({
@@ -58,7 +54,27 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [lowStockOnly, setLowStockOnly] = useState(false);
-  const [formData, setFormData] = useState<InventoryFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once the schema parses.
+  const form = useForm({
+    schema: inventoryFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        name: data.name,
+        category: data.category,
+        sku: data.sku || undefined,
+        quantity: data.quantity,
+        reorderPoint: data.reorderPoint,
+        unitPrice: data.unitPrice,
+        location: data.location || undefined,
+      };
+      if (editingItem) {
+        updateMutation.mutate({ id: editingItem.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const stats = useMemo(() => ({
     lowStock: items.filter(i => i.quantity <= i.reorderPoint).length,
@@ -81,27 +97,10 @@ export default function Inventory() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      name: formData.name,
-      category: formData.category,
-      sku: formData.sku || undefined,
-      quantity: parseInt(formData.quantity, 10) || 0,
-      reorderPoint: parseInt(formData.reorderPoint, 10) || 0,
-      unitPrice: parseFloat(formData.unitPrice) || 0,
-      location: formData.location || undefined,
-    };
-    if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item);
-    setFormData({
+    form.setValues({
       name: item.name,
       category: item.category,
       sku: item.sku || '',
@@ -121,9 +120,6 @@ export default function Inventory() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof InventoryFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -136,7 +132,7 @@ export default function Inventory() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingItem(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingItem(null); setShowModal(true); }}>
             Add Item
           </Button>
         </div>
@@ -299,30 +295,30 @@ export default function Inventory() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingItem ? 'Save Changes' : 'Add Item'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Item Name" value={formData.name} onChange={f('name')} required />
+        <form onSubmit={form.handleSubmit} className="space-y-4">
+          <Input label="Item Name" {...form.getFieldProps('name')} error={getFieldError('name', form.errors, form.touched)} required />
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="Category"
               options={CATEGORIES}
-              value={formData.category}
-              onChange={f('category')}
+              {...form.getFieldProps('category')}
+              error={getFieldError('category', form.errors, form.touched)}
             />
-            <Input label="SKU" value={formData.sku} onChange={f('sku')} placeholder="Optional" />
+            <Input label="SKU" {...form.getFieldProps('sku')} error={getFieldError('sku', form.errors, form.touched)} placeholder="Optional" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Quantity" type="number" min="0" value={formData.quantity} onChange={f('quantity')} required />
-            <Input label="Reorder Point" type="number" min="0" value={formData.reorderPoint} onChange={f('reorderPoint')} required />
+            <Input label="Quantity" type="number" min="0" {...form.getFieldProps('quantity')} error={getFieldError('quantity', form.errors, form.touched)} required />
+            <Input label="Reorder Point" type="number" min="0" {...form.getFieldProps('reorderPoint')} error={getFieldError('reorderPoint', form.errors, form.touched)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Unit Price ($)" type="number" min="0" step="0.01" value={formData.unitPrice} onChange={f('unitPrice')} required />
-            <Input label="Storage Location" value={formData.location} onChange={f('location')} placeholder="Optional" />
+            <Input label="Unit Price ($)" type="number" min="0" step="0.01" {...form.getFieldProps('unitPrice')} error={getFieldError('unitPrice', form.errors, form.touched)} required />
+            <Input label="Storage Location" {...form.getFieldProps('location')} error={getFieldError('location', form.errors, form.touched)} placeholder="Optional" />
           </div>
         </form>
       </Modal>

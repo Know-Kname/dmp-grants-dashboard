@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useWorkOrders, useCreateWorkOrder,
   useUpdateWorkOrder, useDeleteWorkOrder,
 } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { workOrderFormSchema } from '../lib/schemas';
 import type { WorkOrder } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
@@ -11,14 +14,8 @@ import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCi
 import { format } from 'date-fns';
 import { isThisMonth } from 'date-fns';
 
-type WorkOrderFormData = {
-  title: string;
-  description: string;
-  type: WorkOrder['type'];
-  priority: WorkOrder['priority'];
-  assignedTo: string;
-  dueDate: string;
-};
+/** Live form state — the input side of `workOrderFormSchema`, so the two cannot drift. */
+type WorkOrderFormData = z.input<typeof workOrderFormSchema>;
 
 const initialForm: WorkOrderFormData = {
   title: '',
@@ -69,15 +66,34 @@ const STATUS_FILTER_OPTIONS = [
 export default function WorkOrders() {
   const { data: workOrders = [], isLoading, error, refetch } = useWorkOrders();
 
-  const createMutation = useCreateWorkOrder({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateWorkOrder({ onSuccess: () => { setShowModal(false); setEditingOrder(null); setFormData(initialForm); } });
+  const createMutation = useCreateWorkOrder({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
+  const updateMutation = useUpdateWorkOrder({ onSuccess: () => { setShowModal(false); setEditingOrder(null); form.reset(initialForm); } });
   const deleteMutation = useDeleteWorkOrder();
 
   const [showModal, setShowModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [formData, setFormData] = useState<WorkOrderFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once the schema parses.
+  const form = useForm({
+    schema: workOrderFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        title: data.title,
+        description: data.description,
+        type: data.type,
+        priority: data.priority,
+        assignedTo: data.assignedTo || undefined,
+        dueDate: data.dueDate || undefined,
+      };
+      if (editingOrder) {
+        updateMutation.mutate({ id: editingOrder.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const stats = useMemo(() => ({
     total: workOrders.length,
@@ -103,26 +119,10 @@ export default function WorkOrders() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      title: formData.title,
-      description: formData.description,
-      type: formData.type,
-      priority: formData.priority,
-      assignedTo: formData.assignedTo || undefined,
-      dueDate: formData.dueDate || undefined,
-    };
-    if (editingOrder) {
-      updateMutation.mutate({ id: editingOrder.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>);
-    }
-  };
 
   const handleEdit = (wo: WorkOrder) => {
     setEditingOrder(wo);
-    setFormData({
+    form.setValues({
       title: wo.title,
       description: wo.description || '',
       type: wo.type,
@@ -140,10 +140,6 @@ export default function WorkOrders() {
   };
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
-  const f = (field: keyof WorkOrderFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -155,7 +151,7 @@ export default function WorkOrders() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingOrder(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingOrder(null); setShowModal(true); }}>
             New Work Order
           </Button>
         </div>
@@ -280,21 +276,21 @@ export default function WorkOrders() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleSubmit} loading={isMutating}>
+            <Button variant="primary" onClick={() => form.handleSubmit()} loading={isMutating}>
               {editingOrder ? 'Save Changes' : 'Create'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Title" value={formData.title} onChange={f('title')} required />
-          <Textarea label="Description" value={formData.description} onChange={f('description')} />
+        <form onSubmit={form.handleSubmit} className="space-y-4">
+          <Input label="Title" {...form.getFieldProps('title')} error={getFieldError('title', form.errors, form.touched)} required />
+          <Textarea label="Description" {...form.getFieldProps('description')} error={getFieldError('description', form.errors, form.touched)} />
           <div className="grid grid-cols-2 gap-4">
-            <Select label="Type" value={formData.type} onChange={f('type')} options={TYPE_OPTIONS} />
-            <Select label="Priority" value={formData.priority} onChange={f('priority')} options={PRIORITY_OPTIONS} />
+            <Select label="Type" {...form.getFieldProps('type')} error={getFieldError('type', form.errors, form.touched)} options={TYPE_OPTIONS} />
+            <Select label="Priority" {...form.getFieldProps('priority')} error={getFieldError('priority', form.errors, form.touched)} options={PRIORITY_OPTIONS} />
           </div>
-          <Input label="Assigned To" value={formData.assignedTo} onChange={f('assignedTo')} placeholder="Staff name" />
-          <Input label="Due Date" type="date" value={formData.dueDate} onChange={f('dueDate')} />
+          <Input label="Assigned To" {...form.getFieldProps('assignedTo')} error={getFieldError('assignedTo', form.errors, form.touched)} placeholder="Staff name" />
+          <Input label="Due Date" type="date" {...form.getFieldProps('dueDate')} error={getFieldError('dueDate', form.errors, form.touched)} />
         </form>
       </Modal>
     </div>

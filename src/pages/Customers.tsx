@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useCustomers, useCreateCustomer,
   useUpdateCustomer, useDeleteCustomer,
 } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { customerFormSchema } from '../lib/schemas';
 import { getErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/utils';
 import type { Customer } from '../types';
@@ -12,17 +15,8 @@ import {
 import { Plus, Search, Users, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
-type CustomerFormData = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  notes: string;
-};
+/** Live form state — the input side of `customerFormSchema`, so the two cannot drift. */
+type CustomerFormData = z.input<typeof customerFormSchema>;
 
 const initialForm: CustomerFormData = {
   firstName: '', lastName: '', email: '', phone: '',
@@ -34,11 +28,11 @@ export default function Customers() {
 
   const toast = useToast();
   const createMutation = useCreateCustomer({
-    onSuccess: () => { toast.success('Customer added'); setShowModal(false); setFormData(initialForm); },
+    onSuccess: () => { toast.success('Customer added'); setShowModal(false); form.reset(initialForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to add customer'),
   });
   const updateMutation = useUpdateCustomer({
-    onSuccess: () => { toast.success('Customer updated'); setShowModal(false); setEditingCustomer(null); setFormData(initialForm); },
+    onSuccess: () => { toast.success('Customer updated'); setShowModal(false); setEditingCustomer(null); form.reset(initialForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update customer'),
   });
   const deleteMutation = useDeleteCustomer({
@@ -49,7 +43,29 @@ export default function Customers() {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<CustomerFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once customerFormSchema parses.
+  const form = useForm({
+    schema: customerFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        city: data.city || undefined,
+        state: data.state || undefined,
+        zipCode: data.zipCode || undefined,
+        notes: data.notes || undefined,
+      };
+      if (editingCustomer) {
+        updateMutation.mutate({ id: editingCustomer.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm) return customers;
@@ -64,29 +80,9 @@ export default function Customers() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-      address: formData.address || undefined,
-      city: formData.city || undefined,
-      state: formData.state || undefined,
-      zipCode: formData.zipCode || undefined,
-      notes: formData.notes || undefined,
-    };
-    if (editingCustomer) {
-      updateMutation.mutate({ id: editingCustomer.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
-
   const handleEdit = (c: Customer) => {
     setEditingCustomer(c);
-    setFormData({
+    form.setValues({
       firstName: c.firstName,
       lastName: c.lastName,
       email: c.email || '',
@@ -108,9 +104,6 @@ export default function Customers() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof CustomerFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -123,7 +116,7 @@ export default function Customers() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingCustomer(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingCustomer(null); setShowModal(true); }}>
             New Customer
           </Button>
         </div>
@@ -240,28 +233,28 @@ export default function Customers() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingCustomer ? 'Save Changes' : 'Add Customer'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={form.handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" value={formData.firstName} onChange={f('firstName')} required />
-            <Input label="Last Name" value={formData.lastName} onChange={f('lastName')} required />
+            <Input label="First Name" {...form.getFieldProps('firstName')} error={getFieldError('firstName', form.errors, form.touched)} required />
+            <Input label="Last Name" {...form.getFieldProps('lastName')} error={getFieldError('lastName', form.errors, form.touched)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Email" type="email" value={formData.email} onChange={f('email')} />
-            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} />
+            <Input label="Email" type="email" {...form.getFieldProps('email')} error={getFieldError('email', form.errors, form.touched)} />
+            <Input label="Phone" type="tel" {...form.getFieldProps('phone')} error={getFieldError('phone', form.errors, form.touched)} />
           </div>
-          <Input label="Address" value={formData.address} onChange={f('address')} />
+          <Input label="Address" {...form.getFieldProps('address')} error={getFieldError('address', form.errors, form.touched)} />
           <div className="grid grid-cols-3 gap-4">
-            <Input label="City" value={formData.city} onChange={f('city')} />
-            <Input label="State" value={formData.state} onChange={f('state')} />
-            <Input label="ZIP Code" value={formData.zipCode} onChange={f('zipCode')} />
+            <Input label="City" {...form.getFieldProps('city')} error={getFieldError('city', form.errors, form.touched)} />
+            <Input label="State" {...form.getFieldProps('state')} error={getFieldError('state', form.errors, form.touched)} />
+            <Input label="ZIP Code" {...form.getFieldProps('zipCode')} error={getFieldError('zipCode', form.errors, form.touched)} />
           </div>
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Textarea label="Notes" {...form.getFieldProps('notes')} error={getFieldError('notes', form.errors, form.touched)} rows={3} />
         </form>
       </Modal>
     </div>

@@ -11,7 +11,8 @@ export interface User {
 export interface WorkOrder {
   id: string;
   title: string;
-  description: string;
+  /** Optional: the column is nullable, and the form submits it blank freely. */
+  description?: string;
   type: 'maintenance' | 'burial_prep' | 'grounds' | 'repair' | 'other';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';

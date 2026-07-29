@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useBurials, useCreateBurial,
   useUpdateBurial, useDeleteBurial,
 } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { burialFormSchema } from '../lib/schemas';
 import { formatDate, formatDateForInput } from '../lib/utils';
 import type { Burial } from '../types';
 import {
@@ -12,23 +15,8 @@ import { Plus, Search, BookOpen, Edit, Trash2, RefreshCw, Calendar, QrCode, Glob
 import { isThisMonth } from 'date-fns';
 import QRCode from 'react-qr-code';
 
-type BurialFormData = {
-  deceasedFirstName: string;
-  deceasedLastName: string;
-  deceasedMiddleName: string;
-  dateOfBirth: string;
-  dateOfDeath: string;
-  burialDate: string;
-  section: string;
-  lot: string;
-  grave: string;
-  contactName: string;
-  contactPhone: string;
-  contactEmail: string;
-  permitNumber: string;
-  notes: string;
-  memorialPublished: boolean;
-};
+/** Live form state — the input side of `burialFormSchema`, so the two cannot drift. */
+type BurialFormData = z.input<typeof burialFormSchema>;
 
 const initialForm: BurialFormData = {
   deceasedFirstName: '', deceasedLastName: '', deceasedMiddleName: '',
@@ -47,15 +35,44 @@ function deceasedName(b: Burial): string {
 export default function Burials() {
   const { data: burials = [], isLoading, error, refetch } = useBurials();
 
-  const createMutation = useCreateBurial({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateBurial({ onSuccess: () => { setShowModal(false); setEditingBurial(null); setFormData(initialForm); } });
+  const createMutation = useCreateBurial({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
+  const updateMutation = useUpdateBurial({ onSuccess: () => { setShowModal(false); setEditingBurial(null); form.reset(initialForm); } });
   const deleteMutation = useDeleteBurial();
 
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
   const [qrBurial, setQrBurial] = useState<Burial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<BurialFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once the schema parses.
+  const form = useForm({
+    schema: burialFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        deceasedFirstName: data.deceasedFirstName,
+        deceasedLastName: data.deceasedLastName,
+        deceasedMiddleName: data.deceasedMiddleName || undefined,
+        dateOfBirth: data.dateOfBirth || undefined,
+        dateOfDeath: data.dateOfDeath || undefined,
+        burialDate: data.burialDate,
+        plotLocation: `${data.section}-${data.lot}-${data.grave}`,
+        section: data.section,
+        lot: data.lot,
+        grave: data.grave,
+        memorialPublished: data.memorialPublished,
+        contactName: data.contactName || undefined,
+        contactPhone: data.contactPhone || undefined,
+        contactEmail: data.contactEmail || undefined,
+        permitNumber: data.permitNumber || undefined,
+        notes: data.notes || undefined,
+      };
+      if (editingBurial) {
+        updateMutation.mutate({ id: editingBurial.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const stats = useMemo(() => ({
     total: burials.length,
@@ -79,38 +96,12 @@ export default function Burials() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      deceasedFirstName: formData.deceasedFirstName,
-      deceasedLastName: formData.deceasedLastName,
-      deceasedMiddleName: formData.deceasedMiddleName || undefined,
-      dateOfBirth: formData.dateOfBirth || undefined,
-      dateOfDeath: formData.dateOfDeath || undefined,
-      burialDate: formData.burialDate,
-      plotLocation: `${formData.section}-${formData.lot}-${formData.grave}`,
-      section: formData.section,
-      lot: formData.lot,
-      grave: formData.grave,
-      memorialPublished: formData.memorialPublished,
-      contactName: formData.contactName || undefined,
-      contactPhone: formData.contactPhone || undefined,
-      contactEmail: formData.contactEmail || undefined,
-      permitNumber: formData.permitNumber || undefined,
-      notes: formData.notes || undefined,
-    };
-    if (editingBurial) {
-      updateMutation.mutate({ id: editingBurial.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Burial, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
 
   const handleEdit = (b: Burial) => {
     setEditingBurial(b);
     // Parse plotLocation back to section/lot/grave if possible
     const parts = (b.plotLocation || '').split('-');
-    setFormData({
+    form.setValues({
       deceasedFirstName: b.deceasedFirstName,
       deceasedLastName: b.deceasedLastName,
       deceasedMiddleName: b.deceasedMiddleName || '',
@@ -138,9 +129,6 @@ export default function Burials() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof BurialFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -153,7 +141,7 @@ export default function Burials() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingBurial(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingBurial(null); setShowModal(true); }}>
             Record Burial
           </Button>
         </div>
@@ -313,46 +301,46 @@ export default function Burials() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingBurial ? 'Save Changes' : 'Record Burial'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={form.handleSubmit} className="space-y-4">
           <p className="text-sm font-semibold text-foreground-muted uppercase tracking-wider">Deceased Information</p>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" value={formData.deceasedFirstName} onChange={f('deceasedFirstName')} required />
-            <Input label="Last Name" value={formData.deceasedLastName} onChange={f('deceasedLastName')} required />
+            <Input label="First Name" {...form.getFieldProps('deceasedFirstName')} error={getFieldError('deceasedFirstName', form.errors, form.touched)} required />
+            <Input label="Last Name" {...form.getFieldProps('deceasedLastName')} error={getFieldError('deceasedLastName', form.errors, form.touched)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Middle Name" value={formData.deceasedMiddleName} onChange={f('deceasedMiddleName')} />
-            <Input label="Date of Birth" type="date" value={formData.dateOfBirth} onChange={f('dateOfBirth')} />
+            <Input label="Middle Name" {...form.getFieldProps('deceasedMiddleName')} error={getFieldError('deceasedMiddleName', form.errors, form.touched)} />
+            <Input label="Date of Birth" type="date" {...form.getFieldProps('dateOfBirth')} error={getFieldError('dateOfBirth', form.errors, form.touched)} />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Date of Death" type="date" value={formData.dateOfDeath} onChange={f('dateOfDeath')} />
-            <Input label="Burial Date" type="date" value={formData.burialDate} onChange={f('burialDate')} required />
+            <Input label="Date of Death" type="date" {...form.getFieldProps('dateOfDeath')} error={getFieldError('dateOfDeath', form.errors, form.touched)} />
+            <Input label="Burial Date" type="date" {...form.getFieldProps('burialDate')} error={getFieldError('burialDate', form.errors, form.touched)} required />
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <Input label="Section" value={formData.section} onChange={f('section')} required placeholder="e.g. A" />
-            <Input label="Lot" value={formData.lot} onChange={f('lot')} required placeholder="e.g. 142" />
-            <Input label="Grave" value={formData.grave} onChange={f('grave')} required placeholder="e.g. 3" />
+            <Input label="Section" {...form.getFieldProps('section')} error={getFieldError('section', form.errors, form.touched)} required placeholder="e.g. A" />
+            <Input label="Lot" {...form.getFieldProps('lot')} error={getFieldError('lot', form.errors, form.touched)} required placeholder="e.g. 142" />
+            <Input label="Grave" {...form.getFieldProps('grave')} error={getFieldError('grave', form.errors, form.touched)} required placeholder="e.g. 3" />
           </div>
           <p className="text-sm font-semibold text-foreground-muted uppercase tracking-wider pt-2">Contact Information</p>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Contact Name" value={formData.contactName} onChange={f('contactName')} />
-            <Input label="Contact Phone" type="tel" value={formData.contactPhone} onChange={f('contactPhone')} />
+            <Input label="Contact Name" {...form.getFieldProps('contactName')} error={getFieldError('contactName', form.errors, form.touched)} />
+            <Input label="Contact Phone" type="tel" {...form.getFieldProps('contactPhone')} error={getFieldError('contactPhone', form.errors, form.touched)} />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Contact Email" type="email" value={formData.contactEmail} onChange={f('contactEmail')} />
-            <Input label="Permit Number" value={formData.permitNumber} onChange={f('permitNumber')} />
+            <Input label="Contact Email" type="email" {...form.getFieldProps('contactEmail')} error={getFieldError('contactEmail', form.errors, form.touched)} />
+            <Input label="Permit Number" {...form.getFieldProps('permitNumber')} error={getFieldError('permitNumber', form.errors, form.touched)} />
           </div>
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Textarea label="Notes" {...form.getFieldProps('notes')} error={getFieldError('notes', form.errors, form.touched)} rows={3} />
           <label className="flex items-center gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
-              checked={formData.memorialPublished}
-              onChange={e => setFormData(prev => ({ ...prev, memorialPublished: e.target.checked }))}
+              checked={form.values.memorialPublished}
+              onChange={(e) => form.setValue('memorialPublished', e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">Publish public memorial page</span>
