@@ -6,7 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
+import { isUUID, toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
 import type {
   WorkOrder,
@@ -52,10 +52,38 @@ async function sb(
   return data;
 }
 
-// Get the current authenticated user's ID (falls back to 'unknown' for demo/anon)
-async function uid(): Promise<string> {
+/**
+ * Resolve the current user's ID for audit columns.
+ *
+ * Returns `null` when there is no authenticated session. This previously
+ * returned the string 'unknown', which was not merely imprecise: `created_by` is
+ * a `uuid` column, so Postgres rejected the insert outright with
+ * `invalid input syntax for type uuid`. Every create failed for demo and
+ * signed-out sessions — the exact cases the fallback was meant to support.
+ *
+ * The `isUUID` guard keeps that guarantee explicit: nothing that isn't a valid
+ * UUID can reach a uuid column through this path.
+ *
+ * @returns The authenticated user's UUID, or `null` if there is no valid session.
+ */
+async function uid(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? 'unknown';
+  const id = user?.id;
+  return id && isUUID(id) ? id : null;
+}
+
+/**
+ * Build the `created_by` fragment of an insert payload.
+ *
+ * Spread into the row being inserted. It contributes the column when a user is
+ * authenticated and contributes *nothing* otherwise, so the column is left NULL
+ * rather than being filled with a placeholder.
+ *
+ * @returns `{ created_by: <uuid> }`, or `{}` when unauthenticated.
+ */
+async function createdByFields(): Promise<{ created_by?: string }> {
+  const userId = await uid();
+  return userId ? { created_by: userId } : {};
 }
 
 // ============================================
@@ -91,7 +119,7 @@ export function useCreateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
     mutationFn: async (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('work_orders')
-          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
+          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), ...(await createdByFields()) })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as WorkOrder;
@@ -169,10 +197,10 @@ export function useGrant(id: string) {
 export function useCreateGrant(callbacks?: MutationCallbacks<Grant>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>) => {
+    mutationFn: async (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('grants')
-          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
+          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), ...(await createdByFields()) })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grant;
@@ -614,7 +642,7 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
     mutationFn: async (data: Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('deposits')
-          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), created_by: await uid() })
+          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), ...(await createdByFields()) })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Deposit;

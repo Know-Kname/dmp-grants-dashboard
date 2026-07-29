@@ -18,7 +18,8 @@ export interface WorkOrder {
   assignedTo?: string;
   dueDate?: string;
   completedDate?: string;
-  createdBy: string;
+  /** Staff member who created the record; null when created without a session. */
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,7 +48,8 @@ export interface Deposit {
   reference?: string;
   customerId?: string;
   notes?: string;
-  createdBy: string;
+  /** Staff member who created the record; null when created without a session. */
+  createdBy: string | null;
   createdAt: string;
 }
 
@@ -142,6 +144,8 @@ export interface Grant {
   status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
   applicationDate?: string;
   notes?: string;
+  /** Staff member who created the record; null when created without a session. */
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
