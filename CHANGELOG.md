@@ -8,7 +8,34 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Grant creation failed 100% of the time.** `useCreateGrant` wrote a `created_by`
+  column that did not exist on `grants`. A migration adds it. Verified against the
+  live schema, which was also the open question left in #74.
+- **Creating any record while signed out or in demo mode failed.** `uid()` returned
+  the string `'unknown'` for a `uuid` column, which Postgres rejected outright. It
+  now returns `null` and the column is simply omitted, affecting work orders and
+  deposits as well as grants.
+- **Receivables and payables could never be created.** `accounts_receivable.status`
+  and `accounts_payable.status` are `NOT NULL` with no default, but both create
+  hooks omitted `status` and never supplied it. Both now open at `pending`.
+- **Dates displayed and prefilled a day off.** `formatDate` and `formatDateForInput`
+  each had a mirror-image timezone bug; both now route through one local-date parser.
+- **AI replies silently dropped tokens** whose SSE frame straddled a network chunk
+  boundary.
+- **Dark mode**: toast icon chips rendered with no background (the referenced `950`
+  shades were never declared in the Tailwind config), and the `ErrorBoundary` crash
+  screen ignored the theme entirely.
+
 ### Added
+- **Generated Supabase schema types** (`src/types/database.ts`) and a typed client,
+  so writing a nonexistent column is now a compile error rather than a runtime 400.
+- **Working Zod form validation.** `schemas.ts` and `useForm.ts` existed but had zero
+  importers; two defects that made `useForm` unusable are fixed and Grants is wired
+  up as the reference conversion.
+- **Shared page components** — `PageError`, `StatCard`, `TABLE_HEAD_CLASS`.
+- Tests for the date-formatting edge cases and both `useForm` defects. Test runs pin
+  `TZ` to `America/Detroit` so the timezone cases are actually exercised.
 - **Server-side AI proxy** — `/api/chat` Vercel Edge Function holds the OpenRouter
   key in a server-only `OPENROUTER_API_KEY` env var. The key is no longer shipped
   in the browser bundle; the dev-direct fallback is dead-code-eliminated from
@@ -23,6 +50,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cyclic object no longer overflows the stack.
 
 ### Removed
+- Roughly 1,000 lines of dead code, each verified unreferenced first: 9 unused
+  data hooks, 6 unused `DEMO_*` datasets, the `NetworkError`/`TimeoutError`
+  hierarchy (never constructed, so its retry branch could never run), the unused
+  `Alert`/`Divider`/`Skeleton`/`Tooltip` components, and a duplicate brand-colour
+  block in `index.css` with no consumers.
+- Duplicated constants: `AIAssistant` re-declared the brand hexes, and `gemini.ts`
+  restated all three cemetery addresses instead of reading `config/company.ts`.
 - Stale `vitest.config.server.ts` and the dead Vite dev proxy to the removed
   Express backend (`/api → localhost:3000`).
 

@@ -1,4 +1,107 @@
 import { useEffect, useId, useRef } from 'react';
+import { AlertCircle, type LucideIcon } from 'lucide-react';
+import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
+
+// ============================================
+// PAGE ERROR
+// ============================================
+
+/**
+ * The standard error banner shown at the top of a CRUD page.
+ *
+ * Accepts the raw error rather than pre-formatted strings so each page no longer
+ * has to derive message/details/requestId itself — that three-line preamble plus
+ * a seventeen-line banner was copy-pasted verbatim across all seven pages.
+ *
+ * @param error Any thrown value. Renders nothing when falsy, so callers can pass
+ *              a combined query/mutation error directly without guarding.
+ */
+export function PageError({ error }: { error: unknown }) {
+  if (!error) return null;
+
+  const details = getErrorDetails(error);
+  const requestId = getErrorRequestId(error);
+
+  return (
+    <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
+      <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
+      <div>
+        <h3 className="font-medium text-danger">Error</h3>
+        <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(error)}</p>
+        {(details.length > 0 || requestId) && (
+          <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
+            {details.map((d, i) => <li key={i}>{d}</li>)}
+            {requestId && <li>Request ID: {requestId}</li>}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// STAT CARD
+// ============================================
+
+export type StatTone = 'primary' | 'info' | 'success' | 'warning' | 'danger';
+
+/**
+ * Tone → class lookup.
+ *
+ * Spelled out rather than interpolated (`bg-${tone}-100`) because Tailwind scans
+ * source text for complete class names; a constructed string is never emitted.
+ * The dark chips also depend on the 950 shades, which only became real when
+ * tailwind.config.js was extended to declare the full ramp.
+ */
+const STAT_TONES: Record<StatTone, { value: string; chip: string; icon: string }> = {
+  primary: { value: 'text-primary', chip: 'bg-primary-100 dark:bg-primary-950', icon: 'text-primary' },
+  info:    { value: 'text-info',    chip: 'bg-info-100 dark:bg-info-950',       icon: 'text-info' },
+  success: { value: 'text-success', chip: 'bg-success-100 dark:bg-success-950', icon: 'text-success' },
+  warning: { value: 'text-warning', chip: 'bg-warning-100 dark:bg-warning-950', icon: 'text-warning' },
+  danger:  { value: 'text-danger',  chip: 'bg-danger-100 dark:bg-danger-950',   icon: 'text-danger' },
+};
+
+/**
+ * Headline metric tile: label, value, and a tinted icon chip.
+ *
+ * @param icon A lucide icon component (passed uninstantiated, e.g. `icon={Users}`).
+ */
+export function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone = 'primary',
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon: LucideIcon;
+  tone?: StatTone;
+}) {
+  const t = STAT_TONES[tone];
+  return (
+    <Card>
+      <CardBody>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground-muted mb-1">{label}</p>
+            <p className={`text-2xl font-bold ${t.value}`}>{value}</p>
+          </div>
+          <div className={`p-3 ${t.chip} rounded-lg`}>
+            <Icon className={t.icon} size={24} />
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ============================================
+// TABLE
+// ============================================
+
+/** Shared class for a table `<th>`, previously retyped for every column. */
+export const TABLE_HEAD_CLASS =
+  'px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider';
 
 // Button Component
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -51,51 +154,6 @@ export function Button({
       ) : null}
       {children}
     </button>
-  );
-}
-
-// Alert Component
-interface AlertProps {
-  title?: string;
-  message: string;
-  details?: string[];
-  variant?: 'error' | 'warning' | 'success' | 'info';
-  onDismiss?: () => void;
-}
-
-export function Alert({ title, message, details, variant = 'error', onDismiss }: AlertProps) {
-  const styles = {
-    error: 'bg-destructive/10 border-destructive/30 text-destructive',
-    warning: 'bg-warning/10 border-warning/30 text-warning-700',
-    success: 'bg-success/10 border-success/30 text-success-700',
-    info: 'bg-info/10 border-info/30 text-info-700',
-  };
-
-  return (
-    <div className={`border rounded-lg p-4 ${styles[variant]}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          {title && <p className="font-semibold">{title}</p>}
-          <p className="text-sm">{message}</p>
-          {details && details.length > 0 && (
-            <ul className="list-disc pl-5 text-sm">
-              {details.map((detail, index) => (
-                <li key={`${detail}-${index}`}>{detail}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-        {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="text-current/70 hover:text-current"
-            aria-label="Dismiss alert"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -458,18 +516,6 @@ export function LoadingSpinner({ size = 'md', className = '' }: { size?: 'sm' | 
   );
 }
 
-// Skeleton Component
-export function Skeleton({ className = '' }: { className?: string }) {
-  return (
-    <div className={`skeleton rounded-md ${className}`} />
-  );
-}
-
-// Divider Component
-export function Divider({ className = '' }: { className?: string }) {
-  return <hr className={`border-border ${className}`} />;
-}
-
 // Avatar Component
 interface AvatarProps {
   src?: string;
@@ -504,20 +550,3 @@ export function Avatar({ src, alt, fallback, size = 'md', className = '' }: Avat
   );
 }
 
-// Tooltip wrapper (basic)
-interface TooltipProps {
-  content: string;
-  children: React.ReactNode;
-}
-
-export function Tooltip({ content, children }: TooltipProps) {
-  return (
-    <div className="relative group">
-      {children}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-slate-900 dark:bg-slate-700 rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
-        {content}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-slate-700" />
-      </div>
-    </div>
-  );
-}

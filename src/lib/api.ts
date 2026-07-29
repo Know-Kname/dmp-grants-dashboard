@@ -1,14 +1,20 @@
 /**
- * Error class hierarchy for the DMP CMS.
+ * Error types for the DMP CMS.
  *
  * The HTTP client (api.get/post/put/delete) and authApi that lived here previously
  * targeted a non-existent Express backend and have been removed. All data access
  * is now Supabase-direct via src/hooks/useData.ts. Auth lives in src/lib/auth.tsx.
  *
- * This file now exports only the error types that propagate through the rest of
- * the codebase: query.tsx uses isApiError/isNetworkError for retry decisions,
- * errors.ts builds user-friendly messages from ApiRequestError, and tests
- * construct ApiRequestError instances directly.
+ * What survives is only what is actually reachable: query.tsx uses `isApiError`
+ * plus the status predicates for retry decisions, errors.ts builds user-facing
+ * messages from `ApiRequestError`, and the tests construct it directly.
+ *
+ * `NetworkError` and `TimeoutError` were removed with the HTTP client that threw
+ * them. Nothing constructed either one, so `isNetworkError` was permanently
+ * false and the "retry network errors up to 3 times" branch in query.tsx could
+ * never run — Supabase failures surface as plain `Error` and always took the
+ * default path. Deleting them changes no behaviour; it just stops the code from
+ * implying a retry policy that was never in effect.
  */
 
 export interface ApiError {
@@ -35,10 +41,6 @@ export class ApiRequestError extends Error {
     this.requestId = error.requestId;
   }
 
-  is(code: string): boolean {
-    return this.code === code;
-  }
-
   isAuthError(): boolean {
     return this.statusCode === 401 || this.code === 'UNAUTHORIZED';
   }
@@ -50,38 +52,8 @@ export class ApiRequestError extends Error {
   isNotFound(): boolean {
     return this.statusCode === 404 || this.code === 'NOT_FOUND';
   }
-
-  isConflict(): boolean {
-    return this.statusCode === 409 || this.code === 'CONFLICT';
-  }
-}
-
-export class NetworkError extends Error {
-  public readonly isNetworkError = true;
-
-  constructor(message: string = 'Network error. Please check your connection.') {
-    super(message);
-    this.name = 'NetworkError';
-  }
-}
-
-export class TimeoutError extends Error {
-  public readonly isTimeoutError = true;
-
-  constructor(message: string = 'Request timed out. Please try again.') {
-    super(message);
-    this.name = 'TimeoutError';
-  }
 }
 
 export function isApiError(error: unknown): error is ApiRequestError {
   return error instanceof ApiRequestError;
-}
-
-export function isNetworkError(error: unknown): error is NetworkError {
-  return error instanceof NetworkError;
-}
-
-export function isTimeoutError(error: unknown): error is TimeoutError {
-  return error instanceof TimeoutError;
 }

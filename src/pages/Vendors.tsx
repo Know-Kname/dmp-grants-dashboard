@@ -1,28 +1,20 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useVendors, useCreateVendor,
   useUpdateVendor, useDeleteVendor,
 } from '../hooks/useData';
-import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { vendorFormSchema } from '../lib/schemas';
 import { formatDate } from '../lib/utils';
 import type { Vendor } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
-  EmptyState, LoadingSpinner, Badge,
-} from '../components/ui';
-import {
-  Plus, Search, Building2, Edit, Trash2,
-  AlertCircle, RefreshCw, Mail, Phone,
-} from 'lucide-react';
+  EmptyState, LoadingSpinner, Badge, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
+import { Plus, Search, Building2, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
 
-type VendorFormData = {
-  name: string;
-  contactName: string;
-  email: string;
-  phone: string;
-  address: string;
-  notes: string;
-};
+/** Live form state — the input side of `vendorFormSchema`, so the two cannot drift. */
+type VendorFormData = z.input<typeof vendorFormSchema>;
 
 const initialForm: VendorFormData = {
   name: '', contactName: '', email: '', phone: '', address: '', notes: '',
@@ -31,14 +23,33 @@ const initialForm: VendorFormData = {
 export default function Vendors() {
   const { data: vendors = [], isLoading, error, refetch } = useVendors();
 
-  const createMutation = useCreateVendor({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateVendor({ onSuccess: () => { setShowModal(false); setEditingVendor(null); setFormData(initialForm); } });
+  const createMutation = useCreateVendor({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
+  const updateMutation = useUpdateVendor({ onSuccess: () => { setShowModal(false); setEditingVendor(null); form.reset(initialForm); } });
   const deleteMutation = useDeleteVendor();
 
   const [showModal, setShowModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<VendorFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once vendorFormSchema parses.
+  const form = useForm({
+    schema: vendorFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        name: data.name,
+        contactName: data.contactName || undefined,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        notes: data.notes || undefined,
+      };
+      if (editingVendor) {
+        updateMutation.mutate({ id: editingVendor.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const filteredVendors = useMemo(() => {
     if (!searchTerm) return vendors;
@@ -52,29 +63,11 @@ export default function Vendors() {
   }, [vendors, searchTerm]);
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      name: formData.name,
-      contactName: formData.contactName || undefined,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-      address: formData.address || undefined,
-      notes: formData.notes || undefined,
-    };
-    if (editingVendor) {
-      updateMutation.mutate({ id: editingVendor.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
 
   const handleEdit = (v: Vendor) => {
     setEditingVendor(v);
-    setFormData({
+    form.setValues({
       name: v.name,
       contactName: v.contactName || '',
       email: v.email || '',
@@ -93,9 +86,6 @@ export default function Vendors() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof VendorFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -108,70 +98,20 @@ export default function Vendors() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingVendor(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingVendor(null); setShowModal(true); }}>
             New Vendor
           </Button>
         </div>
       </div>
 
       {/* Error */}
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Vendors</p>
-                <p className="text-2xl font-bold text-primary">{vendors.length}</p>
-              </div>
-              <div className="p-3 bg-primary-100 dark:bg-primary-950 rounded-lg">
-                <Building2 className="text-primary" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">With Email</p>
-                <p className="text-2xl font-bold text-info">{vendors.filter(v => v.email).length}</p>
-              </div>
-              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
-                <Mail className="text-info" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">With Phone</p>
-                <p className="text-2xl font-bold text-success">{vendors.filter(v => v.phone).length}</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <Phone className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard label="Total Vendors" value={vendors.length} icon={Building2} tone="primary" />
+        <StatCard label="With Email" value={vendors.filter(v => v.email).length} icon={Mail} tone="info" />
+        <StatCard label="With Phone" value={vendors.filter(v => v.phone).length} icon={Phone} tone="success" />
       </div>
 
       {/* Filter */}
@@ -221,11 +161,11 @@ export default function Vendors() {
             <table className="w-full text-sm">
               <thead className="bg-background-subtle border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Company</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Phone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Added</th>
+                  <th className={TABLE_HEAD_CLASS}>Company</th>
+                  <th className={TABLE_HEAD_CLASS}>Contact</th>
+                  <th className={TABLE_HEAD_CLASS}>Email</th>
+                  <th className={TABLE_HEAD_CLASS}>Phone</th>
+                  <th className={TABLE_HEAD_CLASS}>Added</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -277,21 +217,21 @@ export default function Vendors() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingVendor ? 'Save Changes' : 'Add Vendor'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Company Name" value={formData.name} onChange={f('name')} required />
+        <form onSubmit={form.handleSubmit} className="space-y-4">
+          <Input label="Company Name" {...form.getFieldProps('name')} error={getFieldError('name', form.errors, form.touched)} required />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Contact Name" value={formData.contactName} onChange={f('contactName')} />
-            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} />
+            <Input label="Contact Name" {...form.getFieldProps('contactName')} error={getFieldError('contactName', form.errors, form.touched)} />
+            <Input label="Phone" type="tel" {...form.getFieldProps('phone')} error={getFieldError('phone', form.errors, form.touched)} />
           </div>
-          <Input label="Email" type="email" value={formData.email} onChange={f('email')} />
-          <Input label="Address" value={formData.address} onChange={f('address')} />
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Input label="Email" type="email" {...form.getFieldProps('email')} error={getFieldError('email', form.errors, form.touched)} />
+          <Input label="Address" {...form.getFieldProps('address')} error={getFieldError('address', form.errors, form.touched)} />
+          <Textarea label="Notes" {...form.getFieldProps('notes')} error={getFieldError('notes', form.errors, form.touched)} rows={3} />
         </form>
       </Modal>
     </div>

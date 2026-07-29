@@ -11,14 +11,16 @@ export interface User {
 export interface WorkOrder {
   id: string;
   title: string;
-  description: string;
+  /** Optional: the column is nullable, and the form submits it blank freely. */
+  description?: string;
   type: 'maintenance' | 'burial_prep' | 'grounds' | 'repair' | 'other';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo?: string;
   dueDate?: string;
   completedDate?: string;
-  createdBy: string;
+  /** Staff member who created the record; null when created without a session. */
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,7 +49,8 @@ export interface Deposit {
   reference?: string;
   customerId?: string;
   notes?: string;
-  createdBy: string;
+  /** Staff member who created the record; null when created without a session. */
+  createdBy: string | null;
   createdAt: string;
 }
 
@@ -123,18 +126,27 @@ export interface ContractItem {
   quantity?: number;
 }
 
-export interface PaymentPlan {
+/**
+ * Stored as JSONB in `contracts.payment_plan`.
+ *
+ * Declared as a type alias rather than an interface on purpose: this has to be
+ * assignable to the generated `Json` type, and TypeScript only gives implicit
+ * index signatures to type aliases. An interface here fails that check even
+ * though the shape is identical.
+ */
+export type PaymentPlan = {
   frequency: 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly';
   installmentAmount: number;
   startDate: string;
   endDate?: string;
-}
+};
 
 // Grant Types
 export interface Grant {
   id: string;
   title: string;
-  description: string;
+  /** Optional: the column is nullable, and the form submits it blank freely. */
+  description?: string;
   type: 'grant' | 'benefit' | 'opportunity';
   source: string;
   amount?: number;
@@ -142,6 +154,8 @@ export interface Grant {
   status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
   applicationDate?: string;
   notes?: string;
+  /** Staff member who created the record; null when created without a session. */
+  createdBy: string | null;
   createdAt: string;
   updatedAt: string;
 }

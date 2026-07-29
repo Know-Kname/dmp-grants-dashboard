@@ -47,7 +47,12 @@ src/
   config/
     company.ts   DMP name, 3 locations, phones, tagline (source of truth)
   types/
-    index.ts     TypeScript types for every data model
+    index.ts     Hand-written camelCase domain types (what components speak)
+    database.ts  GENERATED snake_case schema types (what Postgres stores).
+                 Regenerate via the Supabase MCP `generate_typescript_types`
+                 tool, or `supabase gen types typescript --linked`.
+                 The case transformers in lib/utils.ts are the boundary
+                 between the two — do not hand-edit database.ts.
   styles/
     index.css    Tailwind base + all CSS design tokens (HSL variables)
 ```
@@ -81,7 +86,14 @@ git push -u origin main   # Push → triggers Vercel auto-deploy
   No Redux, no Zustand.
 - **Styling:** Tailwind utility classes + CSS variable tokens. No inline `style={}` except
   for the dark-green sidebar brand colors (`#1a3d2b`, `#c49a2c`).
-- **Forms:** controlled inputs with `useState`. Zod schema validation in `src/lib/schemas.ts`.
+- **Forms:** controlled inputs driven by `useForm` (`src/hooks/useForm.ts`) with Zod
+  schemas from `src/lib/schemas.ts`. Bind fields with `form.getFieldProps(name)` and
+  pass `getFieldError(...)` into the `error` prop on `Input`/`Select`/`Textarea`.
+  Derive the form's state type from the schema (`z.input<typeof xFormSchema>`)
+  rather than hand-declaring it, so the two cannot drift.
+  Every CRUD page follows this; **Grants is the clearest example**. The only
+  exception is the two payment-recording forms in `Financial.tsx`, which capture a
+  single amount against an existing invoice and stay on plain `useState`.
 - **Error handling:** surface via `getErrorMessage(err)` from `src/lib/errors.ts`.
   Show errors with the `<Alert>` component from `ui.tsx`.
 
@@ -93,8 +105,15 @@ git push -u origin main   # Push → triggers Vercel auto-deploy
 DMP Forest Green: #1a3d2b   ← sidebar background, login left panel
 DMP Gold:         #c49a2c   ← active nav, accents, highlights
 ```
-These are hardcoded (not in CSS variables) because the sidebar should stay dark
-regardless of the user's light/dark theme preference.
+These stay fixed regardless of the user's light/dark preference, because the
+sidebar and login hero should always read as dark.
+
+There are exactly two definitions, and both are intentional:
+- `BRAND` in `src/config/brand.ts` — import this from `.tsx`.
+- `--brand-green` / `--brand-gold` in `src/styles/index.css` — use these from CSS.
+
+Do not add a third. A duplicate `--forest-hex`/`--gold-hex` block existed for a
+while with no consumers at all; it has been removed.
 
 ---
 

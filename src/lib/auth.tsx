@@ -8,7 +8,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import { User, Session } from "@supabase/supabase-js"
 import { supabase } from "./supabase"
-import { DEMO_USER, disableDemoMode } from "./demo-data"
+import { DEMO_CHANGE_EVENT, DEMO_USER, disableDemoMode, isDemoMode } from "./demo-data"
 
 interface LocalUser {
   id: string
@@ -43,13 +43,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isDemoActive, setIsDemoActive] = useState(() => localStorage.getItem('dmp-demo-mode') === 'true')
+  const [isDemoActive, setIsDemoActive] = useState(isDemoMode)
 
-  // React to demo mode toggled from outside (Login page, logout, etc.)
+  // React to demo mode toggled from outside (Login page, logout, etc.).
+  // The key and event name come from demo-data.ts so there is one definition of
+  // each rather than string literals repeated across modules.
   useEffect(() => {
     const handler = (e: Event) => setIsDemoActive((e as CustomEvent<boolean>).detail)
-    window.addEventListener('dmp-demo-change', handler)
-    return () => window.removeEventListener('dmp-demo-change', handler)
+    window.addEventListener(DEMO_CHANGE_EVENT, handler)
+    return () => window.removeEventListener(DEMO_CHANGE_EVENT, handler)
   }, [])
 
   useEffect(() => {

@@ -10,14 +10,14 @@
 /**
  * Convert a string from camelCase to snake_case
  */
-export function toSnakeCase(str: string): string {
+function toSnakeCase(str: string): string {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
 /**
  * Convert a string from snake_case to camelCase
  */
-export function toCamelCase(str: string): string {
+function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
@@ -55,11 +55,47 @@ function transformKeys<T>(obj: T, mapKey: (key: string) => string, seen: WeakSet
 }
 
 /**
- * Recursively convert object keys from camelCase to snake_case
- * Handles nested objects and arrays
+ * Type-level mirror of {@link toSnakeCase}: rewrites a camelCase string literal
+ * type to its snake_case form.
+ *
+ * A character is treated as a word boundary only when it is an uppercase letter,
+ * i.e. when it differs from its own lowercase form. Digits and symbols are
+ * uppercase-invariant, so they pass through untouched — matching the runtime
+ * regex, which only rewrites `[A-Z]`.
  */
-export function toSnakeCaseKeys<T>(obj: T): T {
-  return transformKeys(obj, toSnakeCase, new WeakSet());
+type SnakeCase<S extends string> = S extends `${infer Head}${infer Tail}`
+  ? Head extends Uppercase<Head>
+    ? Head extends Lowercase<Head>
+      ? `${Head}${SnakeCase<Tail>}`
+      : `_${Lowercase<Head>}${SnakeCase<Tail>}`
+    : `${Head}${SnakeCase<Tail>}`
+  : S;
+
+/**
+ * Applies {@link SnakeCase} to every key of `T`.
+ *
+ * Deliberately shallow. The runtime transform recurses, but every nested payload
+ * this codebase sends (only `contracts.payment_plan`) is typed `Json` in the
+ * schema, which accepts any shape — so recursing at the type level would add
+ * complexity without adding a single check.
+ */
+export type SnakeCaseKeys<T> = {
+  [K in keyof T as K extends string ? SnakeCase<K> : K]: T[K];
+};
+
+/**
+ * Recursively convert object keys from camelCase to snake_case.
+ * Handles nested objects and arrays.
+ *
+ * The return type is mapped rather than passed through as `T`, which is what
+ * lets a transformed payload be checked against the generated database types.
+ * Were this to return `T` (or were callers to widen the input to
+ * `Record<string, unknown>` first), the result would collapse to an index
+ * signature and Postgrest would accept any object at all — which is precisely
+ * how an insert naming a nonexistent `created_by` column reached production.
+ */
+export function toSnakeCaseKeys<T>(obj: T): SnakeCaseKeys<T> {
+  return transformKeys(obj, toSnakeCase, new WeakSet()) as SnakeCaseKeys<T>;
 }
 
 /**
@@ -74,12 +110,44 @@ export function toCamelCaseKeys<T>(obj: T): T {
 // DATE UTILITIES
 // ============================================
 
+/** Matches a bare calendar date with no time component, e.g. "2026-07-29". */
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 /**
- * Format a date for display
+ * Parse a date value into a `Date` that represents the intended *calendar day*
+ * in the viewer's local timezone.
+ *
+ * Why this exists: `new Date('2026-07-29')` is specified to parse as UTC
+ * midnight, which is the *previous* calendar day in every negative-offset
+ * timezone — i.e. everywhere DMP operates. Date-only strings are therefore
+ * built from their parts so the day survives; anything else (a full timestamp,
+ * or an existing `Date`) is used as-is.
+ *
+ * @param date A `Date`, an ISO timestamp, or a bare `YYYY-MM-DD` string.
+ * @returns A valid local `Date`, or `null` if the input could not be parsed.
+ */
+function parseLocalDate(date: Date | string): Date | null {
+  if (date instanceof Date) {
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const dateOnly = DATE_ONLY_PATTERN.exec(date);
+  const parsed = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(date);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Format a date for display, e.g. "Jul 29, 2026".
+ *
+ * @returns The formatted date, or `''` if the input is missing or unparseable.
  */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = parseLocalDate(date);
+  if (!d) return '';
   return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -88,12 +156,23 @@ export function formatDate(date: Date | string | null | undefined): string {
 }
 
 /**
- * Format a date for form inputs (YYYY-MM-DD)
+ * Format a date for a native `<input type="date">`, which requires `YYYY-MM-DD`.
+ *
+ * Built from local getters rather than `toISOString()`: the latter converts to
+ * UTC first, so any evening timestamp in a negative-offset timezone would
+ * prefill the form with the *following* day.
+ *
+ * @returns The `YYYY-MM-DD` string, or `''` if the input is missing or unparseable.
  */
 export function formatDateForInput(date: Date | string | null | undefined): string {
   if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toISOString().split('T')[0];
+  const d = parseLocalDate(date);
+  if (!d) return '';
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -114,7 +193,7 @@ export function formatCurrency(amount: number | null | undefined): string {
 /**
  * Capitalize first letter of a string
  */
-export function capitalize(str: string): string {
+function capitalize(str: string): string {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
@@ -136,41 +215,11 @@ export function formatStatus(status: string): string {
 // ============================================
 
 /**
- * Check if a value is a non-null object
- */
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
  * Check if a value is a valid UUID
  */
 export function isUUID(value: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(value);
-}
-
-// ============================================
-// DEBOUNCE / THROTTLE
-// ============================================
-
-/**
- * Debounce a function
- */
-export function debounce<T extends (...args: unknown[]) => unknown>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  return function (this: unknown, ...args: Parameters<T>) {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func.apply(this, args);
-    }, wait);
-  };
 }
 
 // ============================================

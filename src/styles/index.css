@@ -178,12 +178,11 @@
     --bone: #F5F1EA;          /* page background */
     --bone-200: #ECE5D8;      /* card surfaces */
     --ink: #1a1a1a;           /* body text on bone */
-    --gold-hex: #c49a2c;      /* accent — fewer than 5 places per page */
-    --gold-soft: #d4b35c;     /* ornamental rules */
-    --forest-hex: #1a3d2b;    /* sidebar, hero overlays */
-    --forest-700: #2d5240;    /* hover, gradient mid */
-    --forest-900: #0f2419;    /* deep section bg */
-    --taupe: #9C8E7D;         /* secondary text, captions (Pendragon) */
+    /* The forest/gold hexes are NOT redeclared here. They previously appeared
+       three times over — as --forest-hex/--gold-hex below, as --brand-* further
+       down this file, and again in config/brand.ts — with no consumer for this
+       copy. The live definitions are --brand-green / --brand-gold (used in CSS)
+       and BRAND in config/brand.ts (used from TSX). */
 
     /* ========================================
        MOTION — heavy, contemplative

@@ -1,32 +1,22 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useCustomers, useCreateCustomer,
   useUpdateCustomer, useDeleteCustomer,
 } from '../hooks/useData';
-import { getErrorMessage, getErrorDetails, getErrorRequestId } from '../lib/errors';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { customerFormSchema } from '../lib/schemas';
+import { getErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/utils';
 import type { Customer } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
-  EmptyState, LoadingSpinner, Avatar, Badge,
-} from '../components/ui';
-import {
-  Plus, Search, Users, Edit, Trash2,
-  AlertCircle, RefreshCw, Mail, Phone,
-} from 'lucide-react';
+  EmptyState, LoadingSpinner, Avatar, Badge, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
+import { Plus, Search, Users, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
-type CustomerFormData = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  notes: string;
-};
+/** Live form state — the input side of `customerFormSchema`, so the two cannot drift. */
+type CustomerFormData = z.input<typeof customerFormSchema>;
 
 const initialForm: CustomerFormData = {
   firstName: '', lastName: '', email: '', phone: '',
@@ -38,11 +28,11 @@ export default function Customers() {
 
   const toast = useToast();
   const createMutation = useCreateCustomer({
-    onSuccess: () => { toast.success('Customer added'); setShowModal(false); setFormData(initialForm); },
+    onSuccess: () => { toast.success('Customer added'); setShowModal(false); form.reset(initialForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to add customer'),
   });
   const updateMutation = useUpdateCustomer({
-    onSuccess: () => { toast.success('Customer updated'); setShowModal(false); setEditingCustomer(null); setFormData(initialForm); },
+    onSuccess: () => { toast.success('Customer updated'); setShowModal(false); setEditingCustomer(null); form.reset(initialForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update customer'),
   });
   const deleteMutation = useDeleteCustomer({
@@ -53,7 +43,29 @@ export default function Customers() {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<CustomerFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once customerFormSchema parses.
+  const form = useForm({
+    schema: customerFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        city: data.city || undefined,
+        state: data.state || undefined,
+        zipCode: data.zipCode || undefined,
+        notes: data.notes || undefined,
+      };
+      if (editingCustomer) {
+        updateMutation.mutate({ id: editingCustomer.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm) return customers;
@@ -67,32 +79,10 @@ export default function Customers() {
   }, [customers, searchTerm]);
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
-  const errorDetails = combinedError ? getErrorDetails(combinedError) : [];
-  const errorRequestId = combinedError ? getErrorRequestId(combinedError) : null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-      address: formData.address || undefined,
-      city: formData.city || undefined,
-      state: formData.state || undefined,
-      zipCode: formData.zipCode || undefined,
-      notes: formData.notes || undefined,
-    };
-    if (editingCustomer) {
-      updateMutation.mutate({ id: editingCustomer.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
 
   const handleEdit = (c: Customer) => {
     setEditingCustomer(c);
-    setFormData({
+    form.setValues({
       firstName: c.firstName,
       lastName: c.lastName,
       email: c.email || '',
@@ -114,9 +104,6 @@ export default function Customers() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof CustomerFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -129,70 +116,20 @@ export default function Customers() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingCustomer(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingCustomer(null); setShowModal(true); }}>
             New Customer
           </Button>
         </div>
       </div>
 
       {/* Error */}
-      {combinedError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(combinedError)}</p>
-            {(errorDetails.length > 0 || errorRequestId) && (
-              <ul className="mt-2 text-sm text-danger-700 dark:text-danger-400 list-disc pl-5 space-y-1">
-                {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
-                {errorRequestId && <li>Request ID: {errorRequestId}</li>}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      <PageError error={combinedError} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Customers</p>
-                <p className="text-2xl font-bold text-primary">{customers.length}</p>
-              </div>
-              <div className="p-3 bg-primary-100 dark:bg-primary-950 rounded-lg">
-                <Users className="text-primary" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">With Email</p>
-                <p className="text-2xl font-bold text-info">{customers.filter(c => c.email).length}</p>
-              </div>
-              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
-                <Mail className="text-info" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">With Phone</p>
-                <p className="text-2xl font-bold text-success">{customers.filter(c => c.phone).length}</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <Phone className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard label="Total Customers" value={customers.length} icon={Users} tone="primary" />
+        <StatCard label="With Email" value={customers.filter(c => c.email).length} icon={Mail} tone="info" />
+        <StatCard label="With Phone" value={customers.filter(c => c.phone).length} icon={Phone} tone="success" />
       </div>
 
       {/* Filter */}
@@ -242,11 +179,11 @@ export default function Customers() {
             <table className="w-full text-sm">
               <thead className="bg-background-subtle border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Phone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Added</th>
+                  <th className={TABLE_HEAD_CLASS}>Name</th>
+                  <th className={TABLE_HEAD_CLASS}>Email</th>
+                  <th className={TABLE_HEAD_CLASS}>Phone</th>
+                  <th className={TABLE_HEAD_CLASS}>Location</th>
+                  <th className={TABLE_HEAD_CLASS}>Added</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -296,28 +233,28 @@ export default function Customers() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingCustomer ? 'Save Changes' : 'Add Customer'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={form.handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" value={formData.firstName} onChange={f('firstName')} required />
-            <Input label="Last Name" value={formData.lastName} onChange={f('lastName')} required />
+            <Input label="First Name" {...form.getFieldProps('firstName')} error={getFieldError('firstName', form.errors, form.touched)} required />
+            <Input label="Last Name" {...form.getFieldProps('lastName')} error={getFieldError('lastName', form.errors, form.touched)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Email" type="email" value={formData.email} onChange={f('email')} />
-            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} />
+            <Input label="Email" type="email" {...form.getFieldProps('email')} error={getFieldError('email', form.errors, form.touched)} />
+            <Input label="Phone" type="tel" {...form.getFieldProps('phone')} error={getFieldError('phone', form.errors, form.touched)} />
           </div>
-          <Input label="Address" value={formData.address} onChange={f('address')} />
+          <Input label="Address" {...form.getFieldProps('address')} error={getFieldError('address', form.errors, form.touched)} />
           <div className="grid grid-cols-3 gap-4">
-            <Input label="City" value={formData.city} onChange={f('city')} />
-            <Input label="State" value={formData.state} onChange={f('state')} />
-            <Input label="ZIP Code" value={formData.zipCode} onChange={f('zipCode')} />
+            <Input label="City" {...form.getFieldProps('city')} error={getFieldError('city', form.errors, form.touched)} />
+            <Input label="State" {...form.getFieldProps('state')} error={getFieldError('state', form.errors, form.touched)} />
+            <Input label="ZIP Code" {...form.getFieldProps('zipCode')} error={getFieldError('zipCode', form.errors, form.touched)} />
           </div>
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Textarea label="Notes" {...form.getFieldProps('notes')} error={getFieldError('notes', form.errors, form.touched)} rows={3} />
         </form>
       </Modal>
     </div>

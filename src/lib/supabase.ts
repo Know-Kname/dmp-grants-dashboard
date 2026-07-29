@@ -1,17 +1,20 @@
 /**
  * Supabase client. Project ref: mgpwjnxtqcnoyjgebytg (us-east-1).
  *
- * The client is intentionally untyped — `.from('any_table')` returns rows as
- * `Record<string, unknown>` and useData.ts converts to camelCase. To enable
- * full table typing, run:
- *   npx supabase login
- *   npx supabase gen types typescript --project-id mgpwjnxtqcnoyjgebytg > src/types/database.ts
- * then change the line below to `createClient<Database>(...)` and import the
- * generated type. (This was the previous approach; the hand-rolled Database
- * type was removed because it covered only 3 of 13 tables and listed `users`,
- * which was dropped in 20260506013416_drop_template_tables.)
+ * Typed against the generated schema in `../types/database`, so `.from('table')`
+ * knows the real column set: an unknown table name, or an insert naming a column
+ * that does not exist, is a compile error rather than a runtime 400. That is not
+ * hypothetical — `grants.created_by` was being written to a column that had never
+ * been added, and every grant insert failed in production until it was caught by
+ * querying the live schema by hand.
+ *
+ * An earlier hand-rolled Database type was removed (commit 79ae3c3) because it
+ * covered only 3 of 13 tables and named a since-dropped `users` table. This one
+ * is generated from the live schema, so it cannot drift by hand — see the header
+ * of `../types/database` for how to regenerate it.
  */
 import { createClient } from "@supabase/supabase-js"
+import type { Database } from "../types/database"
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -29,7 +32,7 @@ if (!supabaseUrl || !supabaseKey) {
   )
 }
 
-export const supabase = createClient(
+export const supabase = createClient<Database>(
   supabaseUrl || PLACEHOLDER_URL,
   supabaseKey || PLACEHOLDER_KEY,
 )

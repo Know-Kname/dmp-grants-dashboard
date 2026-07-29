@@ -72,38 +72,66 @@ export default {
           'active-foreground': 'hsl(var(--sidebar-active-foreground))',
           hover: 'hsl(var(--sidebar-hover))',
         },
-        // Status colors
+        // Status colors.
+        // The full 50–950 ramp is exposed for each because index.css defines every
+        // step, and components reference the dark-mode ends (e.g. `dark:bg-danger-950`
+        // in toast.tsx). Tailwind silently emits nothing for a shade that isn't
+        // declared here, so a partial scale renders as a missing background.
         success: {
           DEFAULT: 'hsl(var(--success-500))',
           50: 'hsl(var(--success-50))',
           100: 'hsl(var(--success-100))',
+          200: 'hsl(var(--success-200))',
+          300: 'hsl(var(--success-300))',
+          400: 'hsl(var(--success-400))',
           500: 'hsl(var(--success-500))',
           600: 'hsl(var(--success-600))',
           700: 'hsl(var(--success-700))',
+          800: 'hsl(var(--success-800))',
+          900: 'hsl(var(--success-900))',
+          950: 'hsl(var(--success-950))',
         },
         warning: {
           DEFAULT: 'hsl(var(--warning-500))',
           50: 'hsl(var(--warning-50))',
           100: 'hsl(var(--warning-100))',
+          200: 'hsl(var(--warning-200))',
+          300: 'hsl(var(--warning-300))',
+          400: 'hsl(var(--warning-400))',
           500: 'hsl(var(--warning-500))',
           600: 'hsl(var(--warning-600))',
           700: 'hsl(var(--warning-700))',
+          800: 'hsl(var(--warning-800))',
+          900: 'hsl(var(--warning-900))',
+          950: 'hsl(var(--warning-950))',
         },
         danger: {
           DEFAULT: 'hsl(var(--danger-500))',
           50: 'hsl(var(--danger-50))',
           100: 'hsl(var(--danger-100))',
+          200: 'hsl(var(--danger-200))',
+          300: 'hsl(var(--danger-300))',
+          400: 'hsl(var(--danger-400))',
           500: 'hsl(var(--danger-500))',
           600: 'hsl(var(--danger-600))',
           700: 'hsl(var(--danger-700))',
+          800: 'hsl(var(--danger-800))',
+          900: 'hsl(var(--danger-900))',
+          950: 'hsl(var(--danger-950))',
         },
         info: {
           DEFAULT: 'hsl(var(--info-500))',
           50: 'hsl(var(--info-50))',
           100: 'hsl(var(--info-100))',
+          200: 'hsl(var(--info-200))',
+          300: 'hsl(var(--info-300))',
+          400: 'hsl(var(--info-400))',
           500: 'hsl(var(--info-500))',
           600: 'hsl(var(--info-600))',
           700: 'hsl(var(--info-700))',
+          800: 'hsl(var(--info-800))',
+          900: 'hsl(var(--info-900))',
+          950: 'hsl(var(--info-950))',
         },
         // Slate for neutrals
         slate: {

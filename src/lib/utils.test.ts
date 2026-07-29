@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatCurrency, formatStatus, toCamelCaseKeys, toSnakeCaseKeys } from './utils';
+import {
+  formatCurrency,
+  formatDate,
+  formatDateForInput,
+  formatStatus,
+  toCamelCaseKeys,
+  toSnakeCaseKeys,
+} from './utils';
 
 describe('utils', () => {
   it('converts object keys to snake_case', () => {
@@ -57,5 +64,40 @@ describe('utils', () => {
   it('formats currency and status', () => {
     expect(formatCurrency(1234.5)).toBe('$1,234.50');
     expect(formatStatus('in_progress')).toBe('In Progress');
+  });
+});
+
+// These run with TZ pinned to America/Detroit (see vite.config.ts) so the
+// negative-UTC-offset edge cases are actually exercised rather than accidentally
+// passing on a UTC machine.
+describe('date formatting across timezones', () => {
+  it('keeps a late-evening timestamp on its own calendar day', () => {
+    // 11:30pm local. Converting to UTC first rolls this onto the next day,
+    // which is what the old toISOString() implementation did.
+    const lateEvening = new Date(2026, 6, 29, 23, 30);
+    expect(formatDateForInput(lateEvening)).toBe('2026-07-29');
+  });
+
+  it('round-trips a bare YYYY-MM-DD string unchanged', () => {
+    // `new Date('2026-07-29')` parses as UTC midnight, i.e. the evening of the
+    // 28th locally, so a naive local-getter implementation loses a day here.
+    expect(formatDateForInput('2026-07-29')).toBe('2026-07-29');
+  });
+
+  it('displays a bare YYYY-MM-DD string as the same calendar day', () => {
+    expect(formatDate('2026-07-29')).toBe('Jul 29, 2026');
+  });
+
+  it('preserves the calendar day of a full local timestamp', () => {
+    expect(formatDateForInput('2026-07-29T23:30:00')).toBe('2026-07-29');
+    expect(formatDate('2026-07-29T23:30:00')).toBe('Jul 29, 2026');
+  });
+
+  it('returns an empty string for missing or unparseable input', () => {
+    expect(formatDateForInput(null)).toBe('');
+    expect(formatDateForInput(undefined)).toBe('');
+    expect(formatDateForInput('')).toBe('');
+    expect(formatDateForInput('not-a-date')).toBe('');
+    expect(formatDate('not-a-date')).toBe('');
   });
 });

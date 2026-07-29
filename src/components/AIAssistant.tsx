@@ -6,9 +6,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Send, Sparkles, RotateCcw, Bot } from 'lucide-react';
 import { streamMessage, type ChatMessage } from '../lib/gemini';
+import { BRAND } from '../config/brand';
 
-const DMP_GREEN = '#1a3d2b';
-const DMP_GOLD = '#c49a2c';
 
 const STARTERS = [
   'How do I record a burial?',
@@ -87,7 +86,7 @@ export default function AIAssistant() {
       <button
         onClick={() => setOpen(v => !v)}
         className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40 w-12 h-12 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
-        style={{ backgroundColor: open ? '#6b7280' : DMP_GREEN, color: DMP_GOLD }}
+        style={{ backgroundColor: open ? '#6b7280' : BRAND.green, color: BRAND.gold }}
         aria-label="AI Assistant"
       >
         {open ? <X size={20} strokeWidth={2.5} style={{ color: 'white' }} /> : <Sparkles size={20} strokeWidth={2} />}
@@ -116,14 +115,14 @@ export default function AIAssistant() {
             {/* Header */}
             <div
               className="flex items-center justify-between px-4 py-3 shrink-0"
-              style={{ backgroundColor: DMP_GREEN, borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+              style={{ backgroundColor: BRAND.green, borderBottom: '1px solid rgba(255,255,255,0.1)' }}
             >
               <div className="flex items-center gap-2.5">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: DMP_GOLD }}
+                  style={{ backgroundColor: BRAND.gold }}
                 >
-                  <Bot size={16} style={{ color: DMP_GREEN }} strokeWidth={2.5} />
+                  <Bot size={16} style={{ color: BRAND.green }} strokeWidth={2.5} />
                 </div>
                 <div>
                   <p className="text-white text-sm font-semibold leading-tight">DMP Assistant</p>
@@ -165,7 +164,7 @@ export default function AIAssistant() {
                     className="w-14 h-14 rounded-2xl flex items-center justify-center"
                     style={{ backgroundColor: 'rgba(26,61,43,0.1)' }}
                   >
-                    <Sparkles size={28} style={{ color: DMP_GREEN }} />
+                    <Sparkles size={28} style={{ color: BRAND.green }} />
                   </div>
                   <div>
                     <p className="font-semibold text-foreground text-sm">Ask me anything</p>
@@ -192,9 +191,9 @@ export default function AIAssistant() {
                       {msg.role === 'assistant' && (
                         <div
                           className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 mr-2"
-                          style={{ backgroundColor: DMP_GREEN }}
+                          style={{ backgroundColor: BRAND.green }}
                         >
-                          <Bot size={12} style={{ color: DMP_GOLD }} strokeWidth={2.5} />
+                          <Bot size={12} style={{ color: BRAND.gold }} strokeWidth={2.5} />
                         </div>
                       )}
                       <div
@@ -203,7 +202,7 @@ export default function AIAssistant() {
                             ? 'text-white rounded-tr-sm'
                             : 'text-foreground border border-border rounded-tl-sm'
                         }`}
-                        style={msg.role === 'user' ? { backgroundColor: DMP_GREEN } : { backgroundColor: 'hsl(var(--background-subtle))' }}
+                        style={msg.role === 'user' ? { backgroundColor: BRAND.green } : { backgroundColor: 'hsl(var(--background-subtle))' }}
                       >
                         {msg.content || (streaming && i === messages.length - 1 ? (
                           <span className="inline-flex gap-1">
@@ -243,7 +242,7 @@ export default function AIAssistant() {
                   onClick={() => send(input)}
                   disabled={!input.trim() || streaming}
                   className="p-1.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-110 active:scale-95 shrink-0"
-                  style={{ backgroundColor: DMP_GREEN, color: DMP_GOLD }}
+                  style={{ backgroundColor: BRAND.green, color: BRAND.gold }}
                 >
                   <Send size={15} strokeWidth={2.5} />
                 </button>

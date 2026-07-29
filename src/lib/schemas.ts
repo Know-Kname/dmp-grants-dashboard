@@ -67,7 +67,12 @@ export const workOrderFormSchema = z.object({
   type: workOrderTypeSchema,
   priority: workOrderPrioritySchema,
   status: workOrderStatusSchema.optional(),
-  assignedTo: uuidSchema.optional().or(z.literal('')),
+  // A free-text staff name, not a foreign key. The form field is a plain text
+  // input placeholdered "Staff name" and work_orders.assigned_to is a nullable
+  // text column — this was declared as a uuid while nothing imported the schema,
+  // so wiring it up unchanged would have rejected every real name entered.
+  assignedTo: z.string().max(255, 'Assigned to must be less than 255 characters')
+    .optional().or(z.literal('')),
   dueDate: dateStringSchema.optional().or(z.literal('')),
   completedDate: dateStringSchema.optional().or(z.literal('')),
 });
@@ -165,6 +170,23 @@ export const customerFormSchema = z.object({
 export type CustomerFormData = z.infer<typeof customerFormSchema>;
 
 // ============================================
+// VENDOR SCHEMAS
+// ============================================
+
+export const vendorFormSchema = z.object({
+  name: z.string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(255, 'Name must be less than 255 characters'),
+  contactName: z.string().max(255, 'Contact name must be less than 255 characters').optional().or(z.literal('')),
+  email: emailSchema.optional().or(z.literal('')),
+  phone: phoneSchema,
+  address: z.string().max(500, 'Address must be less than 500 characters').optional().or(z.literal('')),
+  notes: z.string().max(2000, 'Notes must be less than 2000 characters').optional().or(z.literal('')),
+});
+
+export type VendorFormData = z.infer<typeof vendorFormSchema>;
+
+// ============================================
 // BURIAL SCHEMAS
 // ============================================
 
@@ -179,7 +201,9 @@ export const burialFormSchema = z.object({
   dateOfBirth: dateStringSchema.optional().or(z.literal('')),
   dateOfDeath: dateStringSchema.optional().or(z.literal('')),
   burialDate: z.string().min(1, 'Burial date is required').pipe(dateStringSchema),
-  plotLocation: z.string().min(1, 'Plot location is required'),
+  // plotLocation is deliberately absent: it is not an input. The page derives it
+  // as `${section}-${lot}-${grave}` when building the payload, so requiring it
+  // here would make a form that can never be valid.
   section: z.string().min(1, 'Section is required'),
   lot: z.string().min(1, 'Lot is required'),
   grave: z.string().min(1, 'Grave is required'),
@@ -188,6 +212,8 @@ export const burialFormSchema = z.object({
   contactEmail: emailSchema.optional().or(z.literal('')),
   permitNumber: z.string().max(100).optional().or(z.literal('')),
   notes: z.string().max(2000).optional().or(z.literal('')),
+  /** Publishes the public QR memorial page; a checkbox on the form. */
+  memorialPublished: z.boolean(),
 });
 
 export type BurialFormData = z.infer<typeof burialFormSchema>;
@@ -228,8 +254,12 @@ export const contractFormSchema = z.object({
     z.number(),
   ]).pipe(positiveNumberSchema),
   signedDate: z.string().min(1, 'Signed date is required').pipe(dateStringSchema),
-  paymentPlan: paymentPlanSchema,
-  items: z.array(contractItemSchema).optional(),
+  status: contractStatusSchema,
+  // paymentPlan and items are deliberately absent: neither is a field on this
+  // form. The payment plan is rendered read-only, and line items are held in
+  // their own state and merged into the payload at submit time (the total is
+  // derived from them when present). `status` was missing despite being a real
+  // field — none of this was noticed while the schema had no importers.
 });
 
 export type ContractFormData = z.infer<typeof contractFormSchema>;
