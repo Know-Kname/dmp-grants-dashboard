@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import { useGrants, useCreateGrant, useUpdateGrant, useDeleteGrant } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { grantFormSchema } from '../lib/schemas';
 import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, formatDateForInput } from '../lib/utils';
 import { Grant } from '../types';
@@ -8,17 +11,14 @@ import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, R
 import { format } from 'date-fns';
 import { useToast } from '../lib/toast';
 
-type GrantFormData = {
-  title: string;
-  description: string;
-  type: 'grant' | 'benefit' | 'opportunity';
-  source: string;
-  amount: string;
-  deadline: string;
-  status: 'available' | 'applied' | 'approved' | 'denied' | 'received';
-  applicationDate: string;
-  notes: string;
-};
+/**
+ * Live form state — the *input* side of `grantFormSchema`.
+ *
+ * Derived from the schema rather than hand-declared so the two cannot drift.
+ * Note it is not the same as the schema's output: `amount` is typed as a string
+ * here (what an `<input>` gives you) and becomes a number once parsed.
+ */
+type GrantFormData = z.input<typeof grantFormSchema>;
 
 const initialFormData: GrantFormData = {
   title: '',
@@ -58,7 +58,32 @@ export default function Grants() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [formData, setFormData] = useState<GrantFormData>(initialFormData);
+  // Form state + validation. `onSubmit` only runs once grantFormSchema parses,
+  // so `data` here is the *output* shape — amount has already been coerced from
+  // its input string to a number.
+  const form = useForm({
+    schema: grantFormSchema,
+    initialValues: initialFormData,
+    onSubmit: (data) => {
+      const payload = {
+        title: data.title,
+        description: data.description || undefined,
+        type: data.type,
+        source: data.source,
+        amount: data.amount,
+        deadline: data.deadline || undefined,
+        status: data.status,
+        applicationDate: data.applicationDate || undefined,
+        notes: data.notes || undefined,
+      };
+
+      if (editingGrant) {
+        updateMutation.mutate({ id: editingGrant.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   // Filter grants using useMemo for performance
   const filteredGrants = useMemo(() => {
@@ -97,31 +122,9 @@ export default function Grants() {
       .reduce((sum, g) => sum + (g.amount || 0), 0),
   }), [filteredGrants]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const payload = {
-      title: formData.title,
-      description: formData.description || undefined,
-      type: formData.type,
-      source: formData.source,
-      amount: formData.amount ? parseFloat(formData.amount) : undefined,
-      deadline: formData.deadline || undefined,
-      status: formData.status,
-      applicationDate: formData.applicationDate || undefined,
-      notes: formData.notes || undefined,
-    };
-
-    if (editingGrant) {
-      updateMutation.mutate({ id: editingGrant.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Grant, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
-
   const handleEdit = (grant: Grant) => {
     setEditingGrant(grant);
-    setFormData({
+    form.setValues({
       title: grant.title,
       description: grant.description || '',
       type: grant.type,
@@ -141,9 +144,7 @@ export default function Grants() {
     }
   };
 
-  const resetForm = () => {
-    setFormData(initialFormData);
-  };
+  const resetForm = () => form.reset(initialFormData);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'primary'> = {
@@ -372,7 +373,7 @@ export default function Grants() {
             </Button>
             <Button
               variant="primary"
-              onClick={handleSubmit}
+              onClick={() => form.handleSubmit()}
               loading={isMutating}
             >
               {editingGrant ? 'Update' : 'Add'}
@@ -380,23 +381,23 @@ export default function Grants() {
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={form.handleSubmit} className="space-y-4">
           <Input
             label="Title"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            {...form.getFieldProps('title')}
+            error={getFieldError('title', form.errors, form.touched)}
             required
           />
           <Textarea
             label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            {...form.getFieldProps('description')}
+            error={getFieldError('description', form.errors, form.touched)}
           />
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="Type"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as GrantFormData['type'] })}
+              {...form.getFieldProps('type')}
+              error={getFieldError('type', form.errors, form.touched)}
               options={[
                 { value: 'grant', label: 'Grant' },
                 { value: 'benefit', label: 'Benefit' },
@@ -405,8 +406,8 @@ export default function Grants() {
             />
             <Select
               label="Status"
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as GrantFormData['status'] })}
+              {...form.getFieldProps('status')}
+              error={getFieldError('status', form.errors, form.touched)}
               options={[
                 { value: 'available', label: 'Available' },
                 { value: 'applied', label: 'Applied' },
@@ -418,35 +419,35 @@ export default function Grants() {
           </div>
           <Input
             label="Source/Organization"
-            value={formData.source}
-            onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+            {...form.getFieldProps('source')}
+            error={getFieldError('source', form.errors, form.touched)}
             required
           />
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Amount"
               type="number"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              {...form.getFieldProps('amount')}
+              error={getFieldError('amount', form.errors, form.touched)}
               placeholder="0.00"
             />
             <Input
               label="Deadline"
               type="date"
-              value={formData.deadline}
-              onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+              {...form.getFieldProps('deadline')}
+              error={getFieldError('deadline', form.errors, form.touched)}
             />
           </div>
           <Input
             label="Application Date"
             type="date"
-            value={formData.applicationDate}
-            onChange={(e) => setFormData({ ...formData, applicationDate: e.target.value })}
+            {...form.getFieldProps('applicationDate')}
+            error={getFieldError('applicationDate', form.errors, form.touched)}
           />
           <Textarea
             label="Notes"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            {...form.getFieldProps('notes')}
+            error={getFieldError('notes', form.errors, form.touched)}
           />
         </form>
       </Modal>

@@ -144,7 +144,8 @@ export type PaymentPlan = {
 export interface Grant {
   id: string;
   title: string;
-  description: string;
+  /** Optional: the column is nullable, and the form submits it blank freely. */
+  description?: string;
   type: 'grant' | 'benefit' | 'opportunity';
   source: string;
   amount?: number;
