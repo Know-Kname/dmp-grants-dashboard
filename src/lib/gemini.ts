@@ -91,6 +91,38 @@ export async function sendMessage(messages: ChatMessage[]): Promise<string> {
   return data.choices[0]?.message?.content ?? 'No response received.';
 }
 
+/** Sentinel distinguishing the terminating `[DONE]` frame from an empty delta. */
+const STREAM_DONE = Symbol('stream-done');
+
+/**
+ * Extract the text delta carried by a single SSE line.
+ *
+ * @param raw One complete line from the event stream.
+ * @returns The delta text, `STREAM_DONE` for the terminating frame, or `null`
+ *          for lines that carry no text (blank separators, comments, keep-alives).
+ */
+function parseStreamLine(raw: string): string | typeof STREAM_DONE | null {
+  const line = raw.trim();
+  if (!line.startsWith('data:')) return null;
+
+  const data = line.slice('data:'.length).trim();
+  if (data === '[DONE]') return STREAM_DONE;
+  if (!data) return null;
+
+  try {
+    const parsed = JSON.parse(data) as {
+      choices?: Array<{ delta?: { content?: string } }>;
+    };
+    return parsed.choices?.[0]?.delta?.content ?? null;
+  } catch {
+    // Chunk-splitting is handled by the caller's buffer, so a frame that still
+    // fails to parse is a genuine server-side anomaly. Surface it rather than
+    // dropping it silently, which previously made truncated replies invisible.
+    console.warn('Discarding malformed AI stream frame', data);
+    return null;
+  }
+}
+
 export async function* streamMessage(messages: ChatMessage[]): AsyncGenerator<string> {
   const { url, init } = buildRequest(messages, true);
   const res = await fetch(url, init);
@@ -102,23 +134,42 @@ export async function* streamMessage(messages: ChatMessage[]): AsyncGenerator<st
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
-    for (const line of lines) {
-      const data = line.slice(6);
-      if (data === '[DONE]') return;
-      try {
-        const parsed = JSON.parse(data) as {
-          choices: Array<{ delta: { content?: string } }>;
-        };
-        const text = parsed.choices[0]?.delta?.content;
-        if (text) yield text;
-      } catch {
-        // skip malformed chunks
+  // SSE frames are not aligned to network chunks: a single `data:` line can be
+  // split across two reads, and a multi-byte UTF-8 character can straddle the
+  // boundary as well. `{ stream: true }` holds back partial code points and
+  // `buffer` holds back partial lines — without both, tokens are silently lost
+  // mid-response.
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Everything up to the final newline forms complete lines; whatever
+      // follows is a partial line that must wait for the next read.
+      const lastNewline = buffer.lastIndexOf('\n');
+      if (lastNewline === -1) continue;
+
+      const lines = buffer.slice(0, lastNewline).split('\n');
+      buffer = buffer.slice(lastNewline + 1);
+
+      for (const line of lines) {
+        const delta = parseStreamLine(line);
+        if (delta === STREAM_DONE) return;
+        if (delta) yield delta;
       }
     }
+
+    // Flush a trailing frame that arrived without a terminating newline.
+    buffer += decoder.decode();
+    const delta = parseStreamLine(buffer);
+    if (delta && delta !== STREAM_DONE) yield delta;
+  } finally {
+    // Runs on the `[DONE]` early return and if the consumer abandons the
+    // generator, so the connection is never left open.
+    await reader.cancel().catch(() => { /* stream already closed */ });
   }
 }

@@ -74,12 +74,44 @@ export function toCamelCaseKeys<T>(obj: T): T {
 // DATE UTILITIES
 // ============================================
 
+/** Matches a bare calendar date with no time component, e.g. "2026-07-29". */
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 /**
- * Format a date for display
+ * Parse a date value into a `Date` that represents the intended *calendar day*
+ * in the viewer's local timezone.
+ *
+ * Why this exists: `new Date('2026-07-29')` is specified to parse as UTC
+ * midnight, which is the *previous* calendar day in every negative-offset
+ * timezone — i.e. everywhere DMP operates. Date-only strings are therefore
+ * built from their parts so the day survives; anything else (a full timestamp,
+ * or an existing `Date`) is used as-is.
+ *
+ * @param date A `Date`, an ISO timestamp, or a bare `YYYY-MM-DD` string.
+ * @returns A valid local `Date`, or `null` if the input could not be parsed.
+ */
+function parseLocalDate(date: Date | string): Date | null {
+  if (date instanceof Date) {
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const dateOnly = DATE_ONLY_PATTERN.exec(date);
+  const parsed = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(date);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Format a date for display, e.g. "Jul 29, 2026".
+ *
+ * @returns The formatted date, or `''` if the input is missing or unparseable.
  */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = parseLocalDate(date);
+  if (!d) return '';
   return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -88,12 +120,23 @@ export function formatDate(date: Date | string | null | undefined): string {
 }
 
 /**
- * Format a date for form inputs (YYYY-MM-DD)
+ * Format a date for a native `<input type="date">`, which requires `YYYY-MM-DD`.
+ *
+ * Built from local getters rather than `toISOString()`: the latter converts to
+ * UTC first, so any evening timestamp in a negative-offset timezone would
+ * prefill the form with the *following* day.
+ *
+ * @returns The `YYYY-MM-DD` string, or `''` if the input is missing or unparseable.
  */
 export function formatDateForInput(date: Date | string | null | undefined): string {
   if (!date) return '';
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toISOString().split('T')[0];
+  const d = parseLocalDate(date);
+  if (!d) return '';
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
