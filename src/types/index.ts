@@ -125,12 +125,20 @@ export interface ContractItem {
   quantity?: number;
 }
 
-export interface PaymentPlan {
+/**
+ * Stored as JSONB in `contracts.payment_plan`.
+ *
+ * Declared as a type alias rather than an interface on purpose: this has to be
+ * assignable to the generated `Json` type, and TypeScript only gives implicit
+ * index signatures to type aliases. An interface here fails that check even
+ * though the shape is identical.
+ */
+export type PaymentPlan = {
   frequency: 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly';
   installmentAmount: number;
   startDate: string;
   endDate?: string;
-}
+};
 
 // Grant Types
 export interface Grant {

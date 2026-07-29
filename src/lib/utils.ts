@@ -55,11 +55,47 @@ function transformKeys<T>(obj: T, mapKey: (key: string) => string, seen: WeakSet
 }
 
 /**
- * Recursively convert object keys from camelCase to snake_case
- * Handles nested objects and arrays
+ * Type-level mirror of {@link toSnakeCase}: rewrites a camelCase string literal
+ * type to its snake_case form.
+ *
+ * A character is treated as a word boundary only when it is an uppercase letter,
+ * i.e. when it differs from its own lowercase form. Digits and symbols are
+ * uppercase-invariant, so they pass through untouched — matching the runtime
+ * regex, which only rewrites `[A-Z]`.
  */
-export function toSnakeCaseKeys<T>(obj: T): T {
-  return transformKeys(obj, toSnakeCase, new WeakSet());
+type SnakeCase<S extends string> = S extends `${infer Head}${infer Tail}`
+  ? Head extends Uppercase<Head>
+    ? Head extends Lowercase<Head>
+      ? `${Head}${SnakeCase<Tail>}`
+      : `_${Lowercase<Head>}${SnakeCase<Tail>}`
+    : `${Head}${SnakeCase<Tail>}`
+  : S;
+
+/**
+ * Applies {@link SnakeCase} to every key of `T`.
+ *
+ * Deliberately shallow. The runtime transform recurses, but every nested payload
+ * this codebase sends (only `contracts.payment_plan`) is typed `Json` in the
+ * schema, which accepts any shape — so recursing at the type level would add
+ * complexity without adding a single check.
+ */
+export type SnakeCaseKeys<T> = {
+  [K in keyof T as K extends string ? SnakeCase<K> : K]: T[K];
+};
+
+/**
+ * Recursively convert object keys from camelCase to snake_case.
+ * Handles nested objects and arrays.
+ *
+ * The return type is mapped rather than passed through as `T`, which is what
+ * lets a transformed payload be checked against the generated database types.
+ * Were this to return `T` (or were callers to widen the input to
+ * `Record<string, unknown>` first), the result would collapse to an index
+ * signature and Postgrest would accept any object at all — which is precisely
+ * how an insert naming a nonexistent `created_by` column reached production.
+ */
+export function toSnakeCaseKeys<T>(obj: T): SnakeCaseKeys<T> {
+  return transformKeys(obj, toSnakeCase, new WeakSet()) as SnakeCaseKeys<T>;
 }
 
 /**

@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { isUUID, toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
+import type { TablesInsert } from '../types/database';
 import type {
   WorkOrder,
   Grant,
@@ -119,7 +120,7 @@ export function useCreateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
     mutationFn: async (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('work_orders')
-          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), ...(await createdByFields()) })
+          .insert({ ...toSnakeCaseKeys(data), ...(await createdByFields()) })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as WorkOrder;
@@ -138,7 +139,7 @@ export function useUpdateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
     mutationFn: async ({ id, ...data }: Partial<WorkOrder> & { id: string }) => {
       const row = await sb(
         supabase.from('work_orders')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as WorkOrder;
@@ -200,7 +201,7 @@ export function useCreateGrant(callbacks?: MutationCallbacks<Grant>) {
     mutationFn: async (data: Omit<Grant, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('grants')
-          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), ...(await createdByFields()) })
+          .insert({ ...toSnakeCaseKeys(data), ...(await createdByFields()) })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grant;
@@ -219,7 +220,7 @@ export function useUpdateGrant(callbacks?: MutationCallbacks<Grant>) {
     mutationFn: async ({ id, ...data }: Partial<Grant> & { id: string }) => {
       const row = await sb(
         supabase.from('grants')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grant;
@@ -281,7 +282,7 @@ export function useCreateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
     mutationFn: async (data: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('inventory')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as InventoryItem;
@@ -300,7 +301,7 @@ export function useUpdateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
     mutationFn: async ({ id, ...data }: Partial<InventoryItem> & { id: string }) => {
       const row = await sb(
         supabase.from('inventory')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as InventoryItem;
@@ -362,7 +363,7 @@ export function useCreateCustomer(callbacks?: MutationCallbacks<Customer>) {
     mutationFn: async (data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('customers')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Customer;
@@ -381,7 +382,7 @@ export function useUpdateCustomer(callbacks?: MutationCallbacks<Customer>) {
     mutationFn: async ({ id, ...data }: Partial<Customer> & { id: string }) => {
       const row = await sb(
         supabase.from('customers')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Customer;
@@ -443,7 +444,7 @@ export function useCreateBurial(callbacks?: MutationCallbacks<Burial>) {
     mutationFn: async (data: Omit<Burial, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('burials')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Burial;
@@ -462,7 +463,7 @@ export function useUpdateBurial(callbacks?: MutationCallbacks<Burial>) {
     mutationFn: async ({ id, ...data }: Partial<Burial> & { id: string }) => {
       const row = await sb(
         supabase.from('burials')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Burial;
@@ -532,9 +533,12 @@ export function useContract(id: string) {
 
 // Build contract_items insert rows from camelCase ContractItem input, dropping
 // any client-side id (real ids are generated by the DB) and binding contractId.
-function itemRows(items: ContractItem[] | undefined, contractId: string): Record<string, unknown>[] {
+function itemRows(
+  items: ContractItem[] | undefined,
+  contractId: string
+): TablesInsert<'contract_items'>[] {
   return (items ?? []).map(({ id: _id, ...item }) => ({
-    ...toSnakeCaseKeys(item as Record<string, unknown>),
+    ...toSnakeCaseKeys(item),
     contract_id: contractId,
   }));
 }
@@ -546,7 +550,7 @@ export function useCreateContract(callbacks?: MutationCallbacks<Contract>) {
       const { items, ...contractData } = data;
       const inserted = await sb(
         supabase.from('contracts')
-          .insert(toSnakeCaseKeys(contractData as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(contractData))
           .select().single()
       ) as Record<string, unknown>;
       const contractId = inserted.id as string;
@@ -575,7 +579,7 @@ export function useUpdateContract(callbacks?: MutationCallbacks<Contract>) {
     mutationFn: async ({ id, items, ...data }: Partial<Contract> & { id: string }) => {
       await sb(
         supabase.from('contracts')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
 
@@ -642,7 +646,7 @@ export function useCreateDeposit(callbacks?: MutationCallbacks<Deposit>) {
     mutationFn: async (data: Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>) => {
       const row = await sb(
         supabase.from('deposits')
-          .insert({ ...toSnakeCaseKeys(data as Record<string, unknown>), ...(await createdByFields()) })
+          .insert({ ...toSnakeCaseKeys(data), ...(await createdByFields()) })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Deposit;
@@ -671,6 +675,18 @@ export function useReceivables() {
   });
 }
 
+/**
+ * Status every newly created invoice opens in.
+ *
+ * `status` is NOT NULL with no database default on both accounts_receivable and
+ * accounts_payable, and both create hooks deliberately omit it from their input
+ * so a caller cannot open an invoice already marked paid. Something therefore
+ * has to supply it — nothing did, so every receivable and payable insert failed
+ * the NOT NULL constraint. (`amountPaid` is omitted safely: it *does* default
+ * to 0 in the database.)
+ */
+const NEW_INVOICE_STATUS = 'pending' satisfies AccountsReceivable['status'];
+
 export function useCreateReceivable(callbacks?: MutationCallbacks<AccountsReceivable>) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -679,7 +695,7 @@ export function useCreateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
     ) => {
       const row = await sb(
         supabase.from('accounts_receivable')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert({ ...toSnakeCaseKeys(data), status: NEW_INVOICE_STATUS })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsReceivable;
@@ -698,7 +714,7 @@ export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
     mutationFn: async ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) => {
       const row = await sb(
         supabase.from('accounts_receivable')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsReceivable;
@@ -735,7 +751,7 @@ export function useCreatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
     ) => {
       const row = await sb(
         supabase.from('accounts_payable')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert({ ...toSnakeCaseKeys(data), status: NEW_INVOICE_STATUS })
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsPayable;
@@ -754,7 +770,7 @@ export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
     mutationFn: async ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) => {
       const row = await sb(
         supabase.from('accounts_payable')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as AccountsPayable;
@@ -800,7 +816,7 @@ export function useCreateVendor(callbacks?: MutationCallbacks<Vendor>) {
     mutationFn: async (data: Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('vendors')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Vendor;
@@ -819,7 +835,7 @@ export function useUpdateVendor(callbacks?: MutationCallbacks<Vendor>) {
     mutationFn: async ({ id, ...data }: Partial<Vendor> & { id: string }) => {
       const row = await sb(
         supabase.from('vendors')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Vendor;
@@ -873,7 +889,7 @@ export function useCreatePaymentScheduleEntry(callbacks?: MutationCallbacks<Paym
     mutationFn: async (data: Omit<PaymentScheduleEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('payment_schedule')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as PaymentScheduleEntry;
@@ -892,7 +908,7 @@ export function useUpdatePaymentScheduleEntry(callbacks?: MutationCallbacks<Paym
     mutationFn: async ({ id, ...data }: Partial<PaymentScheduleEntry> & { id: string }) => {
       const row = await sb(
         supabase.from('payment_schedule')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as PaymentScheduleEntry;
@@ -927,7 +943,7 @@ export function useCreateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
     mutationFn: async (data: Omit<Cemetery, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('cemeteries')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Cemetery;
@@ -946,7 +962,7 @@ export function useUpdateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
     mutationFn: async ({ id, ...data }: Partial<Cemetery> & { id: string }) => {
       const row = await sb(
         supabase.from('cemeteries')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Cemetery;
@@ -996,7 +1012,7 @@ export function useCreateSection(callbacks?: MutationCallbacks<Section>) {
     mutationFn: async (data: Omit<Section, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('sections')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Section;
@@ -1015,7 +1031,7 @@ export function useUpdateSection(callbacks?: MutationCallbacks<Section>) {
     mutationFn: async ({ id, ...data }: Partial<Section> & { id: string }) => {
       const row = await sb(
         supabase.from('sections')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Section;
@@ -1065,7 +1081,7 @@ export function useCreateLot(callbacks?: MutationCallbacks<Lot>) {
     mutationFn: async (data: Omit<Lot, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('lots')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Lot;
@@ -1084,7 +1100,7 @@ export function useUpdateLot(callbacks?: MutationCallbacks<Lot>) {
     mutationFn: async ({ id, ...data }: Partial<Lot> & { id: string }) => {
       const row = await sb(
         supabase.from('lots')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Lot;
@@ -1134,7 +1150,7 @@ export function useCreateGrave(callbacks?: MutationCallbacks<Grave>) {
     mutationFn: async (data: Omit<Grave, 'id' | 'createdAt' | 'updatedAt'>) => {
       const row = await sb(
         supabase.from('graves')
-          .insert(toSnakeCaseKeys(data as Record<string, unknown>))
+          .insert(toSnakeCaseKeys(data))
           .select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grave;
@@ -1153,7 +1169,7 @@ export function useUpdateGrave(callbacks?: MutationCallbacks<Grave>) {
     mutationFn: async ({ id, ...data }: Partial<Grave> & { id: string }) => {
       const row = await sb(
         supabase.from('graves')
-          .update(toSnakeCaseKeys(data as Record<string, unknown>))
+          .update(toSnakeCaseKeys(data))
           .eq('id', id).select().single()
       );
       return toCamelCaseKeys(row as Record<string, unknown>) as unknown as Grave;
