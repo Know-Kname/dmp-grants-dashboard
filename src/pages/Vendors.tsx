@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useVendors, useCreateVendor,
   useUpdateVendor, useDeleteVendor,
 } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { vendorFormSchema } from '../lib/schemas';
 import { formatDate } from '../lib/utils';
 import type { Vendor } from '../types';
 import {
@@ -10,14 +13,8 @@ import {
   EmptyState, LoadingSpinner, Badge, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, Building2, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
 
-type VendorFormData = {
-  name: string;
-  contactName: string;
-  email: string;
-  phone: string;
-  address: string;
-  notes: string;
-};
+/** Live form state — the input side of `vendorFormSchema`, so the two cannot drift. */
+type VendorFormData = z.input<typeof vendorFormSchema>;
 
 const initialForm: VendorFormData = {
   name: '', contactName: '', email: '', phone: '', address: '', notes: '',
@@ -26,14 +23,33 @@ const initialForm: VendorFormData = {
 export default function Vendors() {
   const { data: vendors = [], isLoading, error, refetch } = useVendors();
 
-  const createMutation = useCreateVendor({ onSuccess: () => { setShowModal(false); setFormData(initialForm); } });
-  const updateMutation = useUpdateVendor({ onSuccess: () => { setShowModal(false); setEditingVendor(null); setFormData(initialForm); } });
+  const createMutation = useCreateVendor({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
+  const updateMutation = useUpdateVendor({ onSuccess: () => { setShowModal(false); setEditingVendor(null); form.reset(initialForm); } });
   const deleteMutation = useDeleteVendor();
 
   const [showModal, setShowModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<VendorFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once vendorFormSchema parses.
+  const form = useForm({
+    schema: vendorFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const payload = {
+        name: data.name,
+        contactName: data.contactName || undefined,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        notes: data.notes || undefined,
+      };
+      if (editingVendor) {
+        updateMutation.mutate({ id: editingVendor.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
 
   const filteredVendors = useMemo(() => {
     if (!searchTerm) return vendors;
@@ -48,26 +64,10 @@ export default function Vendors() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      name: formData.name,
-      contactName: formData.contactName || undefined,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-      address: formData.address || undefined,
-      notes: formData.notes || undefined,
-    };
-    if (editingVendor) {
-      updateMutation.mutate({ id: editingVendor.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
 
   const handleEdit = (v: Vendor) => {
     setEditingVendor(v);
-    setFormData({
+    form.setValues({
       name: v.name,
       contactName: v.contactName || '',
       email: v.email || '',
@@ -86,9 +86,6 @@ export default function Vendors() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  const f = (field: keyof VendorFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -101,7 +98,7 @@ export default function Vendors() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingVendor(null); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingVendor(null); setShowModal(true); }}>
             New Vendor
           </Button>
         </div>
@@ -220,21 +217,21 @@ export default function Vendors() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingVendor ? 'Save Changes' : 'Add Vendor'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Company Name" value={formData.name} onChange={f('name')} required />
+        <form onSubmit={form.handleSubmit} className="space-y-4">
+          <Input label="Company Name" {...form.getFieldProps('name')} error={getFieldError('name', form.errors, form.touched)} required />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Contact Name" value={formData.contactName} onChange={f('contactName')} />
-            <Input label="Phone" type="tel" value={formData.phone} onChange={f('phone')} />
+            <Input label="Contact Name" {...form.getFieldProps('contactName')} error={getFieldError('contactName', form.errors, form.touched)} />
+            <Input label="Phone" type="tel" {...form.getFieldProps('phone')} error={getFieldError('phone', form.errors, form.touched)} />
           </div>
-          <Input label="Email" type="email" value={formData.email} onChange={f('email')} />
-          <Input label="Address" value={formData.address} onChange={f('address')} />
-          <Textarea label="Notes" value={formData.notes} onChange={f('notes')} rows={3} />
+          <Input label="Email" type="email" {...form.getFieldProps('email')} error={getFieldError('email', form.errors, form.touched)} />
+          <Input label="Address" {...form.getFieldProps('address')} error={getFieldError('address', form.errors, form.touched)} />
+          <Textarea label="Notes" {...form.getFieldProps('notes')} error={getFieldError('notes', form.errors, form.touched)} rows={3} />
         </form>
       </Modal>
     </div>

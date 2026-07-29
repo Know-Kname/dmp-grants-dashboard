@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useContracts, useCreateContract,
   useUpdateContract, useDeleteContract,
   useCustomers, usePaymentSchedule,
 } from '../hooks/useData';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { contractFormSchema } from '../lib/schemas';
 import { formatCurrency, formatDate, formatDateForInput, cn } from '../lib/utils';
 import type { Contract, ContractItem } from '../types';
 import {
@@ -11,14 +14,8 @@ import {
   Badge, EmptyState, LoadingSpinner, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, FileText, Edit, Trash2, RefreshCw, DollarSign, TrendingUp, X, CalendarDays } from 'lucide-react';
 
-type ContractFormData = {
-  contractNumber: string;
-  type: Contract['type'];
-  customerId: string;
-  totalAmount: string;
-  signedDate: string;
-  status: Contract['status'];
-};
+/** Live form state — the input side of `contractFormSchema`, so the two cannot drift. */
+type ContractFormData = z.input<typeof contractFormSchema>;
 
 type LineItemDraft = {
   tempId: string;
@@ -105,8 +102,8 @@ export default function Contracts() {
   const { data: contracts = [], isLoading, error, refetch } = useContracts();
   const { data: customers = [] } = useCustomers();
 
-  const createMutation = useCreateContract({ onSuccess: () => { setShowModal(false); setFormData(initialForm); setLineItems([]); } });
-  const updateMutation = useUpdateContract({ onSuccess: () => { setShowModal(false); setEditingContract(null); setFormData(initialForm); setLineItems([]); } });
+  const createMutation = useCreateContract({ onSuccess: () => { setShowModal(false); form.reset(initialForm); setLineItems([]); } });
+  const updateMutation = useUpdateContract({ onSuccess: () => { setShowModal(false); setEditingContract(null); form.reset(initialForm); setLineItems([]); } });
   const deleteMutation = useDeleteContract();
 
   const [showModal, setShowModal] = useState(false);
@@ -114,7 +111,32 @@ export default function Contracts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [formData, setFormData] = useState<ContractFormData>(initialForm);
+  // Form state + validation. onSubmit only runs once contractFormSchema parses.
+  const form = useForm({
+    schema: contractFormSchema,
+    initialValues: initialForm,
+    onSubmit: (data) => {
+      const itemsPayload = lineItems.map(({ description, amount }) => ({
+        description,
+        amount: parseFloat(amount) || 0,
+      }));
+      const payload = {
+        contractNumber: data.contractNumber,
+        type: data.type,
+        customerId: data.customerId,
+        totalAmount: lineItems.length > 0 ? computedTotal : data.totalAmount,
+        amountPaid: editingContract ? editingContract.amountPaid : 0,
+        signedDate: data.signedDate,
+        status: data.status,
+        items: (itemsPayload.length > 0 ? itemsPayload : (editingContract?.items ?? [])) as ContractItem[],
+      };
+      if (editingContract) {
+        updateMutation.mutate({ id: editingContract.id, ...payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+  });
   const [lineItems, setLineItems] = useState<LineItemDraft[]>([]);
 
   const customerOptions = useMemo(() =>
@@ -127,7 +149,10 @@ export default function Contracts() {
     [lineItems]
   );
 
-  const displayTotal = lineItems.length > 0 ? computedTotal : parseFloat(formData.totalAmount) || 0;
+  // `Number` rather than `parseFloat`: the schema's input type allows the field
+  // to be either a raw string from the input or an already-numeric value.
+  const displayTotal =
+    lineItems.length > 0 ? computedTotal : Number(form.values.totalAmount) || 0;
 
   const stats = useMemo(() => ({
     total: contracts.length,
@@ -152,32 +177,10 @@ export default function Contracts() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const itemsPayload = lineItems.map(({ description, amount }) => ({
-      description,
-      amount: parseFloat(amount) || 0,
-    }));
-    const payload = {
-      contractNumber: formData.contractNumber,
-      type: formData.type,
-      customerId: formData.customerId,
-      totalAmount: lineItems.length > 0 ? computedTotal : parseFloat(formData.totalAmount) || 0,
-      amountPaid: editingContract ? editingContract.amountPaid : 0,
-      signedDate: formData.signedDate,
-      status: formData.status,
-      items: (itemsPayload.length > 0 ? itemsPayload : (editingContract?.items ?? [])) as ContractItem[],
-    };
-    if (editingContract) {
-      updateMutation.mutate({ id: editingContract.id, ...payload });
-    } else {
-      createMutation.mutate(payload as Omit<Contract, 'id' | 'createdAt' | 'updatedAt'>);
-    }
-  };
 
   const handleEdit = (c: Contract) => {
     setEditingContract(c);
-    setFormData({
+    form.setValues({
       contractNumber: c.contractNumber,
       type: c.type,
       customerId: c.customerId,
@@ -202,7 +205,7 @@ export default function Contracts() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingContract(null);
-    setFormData(initialForm);
+    form.reset(initialForm);
     setLineItems([]);
   };
 
@@ -218,9 +221,6 @@ export default function Contracts() {
     setLineItems(prev => prev.map(i => i.tempId === tempId ? { ...i, [field]: value } : i));
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
-
-  const f = (field: keyof ContractFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
 
   const customerName = (customerId: string) => {
     const c = customers.find(x => x.id === customerId);
@@ -239,7 +239,7 @@ export default function Contracts() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setFormData(initialForm); setEditingContract(null); setLineItems([]); setShowModal(true); }}>
+          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingContract(null); setLineItems([]); setShowModal(true); }}>
             New Contract
           </Button>
         </div>
@@ -370,34 +370,34 @@ export default function Contracts() {
         footer={
           <>
             <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
               {editingContract ? 'Save Changes' : 'Create Contract'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={form.handleSubmit} className="space-y-5">
           {/* Contract Header */}
           <div>
             <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">Contract Details</p>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Contract Number" value={formData.contractNumber} onChange={f('contractNumber')} required />
+              <Input label="Contract Number" {...form.getFieldProps('contractNumber')} error={getFieldError('contractNumber', form.errors, form.touched)} required />
               <Select
                 label="Type"
                 options={[
                   { value: 'at_need', label: 'At-Need' },
                   { value: 'pre_need', label: 'Pre-Need' },
                 ]}
-                value={formData.type}
-                onChange={f('type')}
+                {...form.getFieldProps('type')}
+                error={getFieldError('type', form.errors, form.touched)}
               />
             </div>
             <div className="grid grid-cols-2 gap-4 mt-4">
               <Select
                 label="Customer"
                 options={customerOptions}
-                value={formData.customerId}
-                onChange={f('customerId')}
+                {...form.getFieldProps('customerId')}
+                error={getFieldError('customerId', form.errors, form.touched)}
                 placeholder="Select customer..."
               />
               <Select
@@ -408,12 +408,12 @@ export default function Contracts() {
                   { value: 'cancelled', label: 'Cancelled' },
                   { value: 'transferred', label: 'Transferred' },
                 ]}
-                value={formData.status}
-                onChange={f('status')}
+                {...form.getFieldProps('status')}
+                error={getFieldError('status', form.errors, form.touched)}
               />
             </div>
             <div className="mt-4">
-              <Input label="Signed Date" type="date" value={formData.signedDate} onChange={f('signedDate')} required />
+              <Input label="Signed Date" type="date" {...form.getFieldProps('signedDate')} error={getFieldError('signedDate', form.errors, form.touched)} required />
             </div>
           </div>
 
@@ -432,8 +432,8 @@ export default function Contracts() {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.totalAmount}
-                  onChange={f('totalAmount')}
+                  {...form.getFieldProps('totalAmount')}
+                  error={getFieldError('totalAmount', form.errors, form.touched)}
                   required={lineItems.length === 0}
                 />
                 <p className="text-xs text-foreground-muted mt-6 whitespace-nowrap">or add line items above</p>

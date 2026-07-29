@@ -170,6 +170,23 @@ export const customerFormSchema = z.object({
 export type CustomerFormData = z.infer<typeof customerFormSchema>;
 
 // ============================================
+// VENDOR SCHEMAS
+// ============================================
+
+export const vendorFormSchema = z.object({
+  name: z.string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(255, 'Name must be less than 255 characters'),
+  contactName: z.string().max(255, 'Contact name must be less than 255 characters').optional().or(z.literal('')),
+  email: emailSchema.optional().or(z.literal('')),
+  phone: phoneSchema,
+  address: z.string().max(500, 'Address must be less than 500 characters').optional().or(z.literal('')),
+  notes: z.string().max(2000, 'Notes must be less than 2000 characters').optional().or(z.literal('')),
+});
+
+export type VendorFormData = z.infer<typeof vendorFormSchema>;
+
+// ============================================
 // BURIAL SCHEMAS
 // ============================================
 
@@ -237,8 +254,12 @@ export const contractFormSchema = z.object({
     z.number(),
   ]).pipe(positiveNumberSchema),
   signedDate: z.string().min(1, 'Signed date is required').pipe(dateStringSchema),
-  paymentPlan: paymentPlanSchema,
-  items: z.array(contractItemSchema).optional(),
+  status: contractStatusSchema,
+  // paymentPlan and items are deliberately absent: neither is a field on this
+  // form. The payment plan is rendered read-only, and line items are held in
+  // their own state and merged into the payload at submit time (the total is
+  // derived from them when present). `status` was missing despite being a real
+  // field — none of this was noticed while the schema had no importers.
 });
 
 export type ContractFormData = z.infer<typeof contractFormSchema>;
