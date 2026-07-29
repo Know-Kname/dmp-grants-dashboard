@@ -8,6 +8,24 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Server-side AI proxy** — `/api/chat` Vercel Edge Function holds the OpenRouter
+  key in a server-only `OPENROUTER_API_KEY` env var. The key is no longer shipped
+  in the browser bundle; the dev-direct fallback is dead-code-eliminated from
+  production builds.
+- **Contract line items now persist** — `useCreateContract` / `useUpdateContract`
+  insert and sync `contract_items` rows (previously the nested `items` were dropped).
+
+### Changed
+- **TypeScript strict mode enabled** (`strict: true`). The Supabase result helper
+  now throws on a null/undefined payload instead of masking it with `!`.
+- **Case transformers guard against circular references** via a `WeakSet`, so a
+  cyclic object no longer overflows the stack.
+
+### Removed
+- Stale `vitest.config.server.ts` and the dead Vite dev proxy to the removed
+  Express backend (`/api → localhost:3000`).
+
 ---
 
 ## [2.0.0] — 2026-05-04

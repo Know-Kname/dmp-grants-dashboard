@@ -6,7 +6,7 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs', 'server', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/tests'],
+  ignorePatterns: ['dist', '.eslintrc.cjs', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/tests'],
   parser: '@typescript-eslint/parser',
   plugins: ['react-refresh'],
   rules: {
@@ -21,4 +21,11 @@ module.exports = {
     'no-console': 'off',
     'no-useless-escape': 'error',
   },
+  overrides: [
+    {
+      // Vercel Edge Functions run server-side: allow Node + Web runtime globals.
+      files: ['api/**/*.ts'],
+      env: { browser: true, node: true, es2020: true },
+    },
+  ],
 };
