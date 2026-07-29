@@ -89,8 +89,11 @@ git push -u origin main   # Push → triggers Vercel auto-deploy
 - **Forms:** controlled inputs driven by `useForm` (`src/hooks/useForm.ts`) with Zod
   schemas from `src/lib/schemas.ts`. Bind fields with `form.getFieldProps(name)` and
   pass `getFieldError(...)` into the `error` prop on `Input`/`Select`/`Textarea`.
-  **Grants is the reference implementation.** The other CRUD pages still use raw
-  `useState` and do not validate yet — convert them to this pattern when touched.
+  Derive the form's state type from the schema (`z.input<typeof xFormSchema>`)
+  rather than hand-declaring it, so the two cannot drift.
+  Every CRUD page follows this; **Grants is the clearest example**. The only
+  exception is the two payment-recording forms in `Financial.tsx`, which capture a
+  single amount against an existing invoice and stay on plain `useState`.
 - **Error handling:** surface via `getErrorMessage(err)` from `src/lib/errors.ts`.
   Show errors with the `<Alert>` component from `ui.tsx`.
 

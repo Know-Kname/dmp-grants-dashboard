@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import type { z } from 'zod';
 import {
   useDeposits, useCreateDeposit,
   useReceivables, useCreateReceivable, useUpdateReceivable,
@@ -6,6 +7,8 @@ import {
   useVendors,
 } from '../hooks/useData';
 import { getErrorMessage } from '../lib/errors';
+import { useForm, getFieldError } from '../hooks/useForm';
+import { depositFormSchema, receivableFormSchema, payableFormSchema } from '../lib/schemas';
 import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
@@ -16,31 +19,18 @@ import { useToast } from '../lib/toast';
 
 type ActiveTab = 'deposits' | 'receivables' | 'payables';
 
-type DepositForm = {
-  amount: string;
-  date: string;
-  method: Deposit['method'];
-  reference: string;
-  notes: string;
-};
+/** Live form state — the input side of `depositFormSchema`. */
+type DepositForm = z.input<typeof depositFormSchema>;
 
-type ReceivableForm = {
-  customerId: string;
-  invoiceNumber: string;
-  amount: string;
-  dueDate: string;
-};
+/** Live form state — the input side of `receivableFormSchema`. */
+type ReceivableForm = z.input<typeof receivableFormSchema>;
 
 type ReceivableEditForm = {
   amountPaid: string;
 };
 
-type PayableForm = {
-  vendorId: string;
-  invoiceNumber: string;
-  amount: string;
-  dueDate: string;
-};
+/** Live form state — the input side of `payableFormSchema`. */
+type PayableForm = z.input<typeof payableFormSchema>;
 
 type PayableEditForm = {
   amountPaid: string;
@@ -79,11 +69,11 @@ export default function Financial() {
 
   const toast = useToast();
   const depositCreateMutation = useCreateDeposit({
-    onSuccess: () => { toast.success('Deposit recorded'); setShowModal(false); setDepositForm(initialDepositForm); },
+    onSuccess: () => { toast.success('Deposit recorded'); setShowModal(false); depositForm.reset(initialDepositForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to record deposit'),
   });
   const receivableCreateMutation = useCreateReceivable({
-    onSuccess: () => { toast.success('Invoice created'); setShowModal(false); setReceivableForm(initialReceivableForm); },
+    onSuccess: () => { toast.success('Invoice created'); setShowModal(false); receivableForm.reset(initialReceivableForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to create invoice'),
   });
   const receivableUpdateMutation = useUpdateReceivable({
@@ -91,7 +81,7 @@ export default function Financial() {
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update invoice'),
   });
   const payableCreateMutation = useCreatePayable({
-    onSuccess: () => { toast.success('Bill recorded'); setShowModal(false); setPayableForm(initialPayableForm); },
+    onSuccess: () => { toast.success('Bill recorded'); setShowModal(false); payableForm.reset(initialPayableForm); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to record bill'),
   });
   const payableUpdateMutation = useUpdatePayable({
@@ -104,10 +94,47 @@ export default function Financial() {
   const [editingReceivable, setEditingReceivable] = useState<AccountsReceivable | null>(null);
   const [editingPayable, setEditingPayable] = useState<AccountsPayable | null>(null);
 
-  const [depositForm, setDepositForm] = useState<DepositForm>(initialDepositForm);
-  const [receivableForm, setReceivableForm] = useState<ReceivableForm>(initialReceivableForm);
+  // Three validated create forms. The two payment-recording edit forms below
+  // stay on plain state: they capture a single amount against an existing
+  // invoice rather than creating a record, and have no schema of their own.
+  const depositForm = useForm({
+    schema: depositFormSchema,
+    initialValues: initialDepositForm,
+    onSubmit: (data) => {
+      depositCreateMutation.mutate({
+        amount: data.amount,
+        date: data.date,
+        method: data.method,
+        reference: data.reference || undefined,
+        notes: data.notes || undefined,
+      });
+    },
+  });
+  const receivableForm = useForm({
+    schema: receivableFormSchema,
+    initialValues: initialReceivableForm,
+    onSubmit: (data) => {
+      receivableCreateMutation.mutate({
+        customerId: data.customerId,
+        invoiceNumber: data.invoiceNumber,
+        amount: data.amount,
+        dueDate: data.dueDate,
+      });
+    },
+  });
   const [receivableEditForm, setReceivableEditForm] = useState<ReceivableEditForm>(initialReceivableEditForm);
-  const [payableForm, setPayableForm] = useState<PayableForm>(initialPayableForm);
+  const payableForm = useForm({
+    schema: payableFormSchema,
+    initialValues: initialPayableForm,
+    onSubmit: (data) => {
+      payableCreateMutation.mutate({
+        vendorId: data.vendorId,
+        invoiceNumber: data.invoiceNumber,
+        amount: data.amount,
+        dueDate: data.dueDate,
+      });
+    },
+  });
   const [payableEditForm, setPayableEditForm] = useState<PayableEditForm>(initialPayableEditForm);
 
   const financialStats = useMemo(() => {
@@ -164,16 +191,12 @@ export default function Financial() {
     setShowModal(true);
   };
 
+  // One modal serves five forms, so submission routes by tab. Creates go through
+  // their validated form; the two edit paths record a payment directly.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (activeTab === 'deposits') {
-      depositCreateMutation.mutate({
-        amount: parseFloat(depositForm.amount) || 0,
-        date: depositForm.date,
-        method: depositForm.method,
-        reference: depositForm.reference || undefined,
-        notes: depositForm.notes || undefined,
-      } as Omit<Deposit, 'id' | 'createdAt' | 'createdBy'>);
+      await depositForm.handleSubmit();
     } else if (activeTab === 'receivables') {
       if (editingReceivable) {
         receivableUpdateMutation.mutate({
@@ -181,12 +204,7 @@ export default function Financial() {
           amountPaid: parseFloat(receivableEditForm.amountPaid) || 0,
         });
       } else {
-        receivableCreateMutation.mutate({
-          customerId: receivableForm.customerId,
-          invoiceNumber: receivableForm.invoiceNumber,
-          amount: parseFloat(receivableForm.amount) || 0,
-          dueDate: receivableForm.dueDate,
-        } as Omit<AccountsReceivable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>);
+        await receivableForm.handleSubmit();
       }
     } else {
       if (editingPayable) {
@@ -195,12 +213,7 @@ export default function Financial() {
           amountPaid: parseFloat(payableEditForm.amountPaid) || 0,
         });
       } else {
-        payableCreateMutation.mutate({
-          vendorId: payableForm.vendorId,
-          invoiceNumber: payableForm.invoiceNumber,
-          amount: parseFloat(payableForm.amount) || 0,
-          dueDate: payableForm.dueDate,
-        } as Omit<AccountsPayable, 'id' | 'createdAt' | 'updatedAt' | 'amountPaid' | 'status'>);
+        await payableForm.handleSubmit();
       }
     }
   };
@@ -487,17 +500,17 @@ export default function Financial() {
           {activeTab === 'deposits' && (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Amount ($)" type="number" min="0" step="0.01" value={depositForm.amount} onChange={e => setDepositForm(p => ({ ...p, amount: e.target.value }))} required />
-                <Input label="Date" type="date" value={depositForm.date} onChange={e => setDepositForm(p => ({ ...p, date: e.target.value }))} required />
+                <Input label="Amount ($)" type="number" min="0" step="0.01" {...depositForm.getFieldProps('amount')} error={getFieldError('amount', depositForm.errors, depositForm.touched)} required />
+                <Input label="Date" type="date" {...depositForm.getFieldProps('date')} error={getFieldError('date', depositForm.errors, depositForm.touched)} required />
               </div>
               <Select
                 label="Payment Method"
                 options={Object.entries(METHOD_LABELS).map(([v, l]) => ({ value: v, label: l }))}
-                value={depositForm.method}
-                onChange={e => setDepositForm(p => ({ ...p, method: e.target.value as Deposit['method'] }))}
+                {...depositForm.getFieldProps('method')}
+                error={getFieldError('method', depositForm.errors, depositForm.touched)}
               />
-              <Input label="Reference / Check #" value={depositForm.reference} onChange={e => setDepositForm(p => ({ ...p, reference: e.target.value }))} />
-              <Textarea label="Notes" value={depositForm.notes} onChange={e => setDepositForm(p => ({ ...p, notes: e.target.value }))} rows={2} />
+              <Input label="Reference / Check #" {...depositForm.getFieldProps('reference')} error={getFieldError('reference', depositForm.errors, depositForm.touched)} />
+              <Textarea label="Notes" {...depositForm.getFieldProps('notes')} error={getFieldError('notes', depositForm.errors, depositForm.touched)} rows={2} />
             </>
           )}
 
@@ -505,12 +518,12 @@ export default function Financial() {
           {activeTab === 'receivables' && !editingReceivable && (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Customer ID" value={receivableForm.customerId} onChange={e => setReceivableForm(p => ({ ...p, customerId: e.target.value }))} required />
-                <Input label="Invoice #" value={receivableForm.invoiceNumber} onChange={e => setReceivableForm(p => ({ ...p, invoiceNumber: e.target.value }))} required />
+                <Input label="Customer ID" {...receivableForm.getFieldProps('customerId')} error={getFieldError('customerId', receivableForm.errors, receivableForm.touched)} required />
+                <Input label="Invoice #" {...receivableForm.getFieldProps('invoiceNumber')} error={getFieldError('invoiceNumber', receivableForm.errors, receivableForm.touched)} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Amount ($)" type="number" min="0" step="0.01" value={receivableForm.amount} onChange={e => setReceivableForm(p => ({ ...p, amount: e.target.value }))} required />
-                <Input label="Due Date" type="date" value={receivableForm.dueDate} onChange={e => setReceivableForm(p => ({ ...p, dueDate: e.target.value }))} required />
+                <Input label="Amount ($)" type="number" min="0" step="0.01" {...receivableForm.getFieldProps('amount')} error={getFieldError('amount', receivableForm.errors, receivableForm.touched)} required />
+                <Input label="Due Date" type="date" {...receivableForm.getFieldProps('dueDate')} error={getFieldError('dueDate', receivableForm.errors, receivableForm.touched)} required />
               </div>
             </>
           )}
@@ -541,16 +554,16 @@ export default function Financial() {
               <div className="grid grid-cols-2 gap-4">
                 <Select
                   label="Vendor"
-                  value={payableForm.vendorId}
-                  onChange={e => setPayableForm(p => ({ ...p, vendorId: e.target.value }))}
+                  {...payableForm.getFieldProps('vendorId')}
+                  error={getFieldError('vendorId', payableForm.errors, payableForm.touched)}
                   options={vendors.map(v => ({ value: v.id, label: v.name }))}
                   placeholder="Select vendor..."
                 />
-                <Input label="Invoice #" value={payableForm.invoiceNumber} onChange={e => setPayableForm(p => ({ ...p, invoiceNumber: e.target.value }))} required />
+                <Input label="Invoice #" {...payableForm.getFieldProps('invoiceNumber')} error={getFieldError('invoiceNumber', payableForm.errors, payableForm.touched)} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Amount ($)" type="number" min="0" step="0.01" value={payableForm.amount} onChange={e => setPayableForm(p => ({ ...p, amount: e.target.value }))} required />
-                <Input label="Due Date" type="date" value={payableForm.dueDate} onChange={e => setPayableForm(p => ({ ...p, dueDate: e.target.value }))} required />
+                <Input label="Amount ($)" type="number" min="0" step="0.01" {...payableForm.getFieldProps('amount')} error={getFieldError('amount', payableForm.errors, payableForm.touched)} required />
+                <Input label="Due Date" type="date" {...payableForm.getFieldProps('dueDate')} error={getFieldError('dueDate', payableForm.errors, payableForm.touched)} required />
               </div>
             </>
           )}
