@@ -1,5 +1,7 @@
 /**
- * React error boundary — wraps the entire app tree in main.tsx.
+ * React error boundary — wraps `<AppRoutes/>` in `App.tsx`, inside the Query/Theme/
+ * Auth/Toast providers. An error thrown by one of those providers themselves would
+ * not be caught here.
  * The only class component in the codebase (getDerivedStateFromError requires it).
  * Accepts an optional fallback prop; defaults to a full-page error screen.
  */

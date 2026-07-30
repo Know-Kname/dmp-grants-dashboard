@@ -7,9 +7,10 @@
 import { Map as MapLibreMap, Marker, NavigationControl, Popup, type MapRef, type MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import { useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { StyleSpecification } from 'maplibre-gl';
 import { Search, Compass, Crosshair, X } from 'lucide-react';
 import type { Grave } from '../types';
+import { SATELLITE_STYLE } from '../lib/mapStyles';
+import { useToast } from '../lib/toast';
 
 const STATUS_COLORS: Record<Grave['status'], string> = {
   available: '#16a34a',   // green
@@ -26,20 +27,6 @@ const STATUS_LABELS: Record<Grave['status'], string> = {
 };
 
 const STREET_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
-const SATELLITE_STYLE: StyleSpecification = {
-  version: 8,
-  name: 'Satellite',
-  sources: {
-    esri: {
-      type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DigitalGlobe, GeoEye',
-    },
-  },
-  layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
-};
 
 // Detroit Memorial Park (Warren, MI) — fallback center when no graves have coords
 const DEFAULT_CENTER = { lat: 42.5145, lng: -83.0286 };
@@ -64,6 +51,7 @@ interface Props {
 }
 
 export default function CemeteryMap({ graves, height = 400, onMapPinDrop }: Props) {
+  const toast = useToast();
   const mapRef = useRef<MapRef | null>(null);
   const [selected, setSelected] = useState<Grave | null>(null);
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<Grave['status']>>(new Set());
@@ -125,7 +113,7 @@ export default function CemeteryMap({ graves, height = 400, onMapPinDrop }: Prop
     const ref = { lat: from.lat!, lng: from.lng! };
     const candidates = placedGraves.filter(g => g.status === 'available' && g.id !== from.id);
     if (candidates.length === 0) {
-      alert('No available graves with coordinates have been placed yet.');
+      toast.info('No available graves with coordinates have been placed yet.');
       return;
     }
     const sorted = candidates
@@ -165,6 +153,7 @@ export default function CemeteryMap({ graves, height = 400, onMapPinDrop }: Prop
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Find by grave number…"
+            aria-label="Find by grave number"
             className="w-full pl-8 pr-7 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           {searchQuery && (

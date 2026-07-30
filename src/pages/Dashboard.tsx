@@ -205,8 +205,8 @@ export default function Dashboard() {
               <div className="w-px h-10 bg-white/20" />
               <div>
                 <p className="text-white/40 text-xs uppercase tracking-widest">Milestone</p>
-                <p className="font-bold text-lg mt-0.5" style={{ color: C.gold }}>100 Years</p>
-                <p className="text-white/50 text-xs">1925 – 2025</p>
+                <p className="font-bold text-lg mt-0.5" style={{ color: C.gold }}>{now.getFullYear() - COMPANY.established}+ Years</p>
+                <p className="text-white/50 text-xs">Since {COMPANY.established}</p>
               </div>
               <div className="w-px h-10 bg-white/20" />
               <div>

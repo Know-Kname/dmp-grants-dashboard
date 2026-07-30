@@ -63,6 +63,21 @@ export default async function handler(req: Request): Promise<Response> {
   if (messages.length === 0) {
     return json({ error: 'No messages provided' }, 400);
   }
+  // Basic abuse guard: this endpoint has no auth check (any caller who can reach
+  // the deployed URL can invoke it — see docs/09-security.md), so it at least
+  // rejects requests shaped to run up the OpenRouter bill or wedge the upstream
+  // call with malformed content, rather than forwarding anything it's handed.
+  const MAX_MESSAGES = 50;
+  const MAX_MESSAGE_LENGTH = 8000;
+  if (messages.length > MAX_MESSAGES) {
+    return json({ error: `Too many messages (max ${MAX_MESSAGES})` }, 400);
+  }
+  const invalid = messages.some(
+    (m) => typeof m?.content !== 'string' || m.content.length > MAX_MESSAGE_LENGTH
+  );
+  if (invalid) {
+    return json({ error: `Each message needs string content up to ${MAX_MESSAGE_LENGTH} characters` }, 400);
+  }
   const stream = payload.stream !== false;
 
   const upstream = await fetch(OPENROUTER_URL, {
