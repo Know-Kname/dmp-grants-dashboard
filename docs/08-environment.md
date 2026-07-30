@@ -6,7 +6,8 @@
 
 ## Table of Contents
 - [What environment variables are](#what-environment-variables-are)
-- [The three variables](#the-three-variables)
+- [The four variables](#the-four-variables)
+- [What happens when a required variable is missing](#what-happens-when-a-required-variable-is-missing)
 - [Where to set them](#where-to-set-them)
 - [Variable scoping (local vs. production vs. preview)](#variable-scoping-local-vs-production-vs-preview)
 - [The VITE_ prefix rule](#the-vite_-prefix-rule)
@@ -35,7 +36,7 @@ Environment variables are key-value pairs that configure the app at startup, wit
 
 **Format:** `https://[PROJECT-REF].supabase.co` (where PROJECT-REF is a random 20-character string)
 
-**Used in:** `src/lib/supabase.ts:3`
+**Used in:** `src/lib/env.ts` (validated), then `src/lib/supabase.ts`
 
 **How to find it:**
 1. Log in to [supabase.com](https://supabase.com)
@@ -55,7 +56,7 @@ Environment variables are key-value pairs that configure the app at startup, wit
 
 **Format:** A long JWT string starting with `eyJ...`
 
-**Used in:** `src/lib/supabase.ts:4`
+**Used in:** `src/lib/env.ts` (validated), then `src/lib/supabase.ts`
 
 **How to find it:**
 1. Log in to [supabase.com](https://supabase.com)
@@ -115,6 +116,32 @@ has no route to serve `/api/chat`). Either set this var for local-direct calls, 
 
 ---
 
+## What happens when a required variable is missing
+
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are **required**. `src/lib/env.ts`
+validates both at runtime, before the app mounts. If either is missing or malformed,
+`src/main.tsx` renders the `ConfigError` component (`src/components/ui.tsx`) — a
+full-page "Configuration required" screen that names each offending variable — and
+the app never mounts.
+
+**This is deliberate, and it replaced worse behavior.** Previously a missing variable
+produced only a console warning, and the Supabase client was constructed against
+`https://missing-supabase-url.invalid`. The app booted, looked normal, and then every
+single query failed — indistinguishable from a Supabase outage. A configuration
+mistake now announces itself as a configuration mistake.
+
+Practical consequences:
+
+- A Vercel deploy missing an env var shows the configuration screen rather than a
+  broken-looking app. Fix the variable, then **redeploy** — `VITE_` values are baked
+  in at build time, so editing the variable alone changes nothing.
+- Watch the environment scope. A variable set for Production but not Preview gives
+  you the configuration screen on preview URLs only.
+- The two OpenRouter variables are optional and are not validated here — a missing
+  one degrades the AI assistant, it doesn't block the app.
+
+---
+
 ## Where to set them
 
 ### Local development: `.env.local`
@@ -148,6 +175,14 @@ Save the file, then `npm run dev`. Vite reads it automatically.
 3. After adding or changing a variable, **trigger a redeploy** (Vercel → Deployments → latest → three-dot menu → Redeploy)
 
 > **Why redeploy?** Vite bakes the variable values into the compiled JS at build time. Changing a variable doesn't automatically rebuild — you must trigger a new build.
+
+### Not env vars, but easy to forget: the Supabase dashboard settings
+
+Google OAuth and password reset also depend on settings that live in the Supabase
+and Google Cloud dashboards, not in any `.env` file — Site URL, the redirect
+allow-list (including a Vercel preview wildcard), and the Google OAuth client's
+authorized redirect URI. See
+[docs/06-supabase.md → Supabase dashboard configuration checklist](06-supabase.md#supabase-dashboard-configuration-checklist).
 
 ---
 
@@ -236,9 +271,10 @@ If you add a new integration that needs a secret:
 
 ## Troubleshooting env var issues
 
-**"Missing Supabase environment variables" error on startup**
-- `.env.local` doesn't exist or is missing `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
-- Run: `cp .env.example .env.local` then fill in the values
+**Full-page "Configuration required" screen instead of the app**
+- `.env.local` doesn't exist, or is missing/malforming `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
+- The screen names each offending variable — see [What happens when a required variable is missing](#what-happens-when-a-required-variable-is-missing)
+- Run: `cp .env.example .env.local`, fill in the values, then restart the dev server
 
 **Var works locally but not in production**
 - The var isn't set in Vercel (only in `.env.local`)

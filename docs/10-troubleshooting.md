@@ -7,8 +7,9 @@
 ## Table of Contents
 - [How to approach a bug](#how-to-approach-a-bug)
 - [White screen / app won't load](#white-screen--app-wont-load)
+- [The app shows "Configuration required"](#the-app-shows-configuration-required)
 - [Login problems](#login-problems)
-- [Demo mode problems](#demo-mode-problems)
+- [Password reset problems](#password-reset-problems)
 - [Data not loading or showing wrong data](#data-not-loading-or-showing-wrong-data)
 - [Vercel build failures](#vercel-build-failures)
 - [GitHub Actions CI failures](#github-actions-ci-failures)
@@ -45,9 +46,13 @@ You open the app and see nothing — a blank white (or black) page with no UI at
 
 Open F12 → Console. You'll almost always see a red error. Common ones:
 
+> **First:** if you see a styled **"Configuration required"** page rather than a
+> blank one, it isn't a crash — see
+> [The app shows "Configuration required"](#the-app-shows-configuration-required) below.
+
 **"Missing Supabase environment variables"**
 
-This is thrown by `src/lib/supabase.ts` if `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing.
+Raised by `src/lib/env.ts` if `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing or malformed.
 
 Fix for local dev:
 ```bash
@@ -84,7 +89,39 @@ If the app works locally (`npm run dev`) but not on Vercel:
 
 ---
 
+## The app shows "Configuration required"
+
+### Symptom
+Instead of the login page you get a full-page message headed "Configuration
+required", listing one or more environment variable names.
+
+### Cause
+`src/lib/env.ts` validates `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` before
+anything renders. If either is missing or malformed, `src/main.tsx` renders the
+`ConfigError` component instead of mounting the app. This is deliberate: previously a
+misconfigured build booted normally with a client pointed at a bogus URL, so every
+query failed and it looked like a Supabase outage instead of a config mistake.
+
+### Fix
+The screen names each offending variable. Then:
+
+- **Local dev:** set the named variables in `.env.local` (`cp .env.example .env.local`
+  if it doesn't exist) and restart `npm run dev` — Vite reads env files at startup.
+- **Vercel:** Vercel → dmpgrants → Settings → Environment Variables. Confirm the
+  variable is set **for the environment you're looking at** (Production vs. Preview),
+  then redeploy — `VITE_` values are baked in at build time.
+
+See [docs/08-environment.md](08-environment.md) for the full variable list.
+
+---
+
 ## Login problems
+
+### "I can't sign in / I don't have an account"
+
+There is no self-service sign-up — accounts are invite-only. Ask a Supabase project
+admin to create yours (Supabase → Authentication → Users → "Add user"); see
+[docs/06-supabase.md](06-supabase.md#authentication).
 
 ### "Invalid login credentials"
 
@@ -124,39 +161,50 @@ If getting a CORS error: something is misconfigured in Supabase → Settings →
 
 ---
 
-## Demo mode problems
+## Password reset problems
 
-### Demo mode button doesn't log in
+### "I forgot my password"
 
-First check: are you on the login page? The demo button is only on the login page (`src/pages/Login.tsx`).
+Click **Forgot password?** on the login page (or go to `/forgot-password`), enter
+your work email, and follow the link Supabase emails you. No admin involvement is
+needed. The new password must be at least 12 characters.
 
-If clicking "View Demo" does nothing (no redirect, no error):
+### The reset email never arrives
 
-1. Open Console — any errors?
-2. Check that `enableDemoMode()` in `src/lib/demo-data.ts` dispatches the event correctly:
-   ```ts
-   window.dispatchEvent(new CustomEvent('dmp-demo-change', { detail: true }))
-   ```
-3. Check that `AuthProvider` in `src/lib/auth.tsx` is listening for this event (see line 41-45).
+1. Check spam/junk first.
+2. Confirm the address exists in Supabase → Authentication → Users. Supabase does
+   not reveal whether an address is registered, so `/forgot-password` shows the same
+   success message either way.
+3. Check Supabase → Authentication → Rate Limits — repeated requests for the same
+   address get throttled.
+4. On the default Supabase SMTP there is a low hourly email cap. For real staff use,
+   configure a custom SMTP provider.
 
-### Demo mode shows blank data (or errors)
+### The reset link shows "expired link"
 
-**This is expected, not a bug.** Demo mode only bypasses Supabase authentication — it
-does not provide mock data. Every `useData.ts` hook queries live Supabase regardless
-of demo mode, so without real `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` values set,
-every page will show empty lists or a failed-to-load state. If you need to see the app
-populated with data, configure real Supabase credentials (see
-[docs/08-environment.md](08-environment.md)) — there is no demo-mode branch in any
-hook to fix; none was ever built.
+`/reset-password` renders its form only when a recovery session is present. The
+"expired link" state means one wasn't — the link was already used, it timed out, or
+it was opened in a different browser than the one that requested it. Click through to
+`/forgot-password` and request a new one.
 
-### Can't exit demo mode
+If it happens for *every* link, the redirect configuration is the likely cause:
+Supabase → Authentication → URL Configuration must list `<your-domain>/reset-password`
+in the redirect allow-list. See
+[docs/06-supabase.md](06-supabase.md#supabase-dashboard-configuration-checklist).
 
-Clicking logout in demo mode should call `disableDemoMode()` from `src/lib/demo-data.ts`, which:
-1. Removes `dmp-demo-mode` from localStorage
-2. Dispatches `dmp-demo-change` event with `detail: false`
-3. `AuthProvider` sets `isDemoActive = false` → `isAuthenticated = false` → redirects to login
+### Google sign-in returns to a blank page or an error
 
-If this isn't working: open DevTools → Application tab → Local Storage → look for `dmp-demo-mode`. Delete it manually, then refresh.
+Google must return to `/auth/callback`. Two places to check:
+
+1. Supabase → Authentication → URL Configuration — the redirect allow-list must
+   include `<your-domain>/auth/callback`.
+2. Google Cloud Console → the OAuth client's authorized redirect URI must be the
+   **Supabase** callback (`https://<project-ref>.supabase.co/auth/v1/callback`), not
+   the app's. This is the single most common misconfiguration.
+
+Preview deploys get a fresh hostname on every push, so they fail here unless the
+Vercel preview wildcard is in the allow-list. Full checklist in
+[docs/06-supabase.md](06-supabase.md#supabase-dashboard-configuration-checklist).
 
 ---
 
@@ -329,7 +377,7 @@ Your editor's TypeScript language server might be using a different TypeScript v
 
 ### The AI button doesn't appear
 
-The `<AIAssistant />` component is rendered in `src/components/Layout.tsx` only for authenticated users. If you're not logged in (or demo mode isn't active), the component won't render.
+The `<AIAssistant />` component is rendered in `src/components/Layout.tsx` only for authenticated users. If you're not signed in, the component won't render.
 
 ### The AI button appears but clicking it shows an error
 
@@ -466,7 +514,7 @@ npm install
 cp .env.example .env.local
 # Edit .env.local with real values
 
-# 5. Clear localStorage (clears demo mode, cached auth, etc.)
+# 5. Clear localStorage (clears the cached Supabase session, theme, etc.)
 # Open browser → F12 → Application → Local Storage → right-click → Clear
 
 # 6. Start fresh

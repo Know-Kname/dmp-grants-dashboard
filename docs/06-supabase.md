@@ -9,6 +9,7 @@
 - [Accessing the dashboard](#accessing-the-dashboard)
 - [The database tables](#the-database-tables)
 - [Authentication](#authentication)
+- [Supabase dashboard configuration checklist](#supabase-dashboard-configuration-checklist)
 - [Row-Level Security (RLS)](#row-level-security-rls)
 - [How the app talks to Supabase](#how-the-app-talks-to-supabase)
 - [Viewing and editing data](#viewing-and-editing-data)
@@ -137,6 +138,14 @@ To add another user:
    WHERE email = 'jsmith@detroitmemorialpark.com';
    ```
 
+> **Note — forgotten passwords no longer need an admin.** Staff can reset their own
+> password from the app: **Forgot password?** on the login page → `/forgot-password`
+> → emailed link → `/reset-password` (12-character minimum). Only *creating* an
+> account still requires the steps above.
+>
+> A proper admin invite UI is planned; until then the dashboard + SQL flow above is
+> the current process, and there is deliberately no self-service sign-up in the app.
+
 ### How the JWT session works
 
 When a user signs in:
@@ -148,6 +157,52 @@ When a user signs in:
 6. RLS policies can read `auth.uid()` from the token to know who's asking
 
 Tokens auto-refresh before expiry. If the browser is closed and reopened within the session window, the user stays logged in.
+
+---
+
+## Supabase dashboard configuration checklist
+
+These settings live in the dashboard, not in the repo — nothing in a code review will
+catch them being wrong. They were previously flagged **UNKNOWN** in `AUDIT_REPORT.md`;
+verify them and keep them verified.
+
+### Authentication → URL Configuration
+
+| Setting | Value |
+|---|---|
+| **Site URL** | The production domain (e.g. `https://dmpgrants.vercel.app`). This is the fallback Supabase uses when an email link has no explicit redirect. |
+| **Redirect URLs** (allow-list) | `<prod>/auth/callback`<br>`<prod>/reset-password`<br>`http://localhost:5173/**`<br>`https://*-<team>.vercel.app/**` |
+
+Every entry matters:
+
+- **`<prod>/auth/callback`** — where Google OAuth returns the browser.
+- **`<prod>/reset-password`** — where the emailed recovery link lands.
+- **`http://localhost:5173/**`** — without it, neither flow works in local dev.
+- **`https://*-<team>.vercel.app/**`** — Vercel gives every preview deploy a unique
+  hostname. Without the wildcard, OAuth and password reset are rejected on every
+  preview, even though production works fine.
+
+### Google Cloud Console → OAuth 2.0 Client
+
+> ⚠️ **The most common misconfiguration.** The authorized redirect URI on the Google
+> OAuth client must be the **Supabase** callback:
+>
+> ```
+> https://<project-ref>.supabase.co/auth/v1/callback
+> ```
+>
+> **Not** the app's `/auth/callback`. Google redirects to Supabase; Supabase then
+> redirects to the app. Putting the app URL here produces a `redirect_uri_mismatch`
+> error from Google before Supabase is ever reached.
+
+The app-side `/auth/callback` URL belongs in Supabase's redirect allow-list (above),
+which is a different list in a different product. Both are required.
+
+### Authentication → Email
+
+- Confirm the recovery ("Reset Password") template is enabled.
+- The default Supabase SMTP has a low hourly cap intended for testing. Configure a
+  custom SMTP provider before relying on password reset for real staff.
 
 ---
 

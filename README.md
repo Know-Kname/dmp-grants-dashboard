@@ -32,7 +32,9 @@ npm run dev
 # → Opens at http://localhost:5173
 ```
 
-> **No Supabase credentials yet?** Click **Preview Demo** on the login page to bypass login, no account needed. Demo mode only bypasses authentication, though — every page still queries live Supabase data, so you'll also want real `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` values to see real records instead of empty states (see [docs/08-environment.md](docs/08-environment.md)).
+> **The two Supabase values are required.** Without valid `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, the app renders a full-page "Configuration required" screen naming the offending variables instead of booting (see [docs/08-environment.md](docs/08-environment.md)).
+>
+> **No account?** There is no self-service sign-up — accounts are provisioned by a Supabase project admin (see [docs/06-supabase.md](docs/06-supabase.md)). Forgot your password? Use **Forgot password?** on the login page.
 
 ---
 
@@ -47,7 +49,7 @@ npm run dev
 | Server state | TanStack React Query v5 | Data fetching, caching, mutations |
 | Validation | Zod 3 | Schema-driven form validation (`useForm` + `lib/schemas.ts`) |
 | Database | Supabase (PostgreSQL) | 16 tables, row-level security |
-| Auth | Supabase Auth | Email/password + Google OAuth + demo mode |
+| Auth | Supabase Auth | Email/password + Google OAuth (PKCE), self-service password reset, invite-only accounts |
 | Maps | MapLibre GL + react-map-gl | Cemetery plot map + locations map (keyless OpenFreeMap/ESRI tiles) |
 | AI assistant | OpenRouter → Gemini 2.5 Pro | Floating chat panel, proxied server-side via `/api/chat` |
 | Deployment | Vercel | Auto CI/CD from `main` branch |
@@ -96,7 +98,7 @@ npm run test:run     # Vitest single run (used in CI)
 
 All guides live in [`/docs/`](docs/README.md). **New to the project?** Read in this order:
 
-1. [Getting Started](docs/01-getting-started.md) — local setup, first run, demo mode
+1. [Getting Started](docs/01-getting-started.md) — local setup, first run, signing in
 2. [Architecture](docs/02-architecture.md) — how the app is built end-to-end
 3. [GitHub Guide](docs/04-github.md) — branches, PRs, CI, code review
 4. [Vercel Guide](docs/05-vercel.md) — deployments, env vars, preview URLs
@@ -104,15 +106,15 @@ All guides live in [`/docs/`](docs/README.md). **New to the project?** Read in t
 
 | Guide | What it covers |
 |---|---|
-| [01 Getting Started](docs/01-getting-started.md) | Install, first run, demo mode, folder map |
+| [01 Getting Started](docs/01-getting-started.md) | Install, first run, signing in, password reset, folder map |
 | [02 Architecture](docs/02-architecture.md) | Data flow, routing, auth, state management |
 | [03 Development](docs/03-development.md) | Daily workflow, conventions, testing, linting |
 | [04 GitHub](docs/04-github.md) | Branches, PRs, CI workflows, secrets, Dependabot |
 | [05 Vercel](docs/05-vercel.md) | Deployments, env vars, preview URLs, rollbacks |
-| [06 Supabase](docs/06-supabase.md) | Database tables, auth, RLS, schema changes |
+| [06 Supabase](docs/06-supabase.md) | Database tables, auth, dashboard config checklist, RLS, schema changes |
 | [07 Deployment Pipeline](docs/07-deployment.md) | Push → preview → production end-to-end |
 | [08 Environment Variables](docs/08-environment.md) | Every variable explained, where to set each one |
-| [09 Security](docs/09-security.md) | Keys, RLS, secrets management, security headers |
+| [09 Security](docs/09-security.md) | Keys, RLS, auth posture, secrets management, security headers |
 | [10 Troubleshooting](docs/10-troubleshooting.md) | Common errors and exactly how to fix them |
 | [11 Design System](docs/11-design-system.md) | Colors, components, dark mode, Tailwind tokens |
 | [12 Roadmap](docs/12-roadmap.md) | Upcoming features, known limitations |

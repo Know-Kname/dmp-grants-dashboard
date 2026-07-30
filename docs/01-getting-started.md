@@ -1,6 +1,6 @@
 # 01 — Getting Started
 
-> **TL;DR:** `git clone` → `npm install` → copy `.env.example` to `.env.local` → fill in two Supabase values → `npm run dev`. Or just click "Preview Demo" to skip the setup entirely.
+> **TL;DR:** `git clone` → `npm install` → copy `.env.example` to `.env.local` → fill in two Supabase values → `npm run dev`. The two Supabase values are not optional — without them the app renders a "Configuration required" screen instead of booting.
 
 ---
 
@@ -10,7 +10,8 @@
 - [Step 2 — Install dependencies](#step-2--install-dependencies)
 - [Step 3 — Set up environment variables](#step-3--set-up-environment-variables)
 - [Step 4 — Start the dev server](#step-4--start-the-dev-server)
-- [Demo mode (no setup required)](#demo-mode-no-setup-required)
+- [Signing in](#signing-in)
+- [Forgot your password?](#forgot-your-password)
 - [Folder map](#folder-map)
 - [What each npm script does](#what-each-npm-script-does)
 - [Troubleshooting first-run issues](#troubleshooting-first-run-issues)
@@ -106,36 +107,46 @@ You should see output like:
 
 Open [http://localhost:5173](http://localhost:5173) in your browser. You should see the DMP login page.
 
-**Sign in with:** an existing Supabase user account (ask a Supabase project admin to
-add you in Authentication → Users — see [docs/06-supabase.md](06-supabase.md)), or
-sign in with Google if OAuth is configured.
-
-Or click **Preview Demo** (no credentials needed — see next section).
-
 > ⚠️ **Port in use?** If 5173 is taken, Vite will try 5174, 5175, etc. It'll tell you which port it's using.
+
+> ⚠️ **"Configuration required" full-page message instead of the app?** One or both
+> Supabase variables are missing or malformed. The screen names each offending
+> variable — fix `.env.local` (or the Vercel env vars in production) and reload.
+> See [docs/08-environment.md](08-environment.md).
 
 ---
 
-## Demo mode (no setup required)
+## Signing in
 
-If you don't have Supabase credentials, or just want to explore the UI, click
-**Preview Demo** on the login page. You'll get:
+There is **no self-service sign-up**. Accounts are provisioned by a Supabase project
+admin (Authentication → Users → "Add user" — see [docs/06-supabase.md](06-supabase.md)).
+Ask an admin to create yours.
 
-- Instant access to all 10 authenticated pages without creating an account
-- A "Preview Mode" banner at the top with an "Exit Preview" button to log out
+Once you have an account, you can sign in two ways:
 
-**What demo mode is NOT:** it does not provide sample/mock data. It only bypasses
-Supabase authentication — under the hood it fakes a signed-in admin identity in
-`localStorage`, but every page still queries live Supabase data exactly as it would
-for a real login. Without real `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` values
-set, most pages will show empty lists rather than sample records. It's useful for
-reviewing the UI shell and navigation without an account, not a curated data
-walkthrough.
+- **Email + password** on the login form.
+- **Continue with Google**, if Google OAuth is configured for the project. Google
+  returns the browser to `/auth/callback`, which finishes the session exchange and
+  then redirects you into the app.
 
-**How it works:** `enableDemoMode()` (`src/lib/demo-data.ts`) sets a flag in your
-browser's `localStorage` and dispatches a `dmp-demo-change` event that `AuthProvider`
-listens for, so `isAuthenticated` becomes `true` with no Supabase session involved.
-Click "Exit Preview" to log out and return to the login page.
+---
+
+## Forgot your password?
+
+The reset flow is self-service — no admin needed:
+
+1. On the login page, click **Forgot password?** (or go straight to `/forgot-password`).
+2. Enter your work email and submit. Supabase emails you a recovery link.
+3. Click the link in the email. It opens `/reset-password` with a short-lived
+   recovery session attached.
+4. Enter a new password — **minimum 12 characters** — and confirm it. You're signed
+   in and redirected into the app.
+
+If the link has already been used or has expired, `/reset-password` shows an
+"expired link" screen with a link back to `/forgot-password` to request a fresh one.
+
+> All three pages (`/forgot-password`, `/reset-password`, `/auth/callback`) are
+> public routes — they have to be reachable while you're logged out.
 
 ---
 
@@ -159,10 +170,15 @@ dmp-grants-dashboard/
 │   │   ├── Cemeteries.tsx      ← Cemetery → Section → Lot → Grave + interactive map
 │   │   ├── Grants.tsx          ← Grant/benefit opportunities (this repo's namesake)
 │   │   ├── MemorialPage.tsx    ← Public, unauthenticated `/memorial/:id` page
-│   │   └── Login.tsx           ← Login + demo mode entry
+│   │   ├── Login.tsx           ← Email/password + Google sign-in
+│   │   ├── ForgotPassword.tsx  ← Public `/forgot-password` — request a reset email
+│   │   ├── ResetPassword.tsx   ← Public `/reset-password` — set a new password
+│   │   └── AuthCallback.tsx    ← Public `/auth/callback` — OAuth return handler
 │   │
 │   ├── components/
 │   │   ├── Layout.tsx          ← Sidebar + topbar + mobile nav (DMP branding)
+│   │   ├── AuthLayout.tsx      ← Shared shell for the 4 auth pages
+│   │                             (AuthLayout, AuthField, AuthButton)
 │   │   ├── AIAssistant.tsx     ← Floating Gemini chat panel
 │   │   ├── ui.tsx              ← All shared UI components (Button, Card, Modal, etc.)
 │   │   ├── CemeteryMap.tsx     ← Interactive plot map (MapLibre GL)
@@ -175,8 +191,9 @@ dmp-grants-dashboard/
 │   │   └── useForm.ts          ← Zod-validated controlled-form hook
 │   │
 │   ├── lib/
-│   │   ├── auth.tsx            ← Login/logout/demo state (AuthProvider)
+│   │   ├── auth.tsx            ← Login/logout/password reset (AuthProvider)
 │   │   ├── api.ts              ← ApiRequestError type (no HTTP client — see 02)
+│   │   ├── env.ts              ← Validates required env vars at startup
 │   │   ├── supabase.ts         ← Typed Supabase JS client
 │   │   ├── query.tsx           ← React Query config + all cache keys
 │   │   ├── schemas.ts          ← Zod validation schemas for every form
@@ -185,8 +202,7 @@ dmp-grants-dashboard/
 │   │   ├── theme.tsx           ← Light/dark/system theme provider
 │   │   ├── toast.tsx           ← Toast notifications
 │   │   ├── utils.ts            ← formatCurrency, formatDate, case transforms, cn()
-│   │   ├── errors.ts           ← getErrorMessage, getErrorDetails
-│   │   └── demo-data.ts        ← DEMO_USER + demo mode toggle (no mock dataset)
+│   │   └── errors.ts           ← getErrorMessage, getErrorDetails
 │   │
 │   ├── config/
 │   │   ├── company.ts          ← DMP name, 3 locations, phones (source of truth)
@@ -239,10 +255,17 @@ dmp-grants-dashboard/
 npm install --legacy-peer-deps
 ```
 
+**"Configuration required" screen instead of the app**
+- `src/lib/env.ts` found a missing or malformed Supabase variable and `main.tsx`
+  rendered `ConfigError` rather than mounting the app. The screen lists each
+  offending variable by name.
+- Fix the named variables in `.env.local` and reload.
+
 **White screen after `npm run dev`**
 - Open your browser's developer tools (F12) → Console tab.
-- Look for red error messages. The most common cause is missing env vars.
-- Make sure `.env.local` exists and has `VITE_SUPABASE_URL` set.
+- Look for red error messages.
+- Note that a *missing env var* no longer produces a white screen — it produces the
+  "Configuration required" screen above.
 
 **"Invalid API key" or "relation does not exist" errors**
 - Your Supabase URL or anon key is wrong. Re-check Steps 3–5 above.
@@ -250,7 +273,8 @@ npm install --legacy-peer-deps
 
 **App loads but all pages show empty data / "Failed to load"**
 - The Supabase tables may not have data yet, or RLS is blocking the request.
-- Click "Preview Demo" to verify the app itself works — if demo mode works but real data doesn't, it's a Supabase configuration issue.
+- Confirm you are actually signed in — every RLS policy is `TO authenticated`, so a
+  session that has silently expired reads as an empty database rather than an error.
 - See [docs/10-troubleshooting.md](10-troubleshooting.md) for more.
 
 ---
