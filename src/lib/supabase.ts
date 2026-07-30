@@ -12,27 +12,48 @@
  * covered only 3 of 13 tables and named a since-dropped `users` table. This one
  * is generated from the live schema, so it cannot drift by hand — see the header
  * of `../types/database` for how to regenerate it.
+ *
+ * Env vars are validated in `./env`. When they are missing the app renders a
+ * config screen instead of mounting, so the placeholders below are only ever
+ * reached under vitest.
  */
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "../types/database"
+import { envResult } from "./env"
+// Imported for its side effect as much as its export: evaluating `./recovery`
+// snapshots the URL *before* `createClient` below consumes and scrubs any
+// recovery credentials from it. Do not move this import below the client.
+import { markPasswordRecovery } from "./recovery"
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const TEST_URL = 'http://localhost:54321'
+const TEST_KEY = 'test-anon-key-not-used-for-real-requests'
 
-// Use placeholder values when env vars are missing so the bundle loads in
-// preview environments / demo mode without throwing at module init. Any actual
-// network call will fail fast with a recognizable URL (helpful for debugging).
-const PLACEHOLDER_URL = 'https://missing-supabase-url.invalid'
-const PLACEHOLDER_KEY = 'missing-supabase-anon-key'
+const url = envResult.ok ? envResult.env.VITE_SUPABASE_URL : TEST_URL
+const key = envResult.ok ? envResult.env.VITE_SUPABASE_ANON_KEY : TEST_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn(
-    'Supabase env vars not set (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). ' +
-    'The app will load but live data calls will fail. Demo mode still works.'
-  )
-}
+export const supabase = createClient<Database>(url, key, {
+  auth: {
+    // PKCE is the correct flow for a browser SPA and makes the OAuth and
+    // password-recovery redirects deterministic — both land on a route that
+    // reads the code from the URL rather than relying on implicit-grant timing.
+    flowType: 'pkce',
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+})
 
-export const supabase = createClient<Database>(
-  supabaseUrl || PLACEHOLDER_URL,
-  supabaseKey || PLACEHOLDER_KEY,
-)
+/**
+ * Latch `PASSWORD_RECOVERY` from the earliest possible moment.
+ *
+ * auth-js emits this event on a `setTimeout(..., 0)` immediately after the
+ * recovery exchange, delivering it only to subscribers registered at that
+ * instant. `/reset-password` subscribes from a `useEffect`, which can easily run
+ * after the emission — so the page cannot rely on catching the event itself.
+ * Registering here (the placement auth-js's own docs recommend: "Register this
+ * immediately after calling createClient!") makes the signal race-free, and
+ * `./recovery` holds it until the page asks.
+ */
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') markPasswordRecovery()
+})

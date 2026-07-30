@@ -8,6 +8,49 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- **Removed demo mode.** It set `isAuthenticated` true with no session — an
+  authentication bypass reachable from a button in the production build, on a
+  system holding burial and financial records. It also never functioned as a
+  demo: RLS grants are `TO authenticated`, so a demo session issued anon-key
+  queries and every screen rendered its empty state. `src/lib/demo-data.ts`, the
+  Login button, the Layout "Preview Mode" banner, and `isDemo` are all gone.
+- **Removed the advertised `admin@dmp.com / admin123` credentials** from the login
+  page. No such account has ever existed; the hint was stale copy from a removed
+  mock-auth era that trained staff to expect shared credentials.
+- **`logout()` is now awaited** and falls back to a local-scope sign-out on
+  failure. The previous fire-and-forget call could leave a live session in
+  `localStorage` behind a logged-out UI — on a shared office workstation the next
+  page load would silently re-authenticate as the previous user.
+- **Removed `signUp`.** Accounts are invite-only; it also wrote a `role` value
+  (`'user'`) that matched neither the `'staff'` default nor anything meaningful.
+
+### Added
+- **Password reset works end to end.** New `/forgot-password` and
+  `/reset-password` routes. `resetPassword()` previously existed but pointed at a
+  route that was never built, so a staff member who forgot a password had no path
+  but to contact an administrator. `/reset-password` renders its form only once a
+  recovery session exists and otherwise shows an expired-link state with a way to
+  request a new one; new passwords must be at least 12 characters.
+- **`/auth/callback`** now handles the OAuth code exchange. Google previously
+  redirected to `/`, a protected route, so the app raced the exchange against its
+  own auth check.
+- **Misconfigured deployments now say so.** `src/lib/env.ts` validates the
+  Supabase environment at runtime and `main.tsx` renders a full-page
+  `ConfigError` naming each missing or invalid variable. Previously a missing env
+  var produced only a console warning plus a client pointed at
+  `missing-supabase-url.invalid`, so every request failed indistinguishably from
+  a Supabase outage.
+- Shared `src/components/AuthLayout.tsx` (`AuthLayout`/`AuthField`/`AuthButton`)
+  so the secondary auth pages reuse the Login page's editorial styling without
+  cloning its hero markup.
+
+### Changed
+- Supabase client now uses the PKCE flow with explicit session-persistence and
+  URL-detection options, making the OAuth and recovery redirects deterministic.
+- `registerFormSchema` was replaced by `forgotPasswordFormSchema` and
+  `resetPasswordFormSchema`.
+
 ### Fixed
 - **Grant creation failed 100% of the time.** `useCreateGrant` wrote a `created_by`
   column that did not exist on `grants`. A migration adds it. Verified against the

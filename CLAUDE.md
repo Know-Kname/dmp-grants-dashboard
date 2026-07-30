@@ -36,16 +36,23 @@ src/
     useData.ts   ALL React Query hooks for every module
   lib/
     api.ts       Error type hierarchy (ApiRequestError)
-    auth.tsx     AuthProvider + useAuth hook (Supabase + demo mode)
-    supabase.ts  Supabase client init
+    auth.tsx     AuthProvider + useAuth hook (Supabase email/password + Google).
+                 No signUp — accounts are admin-provisioned, invite-only.
+    authStorage.ts  Derives the Supabase storage key and clears it directly.
+                 Needed because signOut() is not network-independent — see the
+                 file header before touching sign-out.
+    recovery.ts  Module-scope snapshot of recovery credentials in the URL, plus
+                 the PASSWORD_RECOVERY latch. Imported by supabase.ts BEFORE
+                 createClient — that ordering is load-bearing, do not reorder.
+    supabase.ts  Supabase client init (PKCE flow)
+    env.ts       Validates VITE_SUPABASE_* at runtime; main.tsx renders a
+                 ConfigError screen instead of the app when they're missing.
+                 Deliberately no zod — this module is in the entry chunk.
     gemini.ts    OpenRouter streaming client
     query.tsx    QueryClient config + all queryKeys
     toast.tsx    Toast notification system
     errors.ts    getErrorMessage / getErrorDetails / getErrorRequestId
     utils.ts     formatCurrency, formatDate, formatDateForInput, cn()
-    demo-data.ts DEMO_USER + enableDemoMode / disableDemoMode (auth bypass only —
-                 every screen still reads live Supabase data in demo mode, there
-                 is no mock dataset)
   config/
     company.ts   DMP name, 3 locations, phones, tagline (source of truth)
   types/
@@ -146,9 +153,19 @@ while with no consumers at all; it has been removed.
 
 1. **No Express backend.** The original `server/` folder was deleted. The frontend
    calls Supabase directly using `@supabase/supabase-js`.
-2. **Demo mode bypass.** `enableDemoMode()` (in `lib/demo-data.ts`) sets localStorage
-   and dispatches a `dmp-demo-change` CustomEvent. `AuthProvider` listens for this
-   event and updates `isDemoActive` state reactively.
+2. **No demo mode, no self-signup.** Demo mode was removed: it set `isAuthenticated`
+   with no session — an auth bypass reachable from the production login page — and
+   never worked anyway, since RLS is `TO authenticated` so its anon queries returned
+   nothing. Accounts are admin-provisioned; staff self-serve password resets at
+   `/forgot-password` → `/reset-password`. `/auth/callback` handles the OAuth code
+   exchange.
+   **A session is never proof of anything on these routes.** `updateUser({password})`
+   changes the *current* session's password with no challenge, and auth-js keeps a
+   pre-existing session when a URL login fails — so "is there a session?" reads a
+   failed exchange as success. `/reset-password` requires recovery credentials in
+   the URL *and* a `PASSWORD_RECOVERY` event this page load; `/auth/callback`
+   requires the user identity to have *changed*. Do not relax either to a session
+   check. See `docs/09-security.md`.
 3. **snake_case ↔ camelCase.** The Supabase DB uses snake_case columns.
    Each hook in `src/hooks/useData.ts` calls `toSnakeCaseKeys` on insert/update
    payloads and `toCamelCaseKeys` on the result, so TypeScript types always use

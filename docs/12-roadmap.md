@@ -37,7 +37,7 @@ The DMP CMS is a working application managing data for three Detroit Memorial Pa
 - ✅ Cemeteries — Cemetery → Section → Lot → Grave hierarchy + interactive plot map
 - ✅ AI Assistant — Gemini 2.5 Pro via OpenRouter, proxied server-side through `/api/chat`
 - ✅ Authentication — Supabase Auth (email/password + Google OAuth, JWT, session persistence)
-- ⚠️ Demo Mode — auth-bypass only; does not provide mock data (see [Known limitations](#known-limitations))
+- ✅ Password reset — self-service `/forgot-password` → emailed link → `/reset-password` (12-char minimum)
 - ✅ Dark/Light/System Mode — full theme toggle
 - ✅ Responsive Layout — iPad-primary, works on mobile and desktop
 - ✅ Form validation — Zod + `useForm` on every CRUD page except `Cemeteries.tsx`

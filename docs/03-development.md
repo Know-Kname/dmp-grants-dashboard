@@ -302,7 +302,7 @@ We use **Conventional Commits** format. This makes the git history scannable and
 | Type | When to use | Example |
 |---|---|---|
 | `feat` | New feature or user-visible capability | `feat: add CSV export to burials page` |
-| `fix` | Bug fix | `fix: demo login not working after page load` |
+| `fix` | Bug fix | `fix: session lost on page reload after login` |
 | `docs` | Documentation only | `docs: add Supabase RLS setup guide` |
 | `style` | Formatting, no logic change | `style: format inventory table columns` |
 | `refactor` | Code restructuring, no behavior change | `refactor: extract burials form into component` |

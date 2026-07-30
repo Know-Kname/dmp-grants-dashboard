@@ -9,7 +9,7 @@ import { getFieldError, useForm } from './useForm';
  * nothing.
  */
 
-// Mirrors registerFormSchema: a top-level .refine() makes this a ZodEffects,
+// Mirrors resetPasswordFormSchema: a top-level .refine() makes this a ZodEffects,
 // which has no `.shape` to look a field up in.
 const refinedSchema = z
   .object({

@@ -13,7 +13,7 @@
 - [Secrets in code: what never to do](#secrets-in-code-what-never-to-do)
 - [OWASP Top 10 and how we address each](#owasp-top-10-and-how-we-address-each)
 - [Key rotation procedures](#key-rotation-procedures)
-- [Demo mode and security](#demo-mode-and-security)
+- [Removed: the demo-mode auth bypass](#removed-the-demo-mode-auth-bypass)
 - [Future security improvements](#future-security-improvements)
 
 ---
@@ -173,13 +173,68 @@ Supabase stores the session in `localStorage`. On page reload, `supabase.auth.ge
 ### Password reset flow
 
 ```ts
-// src/lib/auth.tsx:111
+// src/lib/auth.tsx — resetPassword()
 supabase.auth.resetPasswordForEmail(email, {
   redirectTo: `${window.location.origin}/reset-password`,
 })
 ```
 
-Supabase sends an email with a link. Clicking the link sets a short-lived token in the URL. The `/reset-password` page (if implemented) calls `supabase.auth.updateUser({ password: newPassword })`.
+`/forgot-password` collects the email and calls the above. Supabase sends an email
+with a link carrying short-lived recovery credentials. Submitting the new password
+calls `updatePassword()`, which wraps `supabase.auth.updateUser({ password })`.
+
+The new password minimum is **12 characters**, enforced by `resetPasswordFormSchema`
+in `src/lib/schemas.ts`.
+
+#### What `/reset-password` accepts, and why it is strict
+
+`updateUser({ password })` changes the password of whoever the **current session**
+belongs to, and Supabase requires no current-password challenge. Whatever decides
+to render that form therefore decides who can be taken over.
+
+> ⚠️ **This page used to accept any session** — the guard was
+> `if (event === 'PASSWORD_RECOVERY' || session)`. An ordinary staff login already
+> in `localStorage` satisfied it, so on a shared workstation anyone could navigate
+> to `/reset-password` and set a signed-in colleague's password. Fixed; see below.
+
+The page now ignores sessions entirely as a readiness signal and asks only whether
+a recovery happened **during this page load**:
+
+1. `src/lib/recovery.ts` snapshots the URL at module evaluation — before
+   `createClient` runs, because auth-js strips the credentials from the URL as
+   soon as it consumes them.
+2. `src/lib/supabase.ts` registers a `PASSWORD_RECOVERY` listener immediately
+   after `createClient`, latching the event. auth-js emits it on a
+   `setTimeout(…, 0)` to whoever is subscribed at that instant, so a component
+   subscribing from `useEffect` can miss it.
+3. The form renders only when both are true: recovery credentials were in the URL,
+   **and** they produced a `PASSWORD_RECOVERY` event.
+
+A pre-existing session with no recovery evidence renders the invalid state, not the
+form. This also closes the second path: opening user B's recovery link in a browser
+holding user A's session. auth-js deliberately keeps A's session when a URL login
+fails, so the old `if (session)` check would have rewritten **A's** password while
+displaying "Password updated."
+
+#### Recovery sessions are gated until the password is set
+
+Supabase issues a *fully privileged* session for a recovery link — it is not scoped
+to "may change password". Without a gate, anyone holding a working reset link could
+skip the form and read burial and financial records for the life of that session,
+turning a one-hour email link into open-ended access.
+
+`ProtectedRoute` therefore redirects to `/reset-password` while a recovery is
+pending (tracked in `sessionStorage`, so a reload cannot lift it). On success,
+`updatePassword()` calls `signOut({ scope: 'others' })`, revoking every other
+session for that user while keeping the current one.
+
+### No self-service sign-up
+
+There is no registration page and no `signUp` in the auth context. Accounts are
+provisioned by a Supabase project admin. This is deliberate: an internal system
+holding burial and financial records should not let anyone mint themselves an
+account, and every RLS policy is written for `authenticated` users generally, so a
+self-registered account would be a full-access account.
 
 ---
 
@@ -346,26 +401,67 @@ This is a more extreme measure (needed if you suspect the JWT secret was comprom
 
 ---
 
-## Demo mode and security
+## Removed: the demo-mode auth bypass
 
-Demo mode (`src/lib/demo-data.ts`) lets users explore the app without a real login. It uses locally generated mock data — **it never reads from or writes to Supabase**.
+The app used to ship a "Preview Demo" button on the login page that set a
+`localStorage` flag and made `isAuthenticated` resolve to `true` with no Supabase
+session at all. **It has been removed entirely** — `src/lib/demo-data.ts` is deleted,
+and `isDemo` no longer exists anywhere in the auth context.
 
-```ts
-// src/lib/auth.tsx:72
-const isAuthenticated = user !== null || isDemo
-```
+**Why it had to go:**
 
-When `isDemo` is true, `isAuthenticated` is true — the user sees all pages. But every data hook that calls Supabase (`useData.ts`, etc.) returns the mock data from `demo-data.ts` instead of making real requests.
+- It was an authentication bypass reachable from the production login page, on a
+  system holding burial and financial records. That is not a posture you can defend
+  regardless of what the bypassed session could actually read.
+- It never worked as a demo anyway. Every RLS policy is `TO authenticated`, so the
+  demo session made anon-key queries and every screen rendered its empty state. It
+  showed a logged-in shell over no data.
 
-**Security implications:**
-- Demo mode cannot be used to access real burial records. Real data requires a valid Supabase JWT.
-- Demo mode state lives only in `localStorage` — it's per-browser and not shared.
-- A malicious user enabling demo mode on their own browser doesn't gain any privilege in Supabase.
-- There's no server-side knowledge of demo mode at all.
+**If a stakeholder demo is ever needed**, the sanctioned approach is a seeded
+Supabase branch with a real account on it — not an auth bypass in production code.
 
-**What demo mode is NOT for:**
-- Don't use demo mode in production if you need real data. It shows fake data.
-- Don't confuse `isDemo` with "admin mode" — demo users have no special Supabase privileges.
+Related hardening landed at the same time:
+
+- **No self-service registration.** `signUp` is gone from the auth context; there is
+  no registration route. Accounts are invite-only, provisioned by a Supabase project
+  admin (see [docs/06-supabase.md](06-supabase.md#authentication)).
+- **Password reset actually works.** `resetPassword()` previously pointed at a
+  `/reset-password` route that did not exist, so the emailed link dead-ended. The
+  route now exists, `updatePassword()` was added, and new passwords must be at least
+  12 characters (`resetPasswordFormSchema` in `src/lib/schemas.ts`).
+- **`/reset-password` requires proof of an actual recovery.** The first version of
+  the route rendered its form for *any* session, which was an account-takeover hole
+  on a shared workstation — it was documented as fixed here before it was. It now
+  requires recovery credentials in the URL **and** a `PASSWORD_RECOVERY` event
+  during the same page load, and a recovery session is confined to the reset page
+  until the password is changed. See
+  [What `/reset-password` accepts](#what-reset-password-accepts-and-why-it-is-strict).
+- **Sign-out no longer depends on the network.** The first fix made `logout()`
+  async with a local-scope fallback, and was documented as complete — but it never
+  ran. `GoTrueClient._signOut` **returns** its error rather than throwing, so the
+  `catch` was dead code, and on a non-`AuthApiError` failure (an offline
+  `AuthRetryableFetchError`) auth-js returns before `_removeSession()`, leaving a
+  live refresh token in `localStorage` behind a logged-out UI. `logout()` now
+  inspects the returned error and purges the auth storage keys directly
+  (`src/lib/authStorage.ts`), so clearing cannot fail for network reasons. It also
+  calls `queryClient.clear()` — the React Query cache is keyed by table, not by
+  user, so without it the next person to sign in on that tab would be served the
+  previous user's burial and financial rows from cache.
+- **The anon key is checked for its role.** `src/lib/env.ts` decodes the JWT payload
+  and rejects any key whose `role` is not `anon`, plus `sb_secret_*` keys. The
+  `service_role` key sits beside the anon key in the dashboard and looks identical;
+  pasted into `VITE_SUPABASE_ANON_KEY` it ships an **RLS-bypassing** key to every
+  browser, and the app works perfectly, which is what makes it dangerous.
+- **The Supabase URL must be https.** `env.ts` previously accepted `http://`.
+  Localhost is the only exception, for `supabase start`.
+- **Missing config fails loudly.** `src/lib/env.ts` validates the Supabase variables
+  and `main.tsx` renders a full-page `ConfigError` naming each offending variable.
+  The old behavior — a console warning plus a client pointed at
+  `https://missing-supabase-url.invalid` — made a misconfigured deploy look like a
+  Supabase outage. See [docs/08-environment.md](08-environment.md).
+- **PKCE + a dedicated OAuth callback.** The Supabase client uses
+  `flowType: 'pkce'`, and Google OAuth now returns to `${origin}/auth/callback`
+  rather than the app root.
 
 ---
 

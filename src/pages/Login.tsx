@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { m, AnimatePresence, EASE_LUX, stagger, fadeUp } from '../lib/motion';
 import Balancer from 'react-wrap-balancer';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { getErrorRequestId } from '../lib/errors';
-import { enableDemoMode } from '../lib/demo-data';
-import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 
@@ -139,11 +138,6 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemo = () => {
-    enableDemoMode();
-    navigate('/');
   };
 
   const handleGoogle = async () => {
@@ -457,6 +451,15 @@ export default function Login() {
                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+                <div className="flex justify-end mt-2.5">
+                  <Link
+                    to="/forgot-password"
+                    className="text-[10px] uppercase hover:underline transition-colors"
+                    style={{ color: 'rgba(26,26,26,0.5)', letterSpacing: '0.18em', fontWeight: 500 }}
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
               </m.div>
 
               <m.div variants={fadeUp}>
@@ -523,46 +526,6 @@ export default function Login() {
                 Continue with Google
               </m.button>
             </m.div>
-
-            {/* ── Demo (dev-only) ── */}
-            {import.meta.env.DEV && (
-              <>
-                <m.div variants={fadeUp} className="mt-3">
-                  <m.button
-                    type="button"
-                    onClick={handleDemo}
-                    whileHover={{ scale: 1.005 }}
-                    whileTap={{ scale: 0.995 }}
-                    className="w-full flex items-center justify-center gap-2.5 py-3 px-5 text-[11px] uppercase font-medium transition-colors"
-                    style={{
-                      color: 'rgba(26,26,26,0.45)',
-                      backgroundColor: 'transparent',
-                      letterSpacing: '0.22em',
-                      border: 'none',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = BRAND.green)}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(26,26,26,0.45)')}
-                  >
-                    <Sparkles size={12} style={{ color: BRAND.gold }} />
-                    Explore Demo
-                  </m.button>
-                </m.div>
-
-                <m.p
-                  variants={fadeUp}
-                  className="text-xs text-center mt-6"
-                  style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontStyle: 'italic',
-                    color: 'rgba(26,26,26,0.4)',
-                  }}
-                >
-                  Staff demo: <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin@dmp.com</span>
-                  {' / '}
-                  <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin123</span>
-                </m.p>
-              </>
-            )}
 
             <m.div
               variants={fadeUp}

@@ -41,6 +41,53 @@ export function PageError({ error }: { error: unknown }) {
 }
 
 // ============================================
+// CONFIG ERROR
+// ============================================
+
+/**
+ * Full-page failure for a misconfigured deployment, rendered by main.tsx in
+ * place of the app. Previously a missing Supabase env var only produced a
+ * console warning and a client pointed at an `.invalid` host, so every query
+ * failed with a network error that was indistinguishable from an outage.
+ */
+export function ConfigError({ issues }: { issues: { key: string; message: string }[] }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
+      <div className="max-w-lg w-full">
+        <div className="flex items-start gap-3 mb-6">
+          <div className="p-2.5 rounded-lg bg-danger-100 dark:bg-danger-950 text-danger shrink-0">
+            <AlertTriangle size={20} />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Configuration required</h1>
+            <p className="text-sm text-foreground-muted mt-1">
+              The app can’t start because required environment variables are missing or invalid.
+            </p>
+          </div>
+        </div>
+
+        <ul className="space-y-2 mb-6">
+          {issues.map((issue) => (
+            <li
+              key={issue.key}
+              className="text-sm bg-card border border-border rounded-lg px-4 py-3"
+            >
+              <code className="font-mono text-danger">{issue.key}</code>{' '}
+              <span className="text-foreground-muted">{issue.message}</span>
+            </li>
+          ))}
+        </ul>
+
+        <p className="text-sm text-foreground-muted">
+          Set these in the Vercel project settings (or <code className="font-mono">.env.local</code>{' '}
+          for local development), then redeploy. See <code className="font-mono">docs/08-environment.md</code>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // STAT CARD
 // ============================================
 

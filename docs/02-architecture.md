@@ -1,6 +1,6 @@
 # 02 — Architecture
 
-> **TL;DR:** React SPA. User navigates → React Router picks the page → React Query fetches data from Supabase → component renders. Auth is Supabase email/password with a local demo-mode bypass. No Express backend. All security lives in Supabase Row-Level Security policies.
+> **TL;DR:** React SPA. User navigates → React Router picks the page → React Query fetches data from Supabase → component renders. Auth is Supabase email/password (plus Google OAuth) — there is no bypass of any kind. No Express backend. All security lives in Supabase Row-Level Security policies.
 
 ---
 
@@ -33,7 +33,7 @@ Browser
   ├── Supabase JS client   (authenticated requests to Supabase cloud)
   │     └── supabase.ts
   │
-  └── AuthProvider         (login state, session, demo mode)
+  └── AuthProvider         (login state, session, password reset)
         └── auth.tsx
 ```
 
@@ -92,6 +92,10 @@ All routes are defined in `src/App.tsx`. The app uses **React Router DOM v6** wi
 
 ```
 /login                    → Login page (public, no auth required)
+/forgot-password          → Request a password-reset email (public)
+/reset-password           → Set a new password from an emailed recovery link (public)
+/auth/callback            → OAuth return handler; completes the Google sign-in
+                             exchange, then redirects into the app (public)
 /memorial/:id             → Public memorial page (public, no auth required —
                              reached via a QR code printed from a published
                              burial record; see MemorialPage.tsx)
@@ -122,9 +126,9 @@ function ProtectedRoute({ children }) {
 }
 ```
 
-`isAuthenticated` is `true` when either:
-- A live Supabase session exists (real user is logged in), OR
-- `localStorage.getItem('dmp-demo-mode') === 'true'` (demo mode is active)
+`isAuthenticated` is `true` only when a live Supabase session exists. There is no
+second path into it — the demo-mode bypass that used to satisfy it was removed (see
+[docs/09-security.md](09-security.md)).
 
 ---
 
@@ -142,30 +146,56 @@ User enters email + password
   → React Router allows access to protected routes
 ```
 
-### Demo mode flow
+### Google OAuth flow
 
 ```
-User clicks "Preview Demo"
-  → Login.tsx calls enableDemoMode() (lib/demo-data.ts)
-  → Sets localStorage.setItem('dmp-demo-mode', 'true')
-  → Dispatches window CustomEvent 'dmp-demo-change'
-  → AuthProvider listener catches the event
-  → isDemoActive state updates to true
-  → isAuthenticated becomes true
-  → No Supabase call made
+User clicks "Continue with Google"
+  → auth.tsx calls supabase.auth.signInWithOAuth({ provider: 'google',
+      options: { redirectTo: `${origin}/auth/callback` } })
+  → Browser leaves for Google, user consents
+  → Google redirects to Supabase, Supabase redirects to /auth/callback
+  → AuthCallback.tsx lets the client complete the PKCE code exchange
+  → Session lands in AuthProvider → redirect into the app
 ```
 
-The `CustomEvent` is the key design choice here. Because `AuthProvider` is a React component, we can't call `setState` from outside it. The custom event acts as a signal that triggers the state update.
+The client is configured with `flowType: 'pkce'` and `detectSessionInUrl`, so the
+callback page's job is just to wait for the exchange and route onward.
 
-### Demo mode data
+### Password reset flow
 
-Demo mode only changes what `isAuthenticated` resolves to — it does **not** change
-what the data hooks do. Every hook in `useData.ts` calls Supabase exactly as it would
-for a real session. `src/lib/demo-data.ts` contains a single fake `DEMO_USER` identity
-and the enable/disable toggle, not a mock dataset — an earlier set of `DEMO_*` sample
-datasets existed and was removed as dead code, since nothing ever branched on demo
-mode to read them. In practice, demo mode without real Supabase credentials configured
-shows empty lists or failed-to-load states on every page, not sample data.
+```
+/forgot-password
+  → resetPassword(email) → supabase.auth.resetPasswordForEmail(email,
+      { redirectTo: `${origin}/reset-password` })
+  → Supabase emails a recovery link
+
+User clicks the link
+  → lands on /reset-password with a recovery session in the URL
+  → ResetPassword.tsx renders the form only once that session exists;
+    otherwise it renders an "expired link" state linking back to
+    /forgot-password
+  → updatePassword(password) → supabase.auth.updateUser({ password })
+  → user is signed in and redirected into the app
+```
+
+The new password must be at least 12 characters, enforced by
+`resetPasswordFormSchema` in `src/lib/schemas.ts`.
+
+### No self-service registration
+
+`signUp` is not exposed by the auth context and there is no registration route.
+Accounts are invite-only — provisioned by a Supabase project admin. The old
+`registerFormSchema`/`RegisterFormData` pair in `src/lib/schemas.ts` was replaced by
+`forgotPasswordFormSchema` and `resetPasswordFormSchema`.
+
+### Startup configuration guard
+
+`src/lib/env.ts` validates `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` before
+anything mounts. If either is missing or malformed, `src/main.tsx` renders the
+`ConfigError` component from `ui.tsx` — a full-page screen naming each offending
+variable — instead of the app. `env.ts` deliberately hand-rolls its checks rather
+than using Zod: it is imported by `main.tsx`, and pulling Zod into the entry chunk
+cost 56 kB on every page load.
 
 ### Authorization (who can do what)
 
@@ -230,6 +260,7 @@ Components available:
 | `<LoadingSpinner>` | Animated spinner (used during data loads) |
 | `<Avatar>` | Circle with initials fallback |
 | `<Pagination>` | Page-number controls — built and exported, but not currently imported by any page |
+| `<ConfigError>` | Full-page "Configuration required" screen, naming each missing/invalid env var. Rendered by `main.tsx` in place of the app |
 
 There is no `<Alert>`, `<Tooltip>`, `<Divider>`, or `<Skeleton>` component. All four
 were removed as unused dead code (see CHANGELOG.md) — pages use `<PageError>` for
@@ -249,12 +280,26 @@ in `utils.ts` instead.
 ### `src/lib/auth.tsx`
 The `AuthProvider` component + `useAuth` hook. Manages:
 - Supabase session subscription (`onAuthStateChange`)
-- Demo mode state (reactive via CustomEvent)
 - `currentUser` shape: `{ id, email, name, role }` normalized from Supabase user metadata
-- Exposes: `login`, `logout`, `isAuthenticated`, `isDemo`, `currentUser`
+- Exposes: `login` / `signIn`, `signInWithGoogle`, `logout` / `signOut`,
+  `resetPassword`, `updatePassword`, `isAuthenticated`, `currentUser`
+- `logout()` is **async and must be awaited**. It falls back to a local-scope
+  sign-out if the network call fails, so a failed request can't leave a live session
+  sitting in `localStorage` behind a logged-out UI.
+- There is no `signUp` and no `isDemo` — see [Authentication and authorization](#authentication-and-authorization).
 
 ### `src/lib/supabase.ts`
-Creates and exports the Supabase JS client using the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` env vars. This is the single Supabase client instance used throughout the app.
+Creates and exports the Supabase JS client using the `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` env vars (validated first by `env.ts`). This is the single
+Supabase client instance used throughout the app. Auth options: `flowType: 'pkce'`,
+`persistSession`, `autoRefreshToken`, and `detectSessionInUrl` — the last two are
+what make the OAuth callback and the emailed recovery link resolve into a session.
+
+### `src/lib/env.ts`
+Reads and validates the required `VITE_` variables at startup and reports which ones
+are missing or malformed. Consumed by `main.tsx` (to decide between mounting the app
+and rendering `ConfigError`) and by `supabase.ts`. Intentionally Zod-free — see
+[Startup configuration guard](#startup-configuration-guard).
 
 ### `src/lib/query.tsx`
 - `QueryProvider` — wraps the app with React Query's `QueryClientProvider`
