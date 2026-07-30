@@ -19,7 +19,6 @@ const baseAuth = {
   isAuthenticated: false,
   isLoading: false,
   currentUser: null,
-  isDemoActive: false,
 };
 
 const renderLogin = () =>

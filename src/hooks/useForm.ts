@@ -65,7 +65,7 @@ interface UseFormReturn<T> {
  * Reach the per-field schema inside a form schema, if one is reachable.
  *
  * `.refine()` and `.transform()` wrap their subject in a `ZodEffects`, which has
- * no `.shape` — `registerFormSchema` is exactly that. The previous
+ * no `.shape` — `resetPasswordFormSchema` is exactly that. The previous
  * implementation cast straight to `ZodObject` and read `.shape[field]`, which
  * was `undefined` for those schemas, so per-field validation silently did
  * nothing. Unwrapping reaches the object underneath.

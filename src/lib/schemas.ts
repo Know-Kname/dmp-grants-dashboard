@@ -325,17 +325,26 @@ export const loginFormSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginFormSchema>;
 
-export const registerFormSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+export const forgotPasswordFormSchema = z.object({
   email: emailSchema,
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordFormSchema>;
+
+/**
+ * 12 characters, matching the Supabase project's minimum. Validating it here as
+ * well means the user gets the rule before submitting rather than as a server
+ * error after. (There is no registration schema — accounts are invite-only.)
+ */
+export const resetPasswordFormSchema = z.object({
+  password: z.string().min(12, 'Password must be at least 12 characters'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 });
 
-export type RegisterFormData = z.infer<typeof registerFormSchema>;
+export type ResetPasswordFormData = z.infer<typeof resetPasswordFormSchema>;
 
 // ============================================
 // VALIDATION HELPERS

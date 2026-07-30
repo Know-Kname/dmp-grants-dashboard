@@ -21,6 +21,9 @@ const Customers   = lazy(() => import('./pages/Customers'));
 const Vendors     = lazy(() => import('./pages/Vendors'));
 const Cemeteries  = lazy(() => import('./pages/Cemeteries'));
 const MemorialPage = lazy(() => import('./pages/MemorialPage'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 
 function PageSpinner() {
   return (
@@ -50,6 +53,9 @@ function AppRoutes() {
     <Suspense fallback={<PageSpinner />}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/memorial/:id" element={<MemorialPage />} />
         <Route
           path="/"
