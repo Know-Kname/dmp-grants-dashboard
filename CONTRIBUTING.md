@@ -95,7 +95,11 @@ Apply to production: push to `main` — `supabase-migrations.yml` auto-deploys.
 - **No Express backend.** All data access is via Supabase JS client directly.
 - **snake_case ↔ camelCase.** `src/lib/api.ts` transforms all keys automatically.
 - **Server state:** React Query (TanStack v5). Local state: `useState`/`useReducer`.
-- **Auth:** `src/lib/auth.tsx` — Supabase Auth + demo mode via localStorage + CustomEvent.
+- **Auth:** `src/lib/auth.tsx` — Supabase Auth (email/password + Google), PKCE flow.
+  No demo mode and no self-signup: accounts are admin-provisioned, and staff reset
+  their own passwords via `/forgot-password` → `/reset-password`. Demo mode was
+  removed — it set `isAuthenticated` with no session, an auth bypass reachable from
+  the production login page.
 - **Brand colors** (`#1a3d2b` forest green, `#c49a2c` gold) are hardcoded in sidebar/login
   and are intentional — not CSS variables — so they don't change with the theme.
 

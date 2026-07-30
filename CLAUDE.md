@@ -38,6 +38,12 @@ src/
     api.ts       Error type hierarchy (ApiRequestError)
     auth.tsx     AuthProvider + useAuth hook (Supabase email/password + Google).
                  No signUp — accounts are admin-provisioned, invite-only.
+    authStorage.ts  Derives the Supabase storage key and clears it directly.
+                 Needed because signOut() is not network-independent — see the
+                 file header before touching sign-out.
+    recovery.ts  Module-scope snapshot of recovery credentials in the URL, plus
+                 the PASSWORD_RECOVERY latch. Imported by supabase.ts BEFORE
+                 createClient — that ordering is load-bearing, do not reorder.
     supabase.ts  Supabase client init (PKCE flow)
     env.ts       Validates VITE_SUPABASE_* at runtime; main.tsx renders a
                  ConfigError screen instead of the app when they're missing.
@@ -151,8 +157,15 @@ while with no consumers at all; it has been removed.
    with no session — an auth bypass reachable from the production login page — and
    never worked anyway, since RLS is `TO authenticated` so its anon queries returned
    nothing. Accounts are admin-provisioned; staff self-serve password resets at
-   `/forgot-password` → `/reset-password` (the latter renders its form only once a
-   recovery session exists). `/auth/callback` handles the OAuth code exchange.
+   `/forgot-password` → `/reset-password`. `/auth/callback` handles the OAuth code
+   exchange.
+   **A session is never proof of anything on these routes.** `updateUser({password})`
+   changes the *current* session's password with no challenge, and auth-js keeps a
+   pre-existing session when a URL login fails — so "is there a session?" reads a
+   failed exchange as success. `/reset-password` requires recovery credentials in
+   the URL *and* a `PASSWORD_RECOVERY` event this page load; `/auth/callback`
+   requires the user identity to have *changed*. Do not relax either to a session
+   check. See `docs/09-security.md`.
 3. **snake_case ↔ camelCase.** The Supabase DB uses snake_case columns.
    Each hook in `src/hooks/useData.ts` calls `toSnakeCaseKeys` on insert/update
    payloads and `toCamelCaseKeys` on the result, so TypeScript types always use

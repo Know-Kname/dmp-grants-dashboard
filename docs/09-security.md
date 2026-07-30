@@ -180,14 +180,53 @@ supabase.auth.resetPasswordForEmail(email, {
 ```
 
 `/forgot-password` collects the email and calls the above. Supabase sends an email
-with a link; clicking it puts a short-lived recovery token in the URL, which the
-client (`detectSessionInUrl`) exchanges for a recovery session. `/reset-password`
-renders its form only once that session exists — otherwise it shows an "expired link"
-state with a link back to `/forgot-password`. Submitting calls `updatePassword()`,
-which wraps `supabase.auth.updateUser({ password })`.
+with a link carrying short-lived recovery credentials. Submitting the new password
+calls `updatePassword()`, which wraps `supabase.auth.updateUser({ password })`.
 
 The new password minimum is **12 characters**, enforced by `resetPasswordFormSchema`
 in `src/lib/schemas.ts`.
+
+#### What `/reset-password` accepts, and why it is strict
+
+`updateUser({ password })` changes the password of whoever the **current session**
+belongs to, and Supabase requires no current-password challenge. Whatever decides
+to render that form therefore decides who can be taken over.
+
+> ⚠️ **This page used to accept any session** — the guard was
+> `if (event === 'PASSWORD_RECOVERY' || session)`. An ordinary staff login already
+> in `localStorage` satisfied it, so on a shared workstation anyone could navigate
+> to `/reset-password` and set a signed-in colleague's password. Fixed; see below.
+
+The page now ignores sessions entirely as a readiness signal and asks only whether
+a recovery happened **during this page load**:
+
+1. `src/lib/recovery.ts` snapshots the URL at module evaluation — before
+   `createClient` runs, because auth-js strips the credentials from the URL as
+   soon as it consumes them.
+2. `src/lib/supabase.ts` registers a `PASSWORD_RECOVERY` listener immediately
+   after `createClient`, latching the event. auth-js emits it on a
+   `setTimeout(…, 0)` to whoever is subscribed at that instant, so a component
+   subscribing from `useEffect` can miss it.
+3. The form renders only when both are true: recovery credentials were in the URL,
+   **and** they produced a `PASSWORD_RECOVERY` event.
+
+A pre-existing session with no recovery evidence renders the invalid state, not the
+form. This also closes the second path: opening user B's recovery link in a browser
+holding user A's session. auth-js deliberately keeps A's session when a URL login
+fails, so the old `if (session)` check would have rewritten **A's** password while
+displaying "Password updated."
+
+#### Recovery sessions are gated until the password is set
+
+Supabase issues a *fully privileged* session for a recovery link — it is not scoped
+to "may change password". Without a gate, anyone holding a working reset link could
+skip the form and read burial and financial records for the life of that session,
+turning a one-hour email link into open-ended access.
+
+`ProtectedRoute` therefore redirects to `/reset-password` while a recovery is
+pending (tracked in `sessionStorage`, so a reload cannot lift it). On success,
+`updatePassword()` calls `signOut({ scope: 'others' })`, revoking every other
+session for that user while keeping the current one.
 
 ### No self-service sign-up
 
@@ -390,10 +429,31 @@ Related hardening landed at the same time:
   `/reset-password` route that did not exist, so the emailed link dead-ended. The
   route now exists, `updatePassword()` was added, and new passwords must be at least
   12 characters (`resetPasswordFormSchema` in `src/lib/schemas.ts`).
-- **`logout()` is awaited.** It is now async and falls back to a local-scope
-  sign-out if the network call fails. The old fire-and-forget version could leave a
-  live session in `localStorage` behind a logged-out UI — a real risk on a shared
-  office workstation.
+- **`/reset-password` requires proof of an actual recovery.** The first version of
+  the route rendered its form for *any* session, which was an account-takeover hole
+  on a shared workstation — it was documented as fixed here before it was. It now
+  requires recovery credentials in the URL **and** a `PASSWORD_RECOVERY` event
+  during the same page load, and a recovery session is confined to the reset page
+  until the password is changed. See
+  [What `/reset-password` accepts](#what-reset-password-accepts-and-why-it-is-strict).
+- **Sign-out no longer depends on the network.** The first fix made `logout()`
+  async with a local-scope fallback, and was documented as complete — but it never
+  ran. `GoTrueClient._signOut` **returns** its error rather than throwing, so the
+  `catch` was dead code, and on a non-`AuthApiError` failure (an offline
+  `AuthRetryableFetchError`) auth-js returns before `_removeSession()`, leaving a
+  live refresh token in `localStorage` behind a logged-out UI. `logout()` now
+  inspects the returned error and purges the auth storage keys directly
+  (`src/lib/authStorage.ts`), so clearing cannot fail for network reasons. It also
+  calls `queryClient.clear()` — the React Query cache is keyed by table, not by
+  user, so without it the next person to sign in on that tab would be served the
+  previous user's burial and financial rows from cache.
+- **The anon key is checked for its role.** `src/lib/env.ts` decodes the JWT payload
+  and rejects any key whose `role` is not `anon`, plus `sb_secret_*` keys. The
+  `service_role` key sits beside the anon key in the dashboard and looks identical;
+  pasted into `VITE_SUPABASE_ANON_KEY` it ships an **RLS-bypassing** key to every
+  browser, and the app works perfectly, which is what makes it dangerous.
+- **The Supabase URL must be https.** `env.ts` previously accepted `http://`.
+  Localhost is the only exception, for `supabase start`.
 - **Missing config fails loudly.** `src/lib/env.ts` validates the Supabase variables
   and `main.tsx` renders a full-page `ConfigError` naming each offending variable.
   The old behavior — a console warning plus a client pointed at
