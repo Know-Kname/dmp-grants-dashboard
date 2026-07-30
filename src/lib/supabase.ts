@@ -20,6 +20,10 @@
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "../types/database"
 import { envResult } from "./env"
+// Imported for its side effect as much as its export: evaluating `./recovery`
+// snapshots the URL *before* `createClient` below consumes and scrubs any
+// recovery credentials from it. Do not move this import below the client.
+import { markPasswordRecovery } from "./recovery"
 
 const TEST_URL = 'http://localhost:54321'
 const TEST_KEY = 'test-anon-key-not-used-for-real-requests'
@@ -37,4 +41,19 @@ export const supabase = createClient<Database>(url, key, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
+})
+
+/**
+ * Latch `PASSWORD_RECOVERY` from the earliest possible moment.
+ *
+ * auth-js emits this event on a `setTimeout(..., 0)` immediately after the
+ * recovery exchange, delivering it only to subscribers registered at that
+ * instant. `/reset-password` subscribes from a `useEffect`, which can easily run
+ * after the emission — so the page cannot rely on catching the event itself.
+ * Registering here (the placement auth-js's own docs recommend: "Register this
+ * immediately after calling createClient!") makes the signal race-free, and
+ * `./recovery` holds it until the page asks.
+ */
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') markPasswordRecovery()
 })
