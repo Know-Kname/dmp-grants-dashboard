@@ -21,9 +21,13 @@ const baseAuth = {
   currentUser: null,
 };
 
+// No `future` flags on MemoryRouter: both v7_startTransition and
+// v7_relativeSplatPath are the default in react-router 7, which this app
+// upgraded to in #88. Passing them is harmless, but keeping them here would
+// contradict the comment in App.tsx explaining why they were dropped.
 const renderLogin = () =>
   render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <ThemeProvider>
         <Login />
       </ThemeProvider>
