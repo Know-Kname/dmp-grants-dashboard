@@ -14,7 +14,8 @@
  * boundary between the two. Both are needed — this file keeps the schema honest,
  * `index.ts` keeps the components readable.
  *
- * Last generated: 2026-07-29 (16 tables, post grants.created_by migration).
+ * Last generated: 2026-07-30 (16 tables, post Phase 1: provenance columns,
+ * NOT NULL timestamptz created_at/updated_at).
  */
 
 export type Json =
@@ -37,34 +38,40 @@ export type Database = {
         Row: {
           amount: number
           amount_paid: number
-          created_at: string | null
+          created_at: string
           due_date: string
           id: string
           invoice_number: string
+          source_ref: string | null
+          source_system: string | null
           status: string
-          updated_at: string | null
+          updated_at: string
           vendor_id: string
         }
         Insert: {
           amount: number
           amount_paid?: number
-          created_at?: string | null
+          created_at?: string
           due_date: string
           id?: string
           invoice_number: string
+          source_ref?: string | null
+          source_system?: string | null
           status: string
-          updated_at?: string | null
+          updated_at?: string
           vendor_id: string
         }
         Update: {
           amount?: number
           amount_paid?: number
-          created_at?: string | null
+          created_at?: string
           due_date?: string
           id?: string
           invoice_number?: string
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
-          updated_at?: string | null
+          updated_at?: string
           vendor_id?: string
         }
         Relationships: [
@@ -81,35 +88,41 @@ export type Database = {
         Row: {
           amount: number
           amount_paid: number
-          created_at: string | null
+          created_at: string
           customer_id: string
           due_date: string
           id: string
           invoice_number: string
+          source_ref: string | null
+          source_system: string | null
           status: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           amount: number
           amount_paid?: number
-          created_at?: string | null
+          created_at?: string
           customer_id: string
           due_date: string
           id?: string
           invoice_number: string
+          source_ref?: string | null
+          source_system?: string | null
           status: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           amount?: number
           amount_paid?: number
-          created_at?: string | null
+          created_at?: string
           customer_id?: string
           due_date?: string
           id?: string
           invoice_number?: string
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -127,7 +140,7 @@ export type Database = {
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
-          created_at: string | null
+          created_at: string
           date_of_birth: string | null
           date_of_death: string | null
           deceased_first_name: string
@@ -142,14 +155,16 @@ export type Database = {
           permit_number: string | null
           plot_location: string
           section: string
-          updated_at: string | null
+          source_ref: string | null
+          source_system: string | null
+          updated_at: string
         }
         Insert: {
           burial_date: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
-          created_at?: string | null
+          created_at?: string
           date_of_birth?: string | null
           date_of_death?: string | null
           deceased_first_name: string
@@ -164,14 +179,16 @@ export type Database = {
           permit_number?: string | null
           plot_location: string
           section: string
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Update: {
           burial_date?: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
-          created_at?: string | null
+          created_at?: string
           date_of_birth?: string | null
           date_of_death?: string | null
           deceased_first_name?: string
@@ -186,7 +203,9 @@ export type Database = {
           permit_number?: string | null
           plot_location?: string
           section?: string
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -202,37 +221,43 @@ export type Database = {
         Row: {
           address: string | null
           city: string | null
-          created_at: string | null
+          created_at: string
           id: string
           name: string
           notes: string | null
           phone: string | null
+          source_ref: string | null
+          source_system: string | null
           state: string | null
-          updated_at: string | null
+          updated_at: string
           zip: string | null
         }
         Insert: {
           address?: string | null
           city?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
           name: string
           notes?: string | null
           phone?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           state?: string | null
-          updated_at?: string | null
+          updated_at?: string
           zip?: string | null
         }
         Update: {
           address?: string | null
           city?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
           name?: string
           notes?: string | null
           phone?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           state?: string | null
-          updated_at?: string | null
+          updated_at?: string
           zip?: string | null
         }
         Relationships: []
@@ -241,29 +266,35 @@ export type Database = {
         Row: {
           amount: number
           contract_id: string | null
-          created_at: string | null
+          created_at: string
           description: string
           id: string
           inventory_id: string | null
           quantity: number
+          source_ref: string | null
+          source_system: string | null
         }
         Insert: {
           amount: number
           contract_id?: string | null
-          created_at?: string | null
+          created_at?: string
           description: string
           id?: string
           inventory_id?: string | null
           quantity?: number
+          source_ref?: string | null
+          source_system?: string | null
         }
         Update: {
           amount?: number
           contract_id?: string | null
-          created_at?: string | null
+          created_at?: string
           description?: string
           id?: string
           inventory_id?: string | null
           quantity?: number
+          source_ref?: string | null
+          source_system?: string | null
         }
         Relationships: [
           {
@@ -286,41 +317,47 @@ export type Database = {
         Row: {
           amount_paid: number
           contract_number: string
-          created_at: string | null
+          created_at: string
           customer_id: string
           id: string
           payment_plan: Json | null
           signed_date: string
+          source_ref: string | null
+          source_system: string | null
           status: string
           total_amount: number
           type: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           amount_paid?: number
           contract_number: string
-          created_at?: string | null
+          created_at?: string
           customer_id: string
           id?: string
           payment_plan?: Json | null
           signed_date: string
+          source_ref?: string | null
+          source_system?: string | null
           status: string
           total_amount: number
           type: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           amount_paid?: number
           contract_number?: string
-          created_at?: string | null
+          created_at?: string
           customer_id?: string
           id?: string
           payment_plan?: Json | null
           signed_date?: string
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
           total_amount?: number
           type?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -336,43 +373,49 @@ export type Database = {
         Row: {
           address: string | null
           city: string | null
-          created_at: string | null
+          created_at: string
           email: string | null
           first_name: string
           id: string
           last_name: string
           notes: string | null
           phone: string | null
+          source_ref: string | null
+          source_system: string | null
           state: string | null
-          updated_at: string | null
+          updated_at: string
           zip_code: string | null
         }
         Insert: {
           address?: string | null
           city?: string | null
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           first_name: string
           id?: string
           last_name: string
           notes?: string | null
           phone?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           state?: string | null
-          updated_at?: string | null
+          updated_at?: string
           zip_code?: string | null
         }
         Update: {
           address?: string | null
           city?: string | null
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           first_name?: string
           id?: string
           last_name?: string
           notes?: string | null
           phone?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           state?: string | null
-          updated_at?: string | null
+          updated_at?: string
           zip_code?: string | null
         }
         Relationships: []
@@ -380,7 +423,7 @@ export type Database = {
       deposits: {
         Row: {
           amount: number
-          created_at: string | null
+          created_at: string
           created_by: string | null
           customer_id: string | null
           date: string
@@ -388,10 +431,12 @@ export type Database = {
           method: string
           notes: string | null
           reference: string | null
+          source_ref: string | null
+          source_system: string | null
         }
         Insert: {
           amount: number
-          created_at?: string | null
+          created_at?: string
           created_by?: string | null
           customer_id?: string | null
           date: string
@@ -399,10 +444,12 @@ export type Database = {
           method: string
           notes?: string | null
           reference?: string | null
+          source_ref?: string | null
+          source_system?: string | null
         }
         Update: {
           amount?: number
-          created_at?: string | null
+          created_at?: string
           created_by?: string | null
           customer_id?: string | null
           date?: string
@@ -410,6 +457,8 @@ export type Database = {
           method?: string
           notes?: string | null
           reference?: string | null
+          source_ref?: string | null
+          source_system?: string | null
         }
         Relationships: [
           {
@@ -425,83 +474,95 @@ export type Database = {
         Row: {
           amount: number | null
           application_date: string | null
-          created_at: string | null
+          created_at: string
           created_by: string | null
           deadline: string | null
           description: string | null
           id: string
           notes: string | null
           source: string
+          source_ref: string | null
+          source_system: string | null
           status: string
           title: string
           type: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           amount?: number | null
           application_date?: string | null
-          created_at?: string | null
+          created_at?: string
           created_by?: string | null
           deadline?: string | null
           description?: string | null
           id?: string
           notes?: string | null
           source: string
+          source_ref?: string | null
+          source_system?: string | null
           status: string
           title: string
           type: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           amount?: number | null
           application_date?: string | null
-          created_at?: string | null
+          created_at?: string
           created_by?: string | null
           deadline?: string | null
           description?: string | null
           id?: string
           notes?: string | null
           source?: string
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
           title?: string
           type?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
       graves: {
         Row: {
-          created_at: string | null
+          created_at: string
           grave_number: string
           id: string
           lat: number | null
           lng: number | null
           lot_id: string
           notes: string | null
+          source_ref: string | null
+          source_system: string | null
           status: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           grave_number: string
           id?: string
           lat?: number | null
           lng?: number | null
           lot_id: string
           notes?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           grave_number?: string
           id?: string
           lat?: number | null
           lng?: number | null
           lot_id?: string
           notes?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -516,41 +577,47 @@ export type Database = {
       inventory: {
         Row: {
           category: string
-          created_at: string | null
+          created_at: string
           id: string
           location: string | null
           name: string
           quantity: number
           reorder_point: number
           sku: string | null
+          source_ref: string | null
+          source_system: string | null
           unit_price: number
-          updated_at: string | null
+          updated_at: string
           vendor_id: string | null
         }
         Insert: {
           category: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           location?: string | null
           name: string
           quantity?: number
           reorder_point?: number
           sku?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           unit_price?: number
-          updated_at?: string | null
+          updated_at?: string
           vendor_id?: string | null
         }
         Update: {
           category?: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           location?: string | null
           name?: string
           quantity?: number
           reorder_point?: number
           sku?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           unit_price?: number
-          updated_at?: string | null
+          updated_at?: string
           vendor_id?: string | null
         }
         Relationships: [
@@ -565,28 +632,34 @@ export type Database = {
       }
       lots: {
         Row: {
-          created_at: string | null
+          created_at: string
           description: string | null
           id: string
           lot_number: string
           section_id: string
-          updated_at: string | null
+          source_ref: string | null
+          source_system: string | null
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           id?: string
           lot_number: string
           section_id: string
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           id?: string
           lot_number?: string
           section_id?: string
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -602,35 +675,41 @@ export type Database = {
         Row: {
           amount: number
           contract_id: string
-          created_at: string | null
+          created_at: string
           due_date: string
           id: string
           notes: string | null
           paid_date: string | null
+          source_ref: string | null
+          source_system: string | null
           status: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           amount: number
           contract_id: string
-          created_at?: string | null
+          created_at?: string
           due_date: string
           id?: string
           notes?: string | null
           paid_date?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           amount?: number
           contract_id?: string
-          created_at?: string | null
+          created_at?: string
           due_date?: string
           id?: string
           notes?: string | null
           paid_date?: string | null
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -646,29 +725,35 @@ export type Database = {
         Row: {
           capacity: number | null
           cemetery_id: string
-          created_at: string | null
+          created_at: string
           description: string | null
           id: string
           name: string
-          updated_at: string | null
+          source_ref: string | null
+          source_system: string | null
+          updated_at: string
         }
         Insert: {
           capacity?: number | null
           cemetery_id: string
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           id?: string
           name: string
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Update: {
           capacity?: number | null
           cemetery_id?: string
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           id?: string
           name?: string
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -684,35 +769,41 @@ export type Database = {
         Row: {
           address: string | null
           contact_name: string | null
-          created_at: string | null
+          created_at: string
           email: string | null
           id: string
           name: string
           notes: string | null
           phone: string | null
-          updated_at: string | null
+          source_ref: string | null
+          source_system: string | null
+          updated_at: string
         }
         Insert: {
           address?: string | null
           contact_name?: string | null
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           id?: string
           name: string
           notes?: string | null
           phone?: string | null
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Update: {
           address?: string | null
           contact_name?: string | null
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           id?: string
           name?: string
           notes?: string | null
           phone?: string | null
-          updated_at?: string | null
+          source_ref?: string | null
+          source_system?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -720,44 +811,50 @@ export type Database = {
         Row: {
           assigned_to: string | null
           completed_date: string | null
-          created_at: string | null
+          created_at: string
           created_by: string | null
           description: string | null
           due_date: string | null
           id: string
           priority: string
+          source_ref: string | null
+          source_system: string | null
           status: string
           title: string
           type: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           assigned_to?: string | null
           completed_date?: string | null
-          created_at?: string | null
+          created_at?: string
           created_by?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           priority: string
+          source_ref?: string | null
+          source_system?: string | null
           status: string
           title: string
           type: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           assigned_to?: string | null
           completed_date?: string | null
-          created_at?: string | null
+          created_at?: string
           created_by?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: string
+          source_ref?: string | null
+          source_system?: string | null
           status?: string
           title?: string
           type?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

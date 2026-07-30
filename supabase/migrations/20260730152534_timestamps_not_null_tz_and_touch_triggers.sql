@@ -49,8 +49,26 @@ begin
 
     -- created_at: naive -> timestamptz (existing values are already UTC),
     -- backfill, default, NOT NULL.
-    execute format(
-      'alter table public.%I alter column created_at type timestamptz using created_at at time zone ''UTC''', t);
+    --
+    -- Branch on the CURRENT type. Applying `at time zone 'UTC'` to a column
+    -- that is ALREADY timestamptz does the opposite of what is wanted: it
+    -- yields a naive UTC wall clock, which ALTER ... TYPE timestamptz then
+    -- re-interprets in the session TimeZone. That round-trip is lossy and
+    -- session-dependent -- replaying this file from a psql session with
+    -- PGTZ=America/Detroit would shift every row in the five tables that
+    -- were created as timestamptz (cemeteries, sections, lots, graves,
+    -- payment_schedule) by 4-5 hours, silently and with no error.
+    --
+    -- It happened to be harmless on first application (those tables were
+    -- empty and the Supabase session TimeZone is UTC), but the file must be
+    -- correct for the replay-against-a-restored-backup case it claims to
+    -- support below.
+    if (select data_type from information_schema.columns
+          where table_schema = 'public' and table_name = t and column_name = 'created_at')
+       = 'timestamp without time zone' then
+      execute format(
+        'alter table public.%I alter column created_at type timestamptz using created_at at time zone ''UTC''', t);
+    end if;
     execute format(
       'update public.%I set created_at = $1 where created_at is null', t) using legacy_ts;
     execute format(
@@ -59,8 +77,12 @@ begin
       'alter table public.%I alter column created_at set not null', t);
 
     if has_updated then
-      execute format(
-        'alter table public.%I alter column updated_at type timestamptz using updated_at at time zone ''UTC''', t);
+      if (select data_type from information_schema.columns
+            where table_schema = 'public' and table_name = t and column_name = 'updated_at')
+         = 'timestamp without time zone' then
+        execute format(
+          'alter table public.%I alter column updated_at type timestamptz using updated_at at time zone ''UTC''', t);
+      end if;
       -- Fall back to created_at, not the sentinel: a row that was created and
       -- never edited has updated_at = created_at, which is the truth.
       execute format(

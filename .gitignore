@@ -11,3 +11,6 @@ coverage
 # Supabase CLI local artifacts
 supabase/.temp
 supabase/.branches
+
+# Agent worktrees (transient)
+.claude/worktrees/

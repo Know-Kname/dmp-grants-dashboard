@@ -31,11 +31,22 @@ begin
     execute format('alter table public.%I add column if not exists source_system text', t);
     execute format('alter table public.%I add column if not exists source_ref text', t);
 
-    execute format(
-      'alter table public.%I add constraint %I check ((source_system is null) = (source_ref is null)) not valid',
-      t, t || '_source_pair_complete');
-    execute format(
-      'alter table public.%I validate constraint %I', t, t || '_source_pair_complete');
+    -- Postgres has no ADD CONSTRAINT IF NOT EXISTS, and the rest of this
+    -- loop is guarded, so without this check the migration would be half
+    -- idempotent -- which is worse than not idempotent at all, because a
+    -- replay gets partway through the loop before aborting on
+    -- "constraint already exists".
+    if not exists (
+      select 1 from pg_constraint
+      where conrelid = format('public.%I', t)::regclass
+        and conname = t || '_source_pair_complete'
+    ) then
+      execute format(
+        'alter table public.%I add constraint %I check ((source_system is null) = (source_ref is null)) not valid',
+        t, t || '_source_pair_complete');
+      execute format(
+        'alter table public.%I validate constraint %I', t, t || '_source_pair_complete');
+    end if;
 
     execute format(
       'create unique index if not exists %I on public.%I (source_system, source_ref) where source_system is not null',

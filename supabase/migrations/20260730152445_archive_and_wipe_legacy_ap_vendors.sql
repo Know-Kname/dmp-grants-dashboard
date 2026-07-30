@@ -25,5 +25,14 @@
 -- DELETE respects the foreign keys and fails loudly if anything still
 -- points at a row being removed.
 
-delete from public.accounts_payable;
-delete from public.vendors;
+-- Scoped to the legacy signature rather than an unqualified DELETE.
+--
+-- All 131 legacy rows had created_at IS NULL -- that is what identified
+-- them as the bad import in the first place, and the very next migration
+-- makes created_at NOT NULL, so no row created after this point can ever
+-- match. Without this predicate, replaying the migration chain against a
+-- branch or restored backup that holds REAL vendor data would silently
+-- delete it. A wipe should be narrow enough that re-running it is boring.
+
+delete from public.accounts_payable where created_at is null;
+delete from public.vendors where created_at is null;
