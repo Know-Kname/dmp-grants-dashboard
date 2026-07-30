@@ -10,37 +10,44 @@ import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { getErrorMessage } from '../lib/errors';
+import { forgotPasswordFormSchema } from '../lib/schemas';
+import { useForm, getFieldError } from '../hooks/useForm';
 import { AuthLayout, AuthField, AuthButton } from '../components/AuthLayout';
 import { m, AnimatePresence, fadeUp } from '../lib/motion';
 import { BRAND } from '../config/brand';
+import type { z } from 'zod';
+
+type ForgotPasswordFormValues = z.input<typeof forgotPasswordFormSchema>;
 
 export default function ForgotPassword() {
   const { resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      await resetPassword(email.trim());
-      setSent(true);
-    } catch (err) {
-      // Rate limiting is the one failure worth surfacing; everything else is
-      // folded into the neutral success state so the form can't enumerate users.
-      const message = getErrorMessage(err);
-      if (/rate|too many/i.test(message)) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
+  // `useForm` + `forgotPasswordFormSchema`, per the project's form convention.
+  // The schema already existed in `lib/schemas.ts` but nothing imported it, so
+  // this page was hand-rolling `useState` and shipping whatever the browser's
+  // `type="email"` happened to accept.
+  const form = useForm<ForgotPasswordFormValues, z.output<typeof forgotPasswordFormSchema>>({
+    schema: forgotPasswordFormSchema,
+    initialValues: { email: '' },
+    onSubmit: async (data) => {
+      setError(null);
+      try {
+        await resetPassword(data.email);
         setSent(true);
+      } catch (err) {
+        // Rate limiting is the one failure worth surfacing; everything else is
+        // folded into the neutral success state so the form can't enumerate users.
+        const message = getErrorMessage(err);
+        if (/rate|too many/i.test(message)) {
+          setError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setSent(true);
+        }
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   return (
     <AuthLayout
@@ -76,12 +83,15 @@ export default function ForgotPassword() {
           >
             <CheckCircle2 size={17} className="flex-shrink-0 mt-0.5" style={{ color: BRAND.green }} />
             <p className="text-sm leading-relaxed" style={{ color: 'rgba(26,26,26,0.7)' }}>
-              If an account exists for <span style={{ fontWeight: 600 }}>{email}</span>, a reset link
-              is on its way. Check spam if it doesn’t arrive within a few minutes.
+              If an account exists for{' '}
+              <span style={{ fontWeight: 600 }}>{form.values.email}</span>, a reset link
+              is on its way. Open it on this device if you can — see the note on the
+              reset page if you need to use another. Check spam if it doesn’t arrive
+              within a few minutes.
             </p>
           </m.div>
         ) : (
-          <m.form key="form" onSubmit={handleSubmit} exit={{ opacity: 0 }}>
+          <m.form key="form" onSubmit={form.handleSubmit} exit={{ opacity: 0 }}>
             <AnimatePresence>
               {error && (
                 <m.div
@@ -108,8 +118,8 @@ export default function ForgotPassword() {
                 label="Email"
                 type="email"
                 icon={<Mail size={15} />}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...form.getFieldProps('email')}
+                error={getFieldError('email', form.errors, form.touched)}
                 placeholder="you@detroitmemorialpark.com"
                 required
                 autoComplete="email"
@@ -118,8 +128,8 @@ export default function ForgotPassword() {
             </m.div>
 
             <m.div variants={fadeUp}>
-              <AuthButton type="submit" loading={loading}>
-                {loading ? 'Sending' : 'Send reset link'}
+              <AuthButton type="submit" loading={form.isSubmitting}>
+                {form.isSubmitting ? 'Sending' : 'Send reset link'}
               </AuthButton>
             </m.div>
           </m.form>

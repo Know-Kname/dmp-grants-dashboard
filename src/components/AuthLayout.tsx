@@ -99,13 +99,27 @@ export function AuthLayout({
   );
 }
 
-/** Underlined field matching the Login page's inputs. */
+/**
+ * Underlined field matching the Login page's inputs.
+ *
+ * Takes an `error` so these pages can follow the project's form convention
+ * (`useForm` + a Zod schema, with `getFieldError(...)` piped into `error`) the
+ * same way `Input`/`Select` do on the CRUD screens.
+ */
 export function AuthField({
   id,
   label,
   icon,
+  error,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { id: string; label: string; icon?: React.ReactNode }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  error?: string;
+}) {
+  const errorId = `${id}-error`;
+
   return (
     <div className="mb-6">
       <label
@@ -117,16 +131,27 @@ export function AuthField({
       </label>
       <div
         className="relative flex items-center transition-all duration-200"
-        style={{ borderBottom: '1px solid rgba(26,61,43,0.25)' }}
+        style={{
+          borderBottom: error
+            ? '1px solid rgba(185,28,28,0.55)'
+            : '1px solid rgba(26,61,43,0.25)',
+        }}
       >
-        {icon && <span style={{ color: 'rgba(26,26,26,0.4)' }}>{icon}</span>}
+        {icon && <span style={{ color: error ? 'rgb(153,27,27)' : 'rgba(26,26,26,0.4)' }}>{icon}</span>}
         <input
           id={id}
           className="w-full pl-3 pr-2 py-3 bg-transparent text-base outline-none"
           style={{ color: 'var(--ink)', fontFamily: 'var(--font-serif)' }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
           {...props}
         />
       </div>
+      {error && (
+        <p id={errorId} className="mt-2 text-xs" style={{ color: 'rgb(153,27,27)' }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

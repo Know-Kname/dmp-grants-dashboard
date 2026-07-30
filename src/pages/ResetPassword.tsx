@@ -1,10 +1,43 @@
 /**
  * Set a new password from a recovery link.
  *
- * The form renders only once a recovery session exists. Supabase delivers that
- * session by exchanging a code in the URL, so a user landing on the bare route —
- * or arriving with an expired link — must see an explanation rather than a form
- * whose submit would 401.
+ * ## The guard is the security boundary of this page
+ *
+ * `updateUser({ password })` changes the password of whoever the **current**
+ * session belongs to, and Supabase demands no current-password challenge. So
+ * whatever decides to render this form decides who can be taken over.
+ *
+ * The previous guard was `if (event === 'PASSWORD_RECOVERY' || session)`, which
+ * accepted *any* session, including an ordinary staff login already sitting in
+ * `localStorage`. On a shared workstation, typing `/reset-password` into the
+ * address bar produced a working form pointed at the signed-in colleague's
+ * account. It also mis-fired the other way: opening someone else's recovery link
+ * in a browser holding your own session left your session intact (auth-js does
+ * not clear it on a failed URL login) and rewrote *your* password under a
+ * "Password updated" banner.
+ *
+ * This page therefore ignores sessions entirely as a readiness signal. It asks
+ * one question: **did a recovery happen during this page load?** That means the
+ * URL arrived carrying recovery credentials (snapshotted in `../lib/recovery`
+ * before auth-js scrubs them) *and* those credentials actually produced a
+ * `PASSWORD_RECOVERY` event. No evidence, no form.
+ *
+ * ## Cross-device links
+ *
+ * With `flowType: 'pkce'`, auth-js only attempts a `?code=` exchange when the
+ * matching code verifier is in *this* browser's storage
+ * (`_isPKCECallback` requires `params.code && <verifier>`). Request the reset on
+ * the office desktop, open the email on a phone, and there is no verifier — so
+ * no exchange is even attempted and the link, which is perfectly valid, reads as
+ * "expired". Staff burn resets forever with no path to success.
+ *
+ * The fix is the token-hash path: a `?token_hash=…&type=recovery` link is
+ * verified here with `verifyOtp`, which needs no local verifier and therefore
+ * works on any device. That requires the Supabase email template to emit
+ * `{{ .TokenHash }}` — see `docs/06-supabase.md`. Until that template is
+ * changed, links still arrive as `?code=`, so the PKCE path is kept and, when
+ * the verifier is missing, says plainly which browser to use instead of blaming
+ * the link.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -13,97 +46,191 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage } from '../lib/errors';
 import { resetPasswordFormSchema } from '../lib/schemas';
+import { useForm, getFieldError } from '../hooks/useForm';
 import { AuthLayout, AuthField, AuthButton } from '../components/AuthLayout';
 import { m, AnimatePresence, fadeUp } from '../lib/motion';
 import { BRAND } from '../config/brand';
+import {
+  initialRecoveryLink,
+  hasPasswordRecoveryFired,
+  onPasswordRecovery,
+  endRecoverySession,
+} from '../lib/recovery';
+import type { z } from 'zod';
 
 type Status = 'checking' | 'ready' | 'invalid' | 'done';
 
+type ResetPasswordFormValues = z.input<typeof resetPasswordFormSchema>;
+
+/** What to tell the user when the page refuses to render the form. */
+interface InvalidReason {
+  title: string;
+  subtitle: string;
+  detail: string;
+}
+
+const REASONS = {
+  /** The URL carried no recovery credentials at all — e.g. typed by hand. */
+  noLink: {
+    title: 'Open the link from your email.',
+    subtitle: 'This page can only be reached from a password reset email.',
+    detail:
+      'For your security, a new password can only be set by following the link we email you — being signed in is not enough. Request a link below and open it from your inbox.',
+  },
+  /** PKCE code present, but this browser never requested the reset. */
+  wrongBrowser: {
+    title: 'Open this link in the browser you requested it from.',
+    subtitle: 'The link is fine — this browser just can’t complete it.',
+    detail:
+      'For security, this reset link has to be finished in the same browser that requested it. Open the email on the computer where you clicked “Reset your password”, or request a fresh link from this device.',
+  },
+  /** The server rejected the credentials: expired, already used, tampered. */
+  rejected: {
+    title: 'This link has expired.',
+    subtitle: 'Reset links are valid for one hour and can only be used once.',
+    detail: 'We couldn’t verify this reset link.',
+  },
+} satisfies Record<string, InvalidReason>;
+
 /**
- * Supabase reports expired/consumed links via error params on the hash or query.
- *
- * Best-effort by design: with `detectSessionInUrl` enabled the client often
- * consumes and clears the hash before this runs, in which case the session check
- * below falls through to the same "expired" state with generic copy. This only
- * upgrades the message when the params survive (query-string variant, or a
- * reload), so the guard must never depend on it firing.
+ * How long to wait for a `PASSWORD_RECOVERY` event that should already be on its
+ * way. Only reached on the PKCE/implicit paths, where auth-js owns the exchange
+ * and we can only observe the outcome. The token-hash path awaits `verifyOtp`
+ * directly and never uses this.
  */
-function linkErrorFromUrl(): string | null {
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const query = new URLSearchParams(window.location.search);
-  const description = hash.get('error_description') ?? query.get('error_description');
-  const code = hash.get('error') ?? query.get('error');
-  if (!description && !code) return null;
-  return description ? description.replace(/\+/g, ' ') : 'This link is no longer valid.';
+const RECOVERY_EVENT_TIMEOUT_MS = 5000;
+
+/**
+ * In-flight (or completed) `verifyOtp` call for this page load.
+ *
+ * A `token_hash` is single-use, so the call must happen exactly once. React
+ * StrictMode mounts effects twice in development, which without this would burn
+ * the token on the first run and report "expired" on the second — making the
+ * flow impossible to exercise locally. Module scope rather than a ref because it
+ * must survive the unmount/remount StrictMode performs.
+ */
+let verification: Promise<{ error: unknown }> | null = null;
+
+function verifyRecoveryToken(tokenHash: string): Promise<{ error: unknown }> {
+  verification ??= supabase.auth
+    .verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+    .then(({ error }) => ({ error: error as unknown }));
+  return verification;
 }
 
 export default function ResetPassword() {
   const { updatePassword } = useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('checking');
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [reason, setReason] = useState<InvalidReason>(REASONS.rejected);
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const urlError = linkErrorFromUrl();
-    if (urlError) {
-      setLinkError(urlError);
-      setStatus('invalid');
-      return;
-    }
-
     let cancelled = false;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const fail = (next: InvalidReason) => {
       if (cancelled) return;
-      if (event === 'PASSWORD_RECOVERY' || session) setStatus('ready');
-    });
+      setReason(next);
+      setStatus('invalid');
+    };
+    const succeed = () => {
+      if (!cancelled) setStatus('ready');
+    };
 
-    // The listener catches the code exchange; this catches the case where it
-    // already completed before we subscribed.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled) return;
-      if (session) {
-        setStatus('ready');
-      } else {
-        // Give detectSessionInUrl a moment to finish before declaring failure.
-        setTimeout(() => {
-          if (!cancelled) setStatus((s) => (s === 'checking' ? 'invalid' : s));
-        }, 2500);
+    /** Resolve once auth-js reports a recovery, or give up. */
+    const awaitRecoveryEvent = () => {
+      if (hasPasswordRecoveryFired()) {
+        succeed();
+        return undefined;
       }
-    });
+
+      const unsubscribe = onPasswordRecovery(succeed);
+      const timer = window.setTimeout(() => {
+        // The exchange either failed or never ran. Critically, we do NOT fall
+        // back to "is there a session?" — on a failed exchange auth-js keeps any
+        // pre-existing session, and treating that as success is the takeover.
+        fail(REASONS.rejected);
+      }, RECOVERY_EVENT_TIMEOUT_MS);
+
+      return () => {
+        unsubscribe();
+        window.clearTimeout(timer);
+      };
+    };
+
+    let cleanup: (() => void) | undefined;
+
+    switch (initialRecoveryLink.kind) {
+      case 'error':
+        fail({
+          ...REASONS.rejected,
+          detail: initialRecoveryLink.errorDescription ?? REASONS.rejected.detail,
+        });
+        break;
+
+      case 'token_hash': {
+        // Device-independent: no code verifier involved, so this works from the
+        // phone the email was opened on. A rejection here is a real rejection
+        // from the server, not a missing-verifier false negative.
+        const tokenHash = initialRecoveryLink.tokenHash;
+        if (tokenHash === null) {
+          fail(REASONS.noLink);
+          break;
+        }
+        void verifyRecoveryToken(tokenHash).then(({ error: verifyError }) => {
+          if (verifyError) {
+            fail({ ...REASONS.rejected, detail: getErrorMessage(verifyError) });
+          } else {
+            succeed();
+          }
+        });
+        break;
+      }
+
+      case 'pkce':
+        if (!initialRecoveryLink.hadCodeVerifier) {
+          // auth-js will not even attempt the exchange without the verifier, so
+          // no event is coming. Say which browser to use rather than "expired".
+          fail(REASONS.wrongBrowser);
+        } else {
+          cleanup = awaitRecoveryEvent();
+        }
+        break;
+
+      case 'implicit':
+        cleanup = awaitRecoveryEvent();
+        break;
+
+      case 'none':
+      default:
+        // No recovery credentials in the URL. An existing session is explicitly
+        // NOT accepted here — that was the account-takeover path.
+        fail(REASONS.noLink);
+        break;
+    }
 
     return () => {
       cancelled = true;
-      subscription.unsubscribe();
+      cleanup?.();
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    const parsed = resetPasswordFormSchema.safeParse({ password, confirmPassword });
-    if (!parsed.success) {
-      setError(parsed.error.errors[0]?.message ?? 'Please check the form.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await updatePassword(parsed.data.password);
-      setStatus('done');
-      setTimeout(() => navigate('/'), 1800);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const form = useForm<ResetPasswordFormValues, z.output<typeof resetPasswordFormSchema>>({
+    schema: resetPasswordFormSchema,
+    initialValues: { password: '', confirmPassword: '' },
+    onSubmit: async (data) => {
+      setError(null);
+      try {
+        await updatePassword(data.password);
+        endRecoverySession();
+        setStatus('done');
+        setTimeout(() => navigate('/', { replace: true }), 1800);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      }
+    },
+  });
 
   const backLink = (
     <Link
@@ -133,8 +260,8 @@ export default function ResetPassword() {
     return (
       <AuthLayout
         eyebrow="Account Recovery"
-        title="This link has expired."
-        subtitle="Reset links are valid for one hour and can only be used once."
+        title={reason.title}
+        subtitle={reason.subtitle}
         footer={backLink}
       >
         <div
@@ -146,7 +273,7 @@ export default function ResetPassword() {
         >
           <AlertCircle size={17} className="flex-shrink-0 mt-0.5" style={{ color: 'rgb(153,27,27)' }} />
           <p className="text-sm leading-relaxed" style={{ color: 'rgba(26,26,26,0.7)' }}>
-            {linkError ?? 'We couldn’t verify this reset link.'}
+            {reason.detail}
           </p>
         </div>
         <Link to="/forgot-password">
@@ -187,7 +314,7 @@ export default function ResetPassword() {
       subtitle="At least 12 characters. Use something you don’t use anywhere else."
       footer={backLink}
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={form.handleSubmit}>
         <AnimatePresence>
           {error && (
             <m.div
@@ -214,8 +341,8 @@ export default function ResetPassword() {
             label="New password"
             type={show ? 'text' : 'password'}
             icon={<Lock size={15} />}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            {...form.getFieldProps('password')}
+            error={getFieldError('password', form.errors, form.touched)}
             required
             autoComplete="new-password"
             autoFocus
@@ -238,16 +365,16 @@ export default function ResetPassword() {
             label="Confirm password"
             type={show ? 'text' : 'password'}
             icon={<Lock size={15} />}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            {...form.getFieldProps('confirmPassword')}
+            error={getFieldError('confirmPassword', form.errors, form.touched)}
             required
             autoComplete="new-password"
           />
         </m.div>
 
         <m.div variants={fadeUp}>
-          <AuthButton type="submit" loading={saving}>
-            {saving ? 'Saving' : 'Set new password'}
+          <AuthButton type="submit" loading={form.isSubmitting}>
+            {form.isSubmitting ? 'Saving' : 'Set new password'}
           </AuthButton>
         </m.div>
       </form>

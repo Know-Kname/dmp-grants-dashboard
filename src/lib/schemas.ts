@@ -325,8 +325,13 @@ export const loginFormSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginFormSchema>;
 
+/**
+ * Trimmed, unlike the shared `emailSchema`, because this address is nearly
+ * always pasted — and a trailing space would otherwise fail `.email()` and read
+ * as "your email is invalid" for an address that is perfectly correct.
+ */
 export const forgotPasswordFormSchema = z.object({
-  email: emailSchema,
+  email: z.string().trim().email('Invalid email address'),
 });
 
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordFormSchema>;
