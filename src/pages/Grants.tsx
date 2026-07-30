@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { z } from 'zod';
 import { useGrants, useCreateGrant, useUpdateGrant, useDeleteGrant } from '../hooks/useData';
 import { useForm, getFieldError } from '../hooks/useForm';
@@ -6,10 +7,40 @@ import { grantFormSchema } from '../lib/schemas';
 import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, formatDateForInput } from '../lib/utils';
 import type { Grant } from '../types';
-import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner, PageError, StatCard } from '../components/ui';
-import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+import {
+  Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState,
+  PageError, StatCard, AnimatedNumber, ConfirmDialog, SkeletonStatRow, Skeleton, Tabs,
+} from '../components/ui';
+import { m, AnimatePresence, staggerContainer, fadeInUp, EASE_LUX } from '../lib/motion';
+import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react';
+import { format, differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from '../lib/toast';
+
+type GrantStatus = Grant['status'];
+
+/** Pipeline column order; denied sits outside the happy path. */
+const PIPELINE: { status: GrantStatus; label: string }[] = [
+  { status: 'available', label: 'Available' },
+  { status: 'applied', label: 'Applied' },
+  { status: 'approved', label: 'Approved' },
+  { status: 'received', label: 'Received' },
+  { status: 'denied', label: 'Denied' },
+];
+
+const NEXT_STATUS: Partial<Record<GrantStatus, { to: GrantStatus; label: string }>> = {
+  available: { to: 'applied', label: 'Mark applied' },
+  applied: { to: 'approved', label: 'Mark approved' },
+  approved: { to: 'received', label: 'Mark received' },
+};
+
+/** Deadline chip: red inside a week, amber inside a month, danger when past. */
+function DeadlineBadge({ deadline }: { deadline: string }) {
+  const daysLeft = differenceInCalendarDays(parseISO(deadline), new Date());
+  if (daysLeft < 0) return <Badge variant="danger" size="sm">overdue</Badge>;
+  if (daysLeft <= 7) return <Badge variant="danger" size="sm">{daysLeft === 0 ? 'due today' : `${daysLeft}d left`}</Badge>;
+  if (daysLeft <= 30) return <Badge variant="warning" size="sm">{daysLeft}d left</Badge>;
+  return null;
+}
 
 /**
  * Live form state — the *input* side of `grantFormSchema`.
@@ -53,11 +84,17 @@ export default function Grants() {
   });
 
   // Local state
+  const [searchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editingGrant, setEditingGrant] = useState<Grant | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  // Seeded from ?q= so the command palette can deep-link a specific grant
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [view, setView] = useState<'list' | 'pipeline'>('list');
+  const [deleteTarget, setDeleteTarget] = useState<Grant | null>(null);
+  /** Grant id currently wearing the one-shot gold shimmer (just marked received). */
+  const [shimmerId, setShimmerId] = useState<string | null>(null);
   // Form state + validation. `onSubmit` only runs once grantFormSchema parses,
   // so `data` here is the *output* shape — amount has already been coerced from
   // its input string to a number.
@@ -109,18 +146,19 @@ export default function Grants() {
     return filtered;
   }, [grants, searchTerm, statusFilter, typeFilter]);
 
-  // Calculate totals using useMemo
-  const totals = useMemo(() => ({
-    available: filteredGrants
-      .filter(g => g.amount && g.status === 'available')
-      .reduce((sum, g) => sum + (g.amount || 0), 0),
-    applied: filteredGrants
-      .filter(g => g.amount && g.status === 'applied')
-      .reduce((sum, g) => sum + (g.amount || 0), 0),
-    received: filteredGrants
-      .filter(g => g.amount && g.status === 'received')
-      .reduce((sum, g) => sum + (g.amount || 0), 0),
-  }), [filteredGrants]);
+  // Headline totals are computed over ALL grants, not the filtered view —
+  // filters narrow the list below, they must not move the headline numbers.
+  const totals = useMemo(() => {
+    const sumFor = (status: GrantStatus) =>
+      grants.filter(g => g.amount && g.status === status).reduce((sum, g) => sum + (g.amount || 0), 0);
+    const countFor = (status: GrantStatus) => grants.filter(g => g.status === status).length;
+    return {
+      available: sumFor('available'), availableCount: countFor('available'),
+      applied: sumFor('applied'), appliedCount: countFor('applied'),
+      approved: sumFor('approved'), approvedCount: countFor('approved'),
+      received: sumFor('received'), receivedCount: countFor('received'),
+    };
+  }, [grants]);
 
   const handleEdit = (grant: Grant) => {
     setEditingGrant(grant);
@@ -138,10 +176,24 @@ export default function Grants() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this grant/opportunity?')) {
-      deleteMutation.mutate(id);
-    }
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+  };
+
+  /** Click-to-advance a grant along the pipeline. Receiving earns a single gold shimmer. */
+  const advance = (grant: Grant, to: GrantStatus) => {
+    updateMutation.mutate(
+      { id: grant.id, status: to },
+      {
+        onSuccess: () => {
+          if (to === 'received') {
+            setShimmerId(grant.id);
+            setTimeout(() => setShimmerId(null), 1200);
+          }
+        },
+      }
+    );
   };
 
   const resetForm = () => form.reset(initialFormData);
@@ -206,11 +258,32 @@ export default function Grants() {
       {/* Error display */}
       <PageError error={combinedError} />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard label="Available Funding" value={formatCurrency(totals.available)} icon={Gift} tone="info" />
-        <StatCard label="Applied For" value={formatCurrency(totals.applied)} icon={Calendar} tone="warning" />
-        <StatCard label="Received" value={formatCurrency(totals.received)} icon={DollarSign} tone="success" />
+      {/* Stats Cards — totals over all grants, unaffected by the filters below */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Available Funding"
+          value={<AnimatedNumber to={totals.available} format={formatCurrency} />}
+          icon={Gift} tone="info"
+          hint={`${totals.availableCount} open`}
+        />
+        <StatCard
+          label="Applied For"
+          value={<AnimatedNumber to={totals.applied} format={formatCurrency} />}
+          icon={Calendar} tone="warning"
+          hint={`${totals.appliedCount} pending`}
+        />
+        <StatCard
+          label="Approved"
+          value={<AnimatedNumber to={totals.approved} format={formatCurrency} />}
+          icon={CheckCircle2} tone="primary"
+          hint={`${totals.approvedCount} awaiting funds`}
+        />
+        <StatCard
+          label="Received"
+          value={<AnimatedNumber to={totals.received} format={formatCurrency} />}
+          icon={DollarSign} tone="success"
+          hint={`${totals.receivedCount} funded`}
+        />
       </div>
 
       {/* Filters */}
@@ -245,8 +318,15 @@ export default function Grants() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             />
-            <div className="flex items-center text-sm text-foreground-muted">
-              {filteredGrants.length} of {grants.length} grants
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-foreground-muted whitespace-nowrap">
+                {filteredGrants.length} of {grants.length}
+              </span>
+              <Tabs
+                tabs={[{ value: 'list', label: 'List' }, { value: 'pipeline', label: 'Pipeline' }]}
+                active={view}
+                onChange={(v) => setView(v as 'list' | 'pipeline')}
+              />
             </div>
           </div>
         </CardBody>
@@ -254,14 +334,18 @@ export default function Grants() {
 
       {/* Loading state */}
       {isLoading && (
-        <Card>
-          <CardBody>
-            <div className="py-12">
-              <LoadingSpinner size="lg" />
-              <p className="text-center text-foreground-muted mt-4">Loading grants...</p>
-            </div>
-          </CardBody>
-        </Card>
+        <div className="space-y-4">
+          <SkeletonStatRow count={4} />
+          {[0, 1, 2].map(i => (
+            <Card key={i}>
+              <CardBody className="space-y-3">
+                <Skeleton className="h-5 w-64" />
+                <Skeleton className="h-4 w-full max-w-lg" />
+                <Skeleton className="h-4 w-72" />
+              </CardBody>
+            </Card>
+          ))}
+        </div>
       )}
 
       {/* Grants List */}
@@ -284,10 +368,82 @@ export default function Grants() {
         </Card>
       )}
 
-      {!isLoading && filteredGrants.length > 0 && (
-        <div className="grid gap-4">
+      {!isLoading && filteredGrants.length > 0 && view === 'pipeline' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 items-start">
+          {PIPELINE.map(col => {
+            const colGrants = filteredGrants.filter(g => g.status === col.status);
+            return (
+              <div key={col.status} className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">{col.label}</h3>
+                  <Badge variant="secondary" size="sm">{colGrants.length}</Badge>
+                </div>
+                <div className="space-y-3 min-h-[60px] rounded-xl">
+                  <AnimatePresence mode="popLayout">
+                    {colGrants.map(grant => {
+                      const next = NEXT_STATUS[grant.status];
+                      return (
+                        <m.div
+                          key={grant.id}
+                          layoutId={`grant-${grant.id}`}
+                          initial={{ opacity: 0, scale: 0.97 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.97 }}
+                          transition={{ duration: 0.3, ease: EASE_LUX }}
+                          className={`relative overflow-hidden bg-card border border-border rounded-xl shadow-sm p-3.5 ${
+                            shimmerId === grant.id ? 'gold-shimmer' : ''
+                          }`}
+                        >
+                          <button
+                            onClick={() => handleEdit(grant)}
+                            className="block w-full text-left min-h-0"
+                          >
+                            <p className="text-sm font-semibold text-foreground leading-snug">{grant.title}</p>
+                            <p className="text-xs text-foreground-muted mt-1 truncate">{grant.source}</p>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              {grant.amount ? (
+                                <span className="text-sm font-semibold text-foreground">{formatCurrency(grant.amount)}</span>
+                              ) : null}
+                              {grant.deadline && grant.status !== 'received' && grant.status !== 'denied' && (
+                                <DeadlineBadge deadline={grant.deadline} />
+                              )}
+                            </div>
+                          </button>
+                          {next && (
+                            <button
+                              onClick={() => advance(grant, next.to)}
+                              disabled={updateMutation.isPending}
+                              className="mt-2.5 w-full min-h-0 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover border border-border hover:border-primary rounded-lg py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              {next.label}
+                              <ArrowRight size={12} />
+                            </button>
+                          )}
+                        </m.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                  {colGrants.length === 0 && (
+                    <div className="border border-dashed border-border rounded-xl py-6 text-center text-xs text-foreground-subtle">
+                      Empty
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!isLoading && filteredGrants.length > 0 && view === 'list' && (
+        <m.div className="grid gap-4" variants={staggerContainer} initial="hidden" animate="show">
           {filteredGrants.map((grant) => (
-            <Card key={grant.id} hoverable className="animate-fade-in">
+            <m.div
+              key={grant.id}
+              variants={fadeInUp}
+              className={`relative overflow-hidden rounded-xl ${shimmerId === grant.id ? 'gold-shimmer' : ''}`}
+            >
+            <Card hoverable>
               <CardBody>
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
@@ -312,9 +468,12 @@ export default function Grants() {
                         </div>
                       )}
                       {grant.deadline && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <Calendar size={14} />
                           <span>Deadline: {format(new Date(grant.deadline), 'MMM d, yyyy')}</span>
+                          {grant.status !== 'received' && grant.status !== 'denied' && (
+                            <DeadlineBadge deadline={grant.deadline} />
+                          )}
                         </div>
                       )}
                       {grant.applicationDate && (
@@ -332,6 +491,16 @@ export default function Grants() {
                   <div className="flex items-start gap-3 ml-4 shrink-0">
                     {getStatusBadge(grant.status)}
                     <div className="flex gap-1">
+                      {NEXT_STATUS[grant.status] && (
+                        <button
+                          onClick={() => advance(grant, NEXT_STATUS[grant.status]!.to)}
+                          disabled={updateMutation.isPending}
+                          className="p-1.5 text-foreground-muted hover:text-success hover:bg-success-50 dark:hover:bg-success-950 rounded-lg transition-colors disabled:opacity-50"
+                          title={NEXT_STATUS[grant.status]!.label}
+                        >
+                          <ArrowRight size={16} />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEdit(grant)}
                         className="p-1.5 text-foreground-muted hover:text-primary hover:bg-primary-50 dark:hover:bg-primary-950 rounded-lg transition-colors"
@@ -340,7 +509,7 @@ export default function Grants() {
                         <Edit size={16} />
                       </button>
                       <button
-                        onClick={() => handleDelete(grant.id)}
+                        onClick={() => setDeleteTarget(grant)}
                         disabled={deleteMutation.isPending}
                         className="p-1.5 text-foreground-muted hover:text-danger hover:bg-danger-50 dark:hover:bg-danger-950 rounded-lg transition-colors disabled:opacity-50"
                         title="Delete"
@@ -352,9 +521,22 @@ export default function Grants() {
                 </div>
               </CardBody>
             </Card>
+            </m.div>
           ))}
-        </div>
+        </m.div>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        loading={deleteMutation.isPending}
+        title="Delete grant"
+        message={
+          <>Permanently remove <span className="font-medium text-foreground">{deleteTarget?.title}</span>? This cannot be undone.</>
+        }
+      />
 
       {/* Modal */}
       <Modal

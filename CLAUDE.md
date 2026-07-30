@@ -100,6 +100,14 @@ git push -u origin main   # Push → triggers Vercel auto-deploy
   `useState` with inline `parseInt`/`parseFloat` coercion and have no schemas in
   `schemas.ts` yet (not yet converted — a real gap, not a deliberate exception).
   **Grants is the clearest example of the converted pattern.**
+- **Motion:** all animation goes through `src/lib/motion.tsx` — the only file allowed
+  to import `framer-motion` (LazyMotion strict mode throws otherwise). Import `m`,
+  `AnimatePresence`, `EASE_LUX`, and the shared variants from there. Respect reduced
+  motion: Framer is covered by `MotionConfig reducedMotion="user"`; CSS animations by
+  the `prefers-reduced-motion` block in `index.css`. Destructive actions use
+  `ConfirmDialog` from `ui.tsx`, never `window.confirm()`. List pages use `DataTable`
+  (`src/components/DataTable.tsx`) for sortable/paginated/CSV-exportable tables and
+  the `Skeleton*` components for loading states.
 - **Error handling:** surface via `getErrorMessage(err)` from `src/lib/errors.ts`.
   Show errors with the `<PageError>` component from `ui.tsx` (renders nothing when
   passed a falsy error, so a page can pass a combined query/mutation error straight

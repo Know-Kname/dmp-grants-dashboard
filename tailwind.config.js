@@ -171,6 +171,9 @@ export default {
         out: 'var(--ease-out)',
         'in-out': 'var(--ease-in-out)',
       },
+      // The referenced @keyframes (fade-in, slide-up, scale-in) are defined
+      // once in src/styles/index.css — these entries only generate the
+      // animate-* utility classes.
       animation: {
         'fade-in': 'fade-in var(--transition-base) var(--ease-out)',
         'slide-up': 'slide-up var(--transition-slow) var(--ease-out)',

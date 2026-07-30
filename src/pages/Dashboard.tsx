@@ -1,20 +1,25 @@
-import { useMemo, lazy, Suspense } from 'react';
+import { useMemo, useState, lazy, Suspense } from 'react';
 const LocationsMap = lazy(() => import('../components/LocationsMap'));
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { format, subMonths, startOfMonth, parseISO } from 'date-fns';
+import { format, subMonths, startOfMonth, parseISO, differenceInCalendarDays } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
-  TrendingUp, BookOpen, FileText, Activity, Zap,
+  TrendingUp, TrendingDown, BookOpen, FileText, Activity, Zap, Gift,
 } from 'lucide-react';
 import {
   useWorkOrders, useBurials, useInventory, useReceivables,
-  useDeposits, useContracts,
+  useDeposits, useContracts, useGrants,
 } from '../hooks/useData';
-import { Card, CardHeader, CardBody, Badge } from '../components/ui';
+import {
+  Card, CardHeader, CardBody, Badge, PageError, AnimatedNumber,
+  Skeleton, SkeletonStatRow, SkeletonChart, Tabs,
+} from '../components/ui';
+import { m, staggerContainer, fadeInUp } from '../lib/motion';
+import { useTheme } from '../lib/theme';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 import { formatCurrency } from '../lib/utils';
@@ -26,9 +31,13 @@ const C = {
   success: '#22c55e',
   warning: '#f59e0b',
   muted: '#94a3b8',
-  tick: '#94a3b8',
-  grid: '#e2e8f0',
 };
+
+/** Grid/tick colors per resolved theme so dark mode stops rendering light-gray gridlines. */
+const CHART_THEME = {
+  light: { tick: '#94a3b8', grid: '#e2e8f0', empty: '#e2e8f0' },
+  dark:  { tick: '#64748b', grid: '#334155', empty: '#334155' },
+} as const;
 
 interface TooltipProps {
   active?: boolean;
@@ -52,22 +61,42 @@ function ChartTooltip({ active, payload, label, formatter }: TooltipProps) {
 }
 
 export default function Dashboard() {
-  const { data: workOrders = [] } = useWorkOrders();
-  const { data: burials = [] } = useBurials();
-  const { data: inventory = [] } = useInventory();
-  const { data: receivables = [] } = useReceivables();
-  const { data: deposits = [] } = useDeposits();
-  const { data: contracts = [] } = useContracts();
+  const workOrdersQ = useWorkOrders();
+  const burialsQ = useBurials();
+  const inventoryQ = useInventory();
+  const receivablesQ = useReceivables();
+  const depositsQ = useDeposits();
+  const contractsQ = useContracts();
+  const grantsQ = useGrants();
+  const { resolvedTheme } = useTheme();
+  const chart = CHART_THEME[resolvedTheme === 'dark' ? 'dark' : 'light'];
 
-  const now = new Date();
+  const workOrders = workOrdersQ.data ?? [];
+  const burials = burialsQ.data ?? [];
+  const inventory = inventoryQ.data ?? [];
+  const receivables = receivablesQ.data ?? [];
+  const deposits = depositsQ.data ?? [];
+  const contracts = contractsQ.data ?? [];
+  const grants = grantsQ.data ?? [];
 
-  // Last 12 month buckets
+  const isLoading =
+    workOrdersQ.isLoading || burialsQ.isLoading || inventoryQ.isLoading ||
+    receivablesQ.isLoading || depositsQ.isLoading || contractsQ.isLoading;
+  const combinedError =
+    workOrdersQ.error || burialsQ.error || inventoryQ.error ||
+    receivablesQ.error || depositsQ.error || contractsQ.error || grantsQ.error;
+
+  const [monthsBack, setMonthsBack] = useState(12);
+
+  // Freeze "now" for the component's lifetime so month buckets stay stable.
+  const now = useMemo(() => new Date(), []);
+
   const months = useMemo(() =>
-    Array.from({ length: 12 }, (_, i) => {
-      const d = subMonths(now, 11 - i);
+    Array.from({ length: monthsBack }, (_, i) => {
+      const d = subMonths(now, monthsBack - 1 - i);
       return { key: format(d, 'yyyy-MM'), label: format(d, 'MMM') };
     }),
-  []);
+  [now, monthsBack]);
 
   // ── KPI stats ──────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -91,17 +120,38 @@ export default function Dashboard() {
       .filter(d => parseISO(d.date) >= thirtyDaysAgo)
       .reduce((s, d) => s + d.amount, 0);
 
+    // Prior periods for trend deltas
+    const lastMonthKey = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM');
+    const burialsLastMonth = burials.filter(b => b.burialDate.startsWith(lastMonthKey)).length;
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const revenuePrior30d = deposits
+      .filter(d => {
+        const dt = parseISO(d.date);
+        return dt >= sixtyDaysAgo && dt < thirtyDaysAgo;
+      })
+      .reduce((s, d) => s + d.amount, 0);
+
     return {
-      burialsThisMonth, burialsYTD,
+      burialsThisMonth, burialsYTD, burialsLastMonth,
       activeContracts: activeContracts.length, contractsValue,
       arOutstanding, overdueAR,
       unpaidAR: unpaidAR.length,
       activeWO: workOrders.filter(w => w.status === 'in_progress').length,
       totalWO: workOrders.length,
       lowStock, totalInventory: inventory.length,
-      revenue30d,
+      revenue30d, revenuePrior30d,
     };
-  }, [workOrders, burials, inventory, receivables, deposits, contracts]);
+  }, [workOrders, burials, inventory, receivables, deposits, contracts, now]);
+
+  // Grant deadlines coming up within 30 days (still actionable statuses only)
+  const upcomingGrants = useMemo(() =>
+    grants
+      .filter(g => (g.status === 'available' || g.status === 'applied') && g.deadline)
+      .map(g => ({ ...g, daysLeft: differenceInCalendarDays(parseISO(g.deadline!), now) }))
+      .filter(g => g.daysLeft >= 0 && g.daysLeft <= 30)
+      .sort((a, b) => a.daysLeft - b.daysLeft)
+      .slice(0, 3),
+  [grants, now]);
 
   // ── Chart data ─────────────────────────────────────────────
   const burialTrend = useMemo(() =>
@@ -127,7 +177,7 @@ export default function Dashboard() {
       { name: 'Completed',   value: workOrders.filter(w => w.status === 'completed').length,   color: C.success },
       { name: 'Cancelled',   value: workOrders.filter(w => w.status === 'cancelled').length,   color: C.muted },
     ].filter(d => d.value > 0);
-    return raw.length > 0 ? raw : [{ name: 'No Data', value: 1, color: '#e2e8f0' }];
+    return raw.length > 0 ? raw : [{ name: 'No Data', value: 1, color: C.muted }];
   }, [workOrders]);
 
   const inventoryCategoryData = useMemo(() => {
@@ -170,8 +220,27 @@ export default function Dashboard() {
     { to: '/inventory',   icon: Package,       label: 'Update Inventory', cls: 'text-info bg-info-100 dark:bg-info-950' },
   ] as const;
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-32 rounded-2xl" />
+        <SkeletonStatRow count={4} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2"><CardBody><SkeletonChart /></CardBody></Card>
+          <Card><CardBody><SkeletonChart /></CardBody></Card>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card><CardBody><SkeletonChart height={180} /></CardBody></Card>
+          <Card><CardBody><SkeletonChart height={180} /></CardBody></Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+
+      <PageError error={combinedError} />
 
       {/* ── Brand Hero ── */}
       <div
@@ -244,9 +313,34 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Grant deadlines ── */}
+      {upcomingGrants.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl px-4 py-3 border"
+          style={{ backgroundColor: 'rgba(196,154,44,0.07)', borderColor: 'rgba(196,154,44,0.35)' }}>
+          <Gift size={18} className="shrink-0 mt-0.5" style={{ color: BRAND.gold }} />
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm items-center">
+            <span className="font-medium text-foreground">Grant deadlines</span>
+            {upcomingGrants.map(g => (
+              <Link key={g.id} to={`/grants?q=${encodeURIComponent(g.title)}`} className="hover:underline inline-flex items-center gap-1.5 text-foreground-muted">
+                <span className="truncate max-w-[220px]">{g.title}</span>
+                <Badge variant={g.daysLeft <= 7 ? 'danger' : 'warning'} size="sm">
+                  {g.daysLeft === 0 ? 'today' : `${g.daysLeft}d`}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+      <m.div
+        className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+      >
         <Link to="/burials" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
@@ -256,14 +350,24 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">{stats.burialsThisMonth}</p>
-                <p className="text-xs text-foreground-muted mt-0.5">this month</p>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.burialsThisMonth} /></p>
+                <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1">
+                  this month
+                  {stats.burialsThisMonth !== stats.burialsLastMonth && (
+                    stats.burialsThisMonth > stats.burialsLastMonth
+                      ? <TrendingUp size={11} className="text-success" />
+                      : <TrendingDown size={11} className="text-foreground-subtle" />
+                  )}
+                  <span className="text-foreground-subtle">vs {stats.burialsLastMonth} last mo</span>
+                </p>
               </div>
             </CardBody>
           </Card>
+        </m.div>
         </Link>
 
         <Link to="/contracts" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
@@ -273,14 +377,16 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">{stats.activeContracts}</p>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.activeContracts} /></p>
                 <p className="text-xs text-foreground-muted mt-0.5">{formatCurrency(stats.contractsValue)}</p>
               </div>
             </CardBody>
           </Card>
+        </m.div>
         </Link>
 
         <Link to="/financial" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className={`h-full ${stats.overdueAR > 0 ? 'border-warning' : ''}`}>
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
@@ -290,14 +396,16 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">{formatCurrency(stats.arOutstanding)}</p>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.arOutstanding} format={formatCurrency} /></p>
                 <p className="text-xs text-foreground-muted mt-0.5">{stats.unpaidAR} open</p>
               </div>
             </CardBody>
           </Card>
+        </m.div>
         </Link>
 
         <Link to="/work-orders" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
@@ -307,14 +415,16 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">{stats.totalWO}</p>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalWO} /></p>
                 <p className="text-xs text-foreground-muted mt-0.5">{stats.activeWO} in progress</p>
               </div>
             </CardBody>
           </Card>
+        </m.div>
         </Link>
 
         <Link to="/inventory" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
@@ -324,16 +434,18 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">{stats.totalInventory}</p>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalInventory} /></p>
                 <p className="text-xs text-foreground-muted mt-0.5">
                   {stats.lowStock > 0 ? `${stats.lowStock} low stock` : 'All stocked'}
                 </p>
               </div>
             </CardBody>
           </Card>
+        </m.div>
         </Link>
 
         <Link to="/financial" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
@@ -343,13 +455,24 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">{formatCurrency(stats.revenue30d)}</p>
-                <p className="text-xs text-foreground-muted mt-0.5">deposits</p>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.revenue30d} format={formatCurrency} /></p>
+                <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1">
+                  deposits
+                  {stats.revenuePrior30d > 0 && stats.revenue30d !== stats.revenuePrior30d && (
+                    stats.revenue30d > stats.revenuePrior30d
+                      ? <TrendingUp size={11} className="text-success" />
+                      : <TrendingDown size={11} className="text-warning" />
+                  )}
+                  {stats.revenuePrior30d > 0 && (
+                    <span className="text-foreground-subtle">vs {formatCurrency(stats.revenuePrior30d)}</span>
+                  )}
+                </p>
               </div>
             </CardBody>
           </Card>
+        </m.div>
         </Link>
-      </div>
+      </m.div>
 
       {/* ── Charts Row 1: Burial Trend + Work Orders Donut ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -357,9 +480,16 @@ export default function Dashboard() {
           <CardHeader className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-foreground">Burial Trend</h3>
-              <p className="text-xs text-foreground-muted mt-0.5">Interments per month — last 12 months</p>
+              <p className="text-xs text-foreground-muted mt-0.5">Interments per month — last {monthsBack} months</p>
             </div>
-            <Badge variant="secondary" size="sm">{stats.burialsYTD} YTD</Badge>
+            <div className="flex items-center gap-3">
+              <Tabs
+                tabs={[{ value: '6', label: '6M' }, { value: '12', label: '12M' }, { value: '24', label: '24M' }]}
+                active={String(monthsBack)}
+                onChange={(v) => setMonthsBack(Number(v))}
+              />
+              <Badge variant="secondary" size="sm">{stats.burialsYTD} YTD</Badge>
+            </div>
           </CardHeader>
           <CardBody>
             <ResponsiveContainer width="100%" height={220}>
@@ -370,9 +500,9 @@ export default function Dashboard() {
                     <stop offset="95%" stopColor={C.green} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} strokeOpacity={0.6} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
                 <Area
                   type="monotone"
@@ -430,7 +560,7 @@ export default function Dashboard() {
           <CardHeader className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-foreground">Monthly Revenue</h3>
-              <p className="text-xs text-foreground-muted mt-0.5">Deposit totals — last 12 months</p>
+              <p className="text-xs text-foreground-muted mt-0.5">Deposit totals — last {monthsBack} months</p>
             </div>
             <Badge variant="success" size="sm">{formatCurrency(stats.revenue30d)} (30d)</Badge>
           </CardHeader>
@@ -443,10 +573,10 @@ export default function Dashboard() {
                     <stop offset="100%" stopColor={C.gold} stopOpacity={0.55} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} strokeOpacity={0.6} vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fontSize: 11, fill: C.tick }}
+                  tick={{ fontSize: 11, fill: chart.tick }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
@@ -469,9 +599,9 @@ export default function Dashboard() {
             {inventoryCategoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height={210}>
                 <BarChart data={inventoryCategoryData} layout="vertical" margin={{ top: 0, right: 8, left: 16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.grid} strokeOpacity={0.6} horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: C.tick }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 12, fill: C.tick }} axisLine={false} tickLine={false} width={58} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="category" tick={{ fontSize: 12, fill: chart.tick }} axisLine={false} tickLine={false} width={58} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="Items" fill={C.green} radius={[0, 3, 3, 0]} />
                 </BarChart>

@@ -5,15 +5,16 @@ import {
   useLots, useCreateLot, useUpdateLot, useDeleteLot,
   useGraves, useCreateGrave, useUpdateGrave, useDeleteGrave,
 } from '../hooks/useData';
-import { getErrorMessage } from '../lib/errors';
 import type { Cemetery, Section, Lot, Grave } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
-  Badge, EmptyState, LoadingSpinner, TABLE_HEAD_CLASS } from '../components/ui';
+  Badge, EmptyState, PageError, ConfirmDialog, Skeleton, SkeletonTable,
+  TABLE_HEAD_CLASS } from '../components/ui';
+import { m, EASE_LUX } from '../lib/motion';
 const CemeteryMap = lazy(() => import('../components/CemeteryMap'));
 import {
   Plus, Map, ChevronRight, ArrowLeft, Edit, Trash2,
-  AlertCircle, RefreshCw, MapPin, Loader2, Building2,
+  RefreshCw, MapPin, Loader2, Building2,
 } from 'lucide-react';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,30 @@ const GRAVE_STATUS_VARIANT: Record<Grave['status'], 'success' | 'warning' | 'dan
   occupied: 'danger',
   unavailable: 'secondary',
 };
+
+/** Skeleton placeholder matching the cemetery/section card grids. */
+function SkeletonCardGrid({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: count }, (_, i) => (
+        <Card key={i}>
+          <CardBody>
+            <div className="flex items-start gap-3">
+              <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/** What a delete confirmation is aimed at, across all four drill-down levels. */
+type DeleteTarget = { kind: 'cemetery' | 'section' | 'lot' | 'grave'; id: string; name: string };
 
 // ────────────────────────────────────────────────────────────────────────────
 // Cemetery CRUD forms
@@ -128,6 +153,20 @@ export default function Cemeteries() {
 
   const queryError = cemeteriesQuery.error || sectionsQuery.error || lotsQuery.error || gravesQuery.error;
 
+  // Delete confirmation (shared across all four levels)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const deletePending =
+    deleteCemetery.isPending || deleteSection.isPending || deleteLot.isPending || deleteGrave.isPending;
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    const options = { onSuccess: () => setDeleteTarget(null) };
+    if (deleteTarget.kind === 'cemetery') deleteCemetery.mutate(deleteTarget.id, options);
+    else if (deleteTarget.kind === 'section') deleteSection.mutate(deleteTarget.id, options);
+    else if (deleteTarget.kind === 'lot') deleteLot.mutate(deleteTarget.id, options);
+    else deleteGrave.mutate(deleteTarget.id, options);
+  };
+
   const graveStatusCounts = useMemo(() => ({
     available: graves.filter(g => g.status === 'available').length,
     reserved: graves.filter(g => g.status === 'reserved').length,
@@ -184,15 +223,7 @@ export default function Cemeteries() {
       </div>
 
       {/* Error */}
-      {queryError && (
-        <div className="bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-danger shrink-0 mt-0.5" size={20} />
-          <div>
-            <h3 className="font-medium text-danger">Error</h3>
-            <p className="text-sm text-danger-700 dark:text-danger-400">{getErrorMessage(queryError)}</p>
-          </div>
-        </div>
-      )}
+      <PageError error={queryError} />
 
       {/* Breadcrumb */}
       {level !== 'cemeteries' && (
@@ -230,11 +261,19 @@ export default function Cemeteries() {
         </div>
       )}
 
+      {/* ── Level content (animates on drill-down / drill-up) ── */}
+      <m.div
+        key={selectedLot?.id ?? selectedSection?.id ?? selectedCemetery?.id ?? 'root'}
+        initial={{ opacity: 0, x: 8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2, ease: EASE_LUX }}
+        className="space-y-6"
+      >
       {/* ── Level: Cemeteries ── */}
       {level === 'cemeteries' && (
         <>
           {cemeteriesQuery.isLoading ? (
-            <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+            <SkeletonCardGrid />
           ) : cemeteries.length === 0 ? (
             <Card>
               <CardBody>
@@ -266,7 +305,7 @@ export default function Cemeteries() {
                     </button>
                     <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border">
                       <button onClick={(e) => { e.stopPropagation(); setEditingCemetery(c); setCemeteryForm({ name: c.name, address: c.address ?? '', city: c.city ?? '', state: c.state ?? '', zip: c.zip ?? '', phone: c.phone ?? '', notes: c.notes ?? '' }); setShowCemeteryModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this cemetery?')) deleteCemetery.mutate(c.id); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'cemetery', id: c.id, name: c.name }); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
                     </div>
                   </CardBody>
                 </Card>
@@ -283,7 +322,7 @@ export default function Cemeteries() {
             <ArrowLeft size={14} /> Back to cemeteries
           </button>
           {sectionsQuery.isLoading ? (
-            <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+            <SkeletonCardGrid />
           ) : sections.length === 0 ? (
             <Card>
               <CardBody>
@@ -317,7 +356,7 @@ export default function Cemeteries() {
                     </button>
                     <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border">
                       <button onClick={(e) => { e.stopPropagation(); setEditingSection(s); setSectionForm({ name: s.name, description: s.description ?? '', capacity: s.capacity != null ? String(s.capacity) : '' }); setShowSectionModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this section?')) deleteSection.mutate(s.id); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'section', id: s.id, name: s.name }); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
                     </div>
                   </CardBody>
                 </Card>
@@ -334,7 +373,7 @@ export default function Cemeteries() {
             <ArrowLeft size={14} /> Back to sections
           </button>
           {lotsQuery.isLoading ? (
-            <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+            <SkeletonTable rows={6} cols={3} />
           ) : lots.length === 0 ? (
             <Card>
               <CardBody>
@@ -364,7 +403,7 @@ export default function Cemeteries() {
                         <td className="px-6 py-4 text-foreground-muted">{lot.description || '—'}</td>
                         <td className="px-6 py-4 text-right space-x-2" onClick={e => e.stopPropagation()}>
                           <button onClick={() => { setEditingLot(lot); setLotForm({ lotNumber: lot.lotNumber, description: lot.description ?? '' }); setShowLotModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                          <button onClick={() => { if (confirm('Delete this lot?')) deleteLot.mutate(lot.id); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                          <button onClick={() => setDeleteTarget({ kind: 'lot', id: lot.id, name: `Lot ${lot.lotNumber}` })} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
                         </td>
                       </tr>
                     ))}
@@ -399,13 +438,7 @@ export default function Cemeteries() {
           {graves.length > 0 && (
             <Card>
               <CardBody className="p-3">
-                <Suspense
-                  fallback={
-                    <div className="flex items-center justify-center h-[360px] bg-background-subtle rounded-lg">
-                      <LoadingSpinner />
-                    </div>
-                  }
-                >
+                <Suspense fallback={<Skeleton className="h-[360px] w-full rounded-lg" />}>
                   <CemeteryMap
                     graves={graves}
                     height={360}
@@ -424,7 +457,7 @@ export default function Cemeteries() {
             </Card>
           )}
           {gravesQuery.isLoading ? (
-            <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+            <SkeletonTable rows={6} cols={5} />
           ) : graves.length === 0 ? (
             <Card>
               <CardBody>
@@ -464,7 +497,7 @@ export default function Cemeteries() {
                         <td className="px-6 py-4 text-foreground-muted">{g.notes || '—'}</td>
                         <td className="px-6 py-4 text-right space-x-2">
                           <button onClick={() => { setEditingGrave(g); setGraveForm({ graveNumber: g.graveNumber, status: g.status, lat: g.lat != null ? String(g.lat) : '', lng: g.lng != null ? String(g.lng) : '', notes: g.notes ?? '' }); setShowGraveModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                          <button onClick={() => { if (confirm('Delete this grave record?')) deleteGrave.mutate(g.id); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                          <button onClick={() => setDeleteTarget({ kind: 'grave', id: g.id, name: `Grave ${g.graveNumber}` })} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
                         </td>
                       </tr>
                     ))}
@@ -475,6 +508,22 @@ export default function Cemeteries() {
           )}
         </>
       )}
+      </m.div>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title={deleteTarget ? `Delete ${deleteTarget.kind.charAt(0).toUpperCase() + deleteTarget.kind.slice(1)}` : 'Delete'}
+        loading={deletePending}
+        message={deleteTarget ? (
+          <>
+            Delete {deleteTarget.kind} <span className="font-medium">{deleteTarget.name}</span>?
+            This cannot be undone.
+          </>
+        ) : null}
+      />
 
       {/* ═══ Modals ═══ */}
 

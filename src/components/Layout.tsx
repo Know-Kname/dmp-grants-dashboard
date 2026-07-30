@@ -2,15 +2,33 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import {
-  Home, FileText, Package, DollarSign, Users,
-  FileSignature, Gift, ClipboardList, LogOut,
+  LogOut, Search,
   Sun, Moon, Monitor, ChevronDown, Phone, ExternalLink, Eye, X,
-  MoreHorizontal, Building2, Map,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from './ui';
 import { COMPANY } from '../config/company';
+import { NAV_ITEMS } from '../config/nav';
+import { CommandPalette } from './CommandPalette';
+import { useHotkeys } from '../hooks/useHotkeys';
+import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
 import AIAssistant from './AIAssistant';
+
+/** Fade-scale wrapper for the two topbar dropdowns, with a real exit. */
+function MenuPop({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <m.div
+      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97, y: -4, transition: { duration: 0.12 } }}
+      transition={{ duration: 0.18, ease: EASE_LUX }}
+      className={`absolute right-0 mt-2 bg-card rounded-lg shadow-lg border border-border py-1 origin-top-right ${className}`}
+    >
+      {children}
+    </m.div>
+  );
+}
 
 export default function Layout() {
   const { currentUser: user, logout, isDemo } = useAuth();
@@ -20,6 +38,9 @@ export default function Layout() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useHotkeys({ 'mod+k': () => setPaletteOpen((v) => !v) });
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -47,18 +68,7 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const navItems = [
-    { icon: Home, label: 'Dashboard', path: '/', description: 'Overview & metrics' },
-    { icon: ClipboardList, label: 'Work Orders', path: '/work-orders', description: 'Tasks & maintenance' },
-    { icon: Package, label: 'Inventory', path: '/inventory', description: 'Stock management' },
-    { icon: DollarSign, label: 'Financial', path: '/financial', description: 'Payments & reports' },
-    { icon: Users, label: 'Burials', path: '/burials', description: 'Records & locations' },
-    { icon: FileSignature, label: 'Contracts', path: '/contracts', description: 'Agreements & docs' },
-    { icon: Gift, label: 'Grants', path: '/grants', description: 'Funding & benefits' },
-    { icon: FileText, label: 'Customers', path: '/customers', description: 'Contact information' },
-    { icon: Building2, label: 'Vendors', path: '/vendors', description: 'Supplier management' },
-    { icon: Map, label: 'Cemeteries', path: '/cemeteries', description: 'Plot & grave inventory' },
-  ];
+  const navItems = NAV_ITEMS;
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -88,6 +98,24 @@ export default function Layout() {
 
             {/* Right side */}
             <div className="flex items-center gap-2">
+              {/* Command palette trigger */}
+              <button
+                onClick={() => setPaletteOpen(true)}
+                className="hidden sm:flex items-center gap-2 h-9 px-3 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:border-border-hover transition-colors text-sm min-h-0"
+                aria-label="Open command palette"
+              >
+                <Search size={14} />
+                <span className="hidden md:inline">Search</span>
+                <kbd className="text-[10px] border border-border rounded px-1.5 py-0.5 text-foreground-subtle">⌘K</kbd>
+              </button>
+              <button
+                onClick={() => setPaletteOpen(true)}
+                className="sm:hidden p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Open command palette"
+              >
+                <Search size={20} />
+              </button>
+
               {/* Theme Toggle */}
               <div className="relative" ref={themeMenuRef}>
                 <button
@@ -98,8 +126,9 @@ export default function Layout() {
                   <ThemeIcon size={20} />
                 </button>
 
+                <AnimatePresence>
                 {themeMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-36 bg-card rounded-lg shadow-lg border border-border py-1 animate-scale-in origin-top-right">
+                  <MenuPop className="w-36">
                     <button
                       onClick={() => { setTheme('light'); setThemeMenuOpen(false); }}
                       className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-accent transition-colors ${theme === 'light' ? 'text-primary font-medium' : 'text-foreground'}`}
@@ -118,8 +147,9 @@ export default function Layout() {
                     >
                       <Monitor size={16} /> System
                     </button>
-                  </div>
+                  </MenuPop>
                 )}
+                </AnimatePresence>
               </div>
 
               {/* User Menu */}
@@ -139,8 +169,9 @@ export default function Layout() {
                   <ChevronDown size={16} className="text-foreground-muted hidden md:block" />
                 </button>
 
+                <AnimatePresence>
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-card rounded-lg shadow-lg border border-border py-1 animate-scale-in origin-top-right">
+                  <MenuPop className="w-48">
                     <div className="px-3 py-2 border-b border-border md:hidden">
                       <div className="text-sm font-medium text-foreground">{user?.name}</div>
                       <div className="text-xs text-foreground-muted capitalize">{user?.role}</div>
@@ -151,8 +182,9 @@ export default function Layout() {
                     >
                       <LogOut size={16} /> Sign out
                     </button>
-                  </div>
+                  </MenuPop>
                 )}
+                </AnimatePresence>
               </div>
             </div>
           </div>
@@ -182,7 +214,7 @@ export default function Layout() {
                     <span className="block">{item.label}</span>
                   </div>
                   {active && (
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                    <m.div layoutId="sidebar-active-dot" className="w-1.5 h-1.5 bg-primary rounded-full" />
                   )}
                 </Link>
               );
@@ -270,15 +302,25 @@ export default function Layout() {
         </nav>
 
         {/* More Sheet — slide-up drawer for remaining nav items */}
+        <AnimatePresence>
         {moreOpen && (
           <>
             {/* Scrim */}
-            <div
-              className="lg:hidden fixed inset-0 bg-black/40 z-30 animate-fade-in"
+            <m.div
+              className="lg:hidden fixed inset-0 bg-black/40 z-30"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               onClick={() => setMoreOpen(false)}
             />
             {/* Sheet */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card rounded-t-2xl z-40 shadow-2xl border-t border-border pb-safe animate-slide-up">
+            <m.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.3, ease: EASE_LUX }}
+              className="lg:hidden fixed bottom-0 left-0 right-0 bg-card rounded-t-2xl z-40 shadow-2xl border-t border-border pb-safe">
               {/* Handle */}
               <div className="flex justify-center pt-3 pb-2">
                 <div className="w-10 h-1 bg-border rounded-full" />
@@ -325,9 +367,10 @@ export default function Layout() {
                   <span className="font-medium text-sm">Sign out</span>
                 </button>
               </div>
-            </div>
+            </m.div>
           </>
         )}
+        </AnimatePresence>
 
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-8 pb-20 lg:pb-8 min-h-[calc(100vh-4rem)]">
@@ -359,11 +402,21 @@ export default function Layout() {
             </div>
           )}
           
-          <div className="max-w-7xl mx-auto animate-fade-in">
+          {/* Entrance-only route transition. Keyed by pathname so every
+              navigation animates; deliberately no AnimatePresence exit, which
+              fights Suspense on lazy routes. */}
+          <m.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: EASE_LUX }}
+            className="max-w-7xl mx-auto"
+          >
             <Outlet />
-          </div>
+          </m.div>
         </main>
       </div>
+      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <AIAssistant />
     </div>
   );

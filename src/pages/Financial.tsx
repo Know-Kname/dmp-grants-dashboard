@@ -13,9 +13,21 @@ import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
-  Badge, EmptyState, LoadingSpinner, PageError, TABLE_HEAD_CLASS } from '../components/ui';
-import { Plus, DollarSign, TrendingUp, TrendingDown, RefreshCw, Edit, CreditCard, ArrowRightLeft, FileText } from 'lucide-react';
+  Badge, EmptyState, PageError, StatCard, AnimatedNumber, SkeletonTable, Tabs,
+} from '../components/ui';
+import { DataTable, type Column } from '../components/DataTable';
+import { Plus, DollarSign, TrendingUp, TrendingDown, RefreshCw, Edit, CreditCard, ArrowRightLeft, FileText, Search } from 'lucide-react';
+import { differenceInCalendarDays } from 'date-fns';
 import { useToast } from '../lib/toast';
+
+/** AR aging buckets over unpaid invoices, keyed by days past due. */
+const AGING_BUCKETS = [
+  { key: 'current', label: 'Current', test: (d: number) => d <= 0 },
+  { key: '1-30', label: '1–30 days', test: (d: number) => d >= 1 && d <= 30 },
+  { key: '31-60', label: '31–60 days', test: (d: number) => d >= 31 && d <= 60 },
+  { key: '61-90', label: '61–90 days', test: (d: number) => d >= 61 && d <= 90 },
+  { key: '90+', label: '90+ days', test: (d: number) => d > 90 },
+] as const;
 
 type ActiveTab = 'deposits' | 'receivables' | 'payables';
 
@@ -93,6 +105,8 @@ export default function Financial() {
   const [showModal, setShowModal] = useState(false);
   const [editingReceivable, setEditingReceivable] = useState<AccountsReceivable | null>(null);
   const [editingPayable, setEditingPayable] = useState<AccountsPayable | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Three validated create forms. The two payment-recording edit forms below
   // stay on plain state: they capture a single amount against an existing
@@ -151,6 +165,60 @@ export default function Financial() {
       .reduce((sum, d) => sum + d.amount, 0);
     return { receivablesOutstanding, payablesDue, recentDeposits };
   }, [deposits, receivables, payables]);
+
+  // Per-tab filtering — the page previously had no search or filters at all.
+  const filteredDeposits = useMemo(() => {
+    if (!searchTerm) return deposits;
+    const s = searchTerm.toLowerCase();
+    return deposits.filter(d =>
+      d.reference?.toLowerCase().includes(s) ||
+      d.notes?.toLowerCase().includes(s) ||
+      METHOD_LABELS[d.method].toLowerCase().includes(s)
+    );
+  }, [deposits, searchTerm]);
+
+  const filteredReceivables = useMemo(() => {
+    let result = receivables;
+    if (statusFilter !== 'all') result = result.filter(r => r.status === statusFilter);
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      result = result.filter(r =>
+        r.invoiceNumber.toLowerCase().includes(s) ||
+        r.customerId.toLowerCase().includes(s)
+      );
+    }
+    return result;
+  }, [receivables, searchTerm, statusFilter]);
+
+  const filteredPayables = useMemo(() => {
+    let result = payables;
+    if (statusFilter !== 'all') result = result.filter(p => p.status === statusFilter);
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      result = result.filter(p =>
+        p.invoiceNumber.toLowerCase().includes(s) ||
+        (vendors.find(v => v.id === p.vendorId)?.name ?? p.vendorId).toLowerCase().includes(s)
+      );
+    }
+    return result;
+  }, [payables, searchTerm, statusFilter, vendors]);
+
+  // AR aging — outstanding balance per days-past-due bucket
+  const arAging = useMemo(() => {
+    const today = new Date();
+    const open = receivables.filter(r => r.status !== 'paid');
+    return AGING_BUCKETS.map(bucket => {
+      const rows = open.filter(r => {
+        const pastDue = r.dueDate ? differenceInCalendarDays(today, new Date(r.dueDate)) : 0;
+        return bucket.test(pastDue);
+      });
+      return {
+        ...bucket,
+        total: rows.reduce((sum, r) => sum + (r.amount - r.amountPaid), 0),
+        count: rows.length,
+      };
+    });
+  }, [receivables]);
 
   const combinedError =
     depositsQuery.error || receivablesQuery.error || payablesQuery.error ||
@@ -258,224 +326,207 @@ export default function Financial() {
 
       {/* Summary stats — always visible (QuickBooks style) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Receivables Outstanding</p>
-                <p className="text-2xl font-bold text-warning">{formatCurrency(financialStats.receivablesOutstanding)}</p>
-                <div className="flex gap-1.5 mt-2 flex-wrap">
-                  {(['pending', 'partial', 'overdue'] as AccountsReceivable['status'][]).map(s => {
-                    const count = receivables.filter(r => r.status === s).length;
-                    return count > 0 ? <Badge key={s} variant={arStatusVariant(s)} size="sm">{count} {formatStatus(s)}</Badge> : null;
-                  })}
-                </div>
-              </div>
-              <div className="p-3 bg-warning-100 dark:bg-warning-950 rounded-lg">
-                <TrendingUp className="text-warning" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Payables Due</p>
-                <p className="text-2xl font-bold text-danger">{formatCurrency(financialStats.payablesDue)}</p>
-                <div className="flex gap-1.5 mt-2 flex-wrap">
-                  {(['pending', 'partial', 'overdue'] as AccountsPayable['status'][]).map(s => {
-                    const count = payables.filter(p => p.status === s).length;
-                    return count > 0 ? <Badge key={s} variant={arStatusVariant(s)} size="sm">{count} {formatStatus(s)}</Badge> : null;
-                  })}
-                </div>
-              </div>
-              <div className="p-3 bg-danger-100 dark:bg-danger-950 rounded-lg">
-                <TrendingDown className="text-danger" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Deposits (30 days)</p>
-                <p className="text-2xl font-bold text-success">{formatCurrency(financialStats.recentDeposits)}</p>
-                <p className="text-xs text-foreground-muted mt-2">{deposits.length} total recorded</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <DollarSign className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard
+          label="Receivables Outstanding"
+          value={<AnimatedNumber to={financialStats.receivablesOutstanding} format={formatCurrency} />}
+          icon={TrendingUp} tone="warning"
+          hint={
+            <span className="flex gap-1.5 mt-1 flex-wrap">
+              {(['pending', 'partial', 'overdue'] as AccountsReceivable['status'][]).map(s => {
+                const count = receivables.filter(r => r.status === s).length;
+                return count > 0 ? <Badge key={s} variant={arStatusVariant(s)} size="sm">{count} {formatStatus(s)}</Badge> : null;
+              })}
+            </span>
+          }
+        />
+        <StatCard
+          label="Payables Due"
+          value={<AnimatedNumber to={financialStats.payablesDue} format={formatCurrency} />}
+          icon={TrendingDown} tone="danger"
+          hint={
+            <span className="flex gap-1.5 mt-1 flex-wrap">
+              {(['pending', 'partial', 'overdue'] as AccountsPayable['status'][]).map(s => {
+                const count = payables.filter(p => p.status === s).length;
+                return count > 0 ? <Badge key={s} variant={arStatusVariant(s)} size="sm">{count} {formatStatus(s)}</Badge> : null;
+              })}
+            </span>
+          }
+        />
+        <StatCard
+          label="Deposits (30 days)"
+          value={<AnimatedNumber to={financialStats.recentDeposits} format={formatCurrency} />}
+          icon={DollarSign} tone="success"
+          hint={`${deposits.length} total recorded`}
+        />
       </div>
 
-      {/* Tab navigation */}
+      {/* Tabs + filters */}
       <Card>
         <CardBody>
-          <div className="flex gap-1 p-1 bg-background-subtle rounded-lg border border-border w-fit">
-            {TABS.map(tab => (
-              <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={cn(
-                  'px-4 py-2 rounded-md text-sm font-medium transition-all',
-                  activeTab === tab.value
-                    ? 'bg-card shadow-sm text-foreground border border-border'
-                    : 'text-foreground-muted hover:text-foreground hover:bg-accent'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
+            <Tabs
+              tabs={TABS.map(t => ({
+                value: t.value,
+                label: t.label,
+                count: t.value === 'deposits' ? deposits.length : t.value === 'receivables' ? receivables.length : payables.length,
+              }))}
+              active={activeTab}
+              onChange={(v) => { setActiveTab(v as ActiveTab); setStatusFilter('all'); }}
+            />
+            <div className="flex-1">
+              <Input
+                placeholder={activeTab === 'deposits' ? 'Search reference, notes, method…' : 'Search invoice #, name…'}
+                icon={<Search size={18} />}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {activeTab !== 'deposits' && (
+              <div className="sm:w-44">
+                <Select
+                  options={[
+                    { value: 'all', label: 'All Statuses' },
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'partial', label: 'Partial' },
+                    { value: 'paid', label: 'Paid' },
+                    { value: 'overdue', label: 'Overdue' },
+                  ]}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                />
+              </div>
+            )}
           </div>
         </CardBody>
       </Card>
 
+      {/* AR aging buckets — only meaningful on the receivables tab */}
+      {activeTab === 'receivables' && !isLoading && receivables.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {arAging.map(bucket => (
+            <Card key={bucket.key} padding="sm" className={cn(
+              bucket.key === '90+' && bucket.total > 0 ? 'border-danger' :
+              bucket.key === '61-90' && bucket.total > 0 ? 'border-warning' : ''
+            )}>
+              <p className="text-[11px] uppercase tracking-wider text-foreground-muted">{bucket.label}</p>
+              <p className={cn(
+                'text-lg font-bold mt-1',
+                bucket.total === 0 ? 'text-foreground-subtle' :
+                bucket.key === '90+' ? 'text-danger' :
+                bucket.key === '61-90' ? 'text-warning' : 'text-foreground'
+              )}>
+                {formatCurrency(bucket.total)}
+              </p>
+              <p className="text-xs text-foreground-muted">{bucket.count} invoice{bucket.count !== 1 ? 's' : ''}</p>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Tab content */}
       {isLoading ? (
-        <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+        <SkeletonTable rows={6} cols={6} />
       ) : (
         <>
           {/* DEPOSITS TAB */}
           {activeTab === 'deposits' && (
-            deposits.length === 0 ? (
-              <Card><CardBody>
-                <EmptyState icon={<DollarSign size={48} />} title="No deposits recorded" description="Record your first deposit" action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Record Deposit</Button>} />
-              </CardBody></Card>
-            ) : (
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-background-subtle border-b border-border">
-                      <tr>
-                        <th className={TABLE_HEAD_CLASS}>Date</th>
-                        <th className={TABLE_HEAD_CLASS}>Method</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
-                        <th className={TABLE_HEAD_CLASS}>Reference</th>
-                        <th className={TABLE_HEAD_CLASS}>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {deposits.map(d => (
-                        <tr key={d.id} className="hover:bg-accent/40 transition-colors">
-                          <td className="px-6 py-4 text-foreground">{d.date ? formatDate(d.date) : '—'}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-1.5 text-foreground-muted">
-                              <MethodIcon method={d.method} />
-                              {METHOD_LABELS[d.method]}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-right font-medium text-success">{formatCurrency(d.amount)}</td>
-                          <td className="px-6 py-4 text-foreground-muted font-mono text-xs">{d.reference || '—'}</td>
-                          <td className="px-6 py-4 text-foreground-muted max-w-xs truncate">{d.notes || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )
+            <DataTable<Deposit>
+              rows={filteredDeposits}
+              rowKey={d => d.id}
+              initialSort={{ key: 'date', dir: 'desc' }}
+              csv={{
+                filename: 'deposits',
+                header: ['Date', 'Method', 'Amount', 'Reference', 'Notes'],
+                row: d => [d.date, METHOD_LABELS[d.method], d.amount, d.reference, d.notes],
+              }}
+              emptyState={
+                <CardBody>
+                  <EmptyState icon={<DollarSign size={48} />} title="No deposits recorded" description={searchTerm ? 'Try adjusting your search' : 'Record your first deposit'} action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Record Deposit</Button>} />
+                </CardBody>
+              }
+              columns={[
+                { key: 'date', header: 'Date', sortValue: d => d.date, cell: d => <span className="text-foreground">{d.date ? formatDate(d.date) : '—'}</span> },
+                { key: 'method', header: 'Method', sortValue: d => METHOD_LABELS[d.method], cell: d => (
+                  <div className="flex items-center gap-1.5 text-foreground-muted">
+                    <MethodIcon method={d.method} />
+                    {METHOD_LABELS[d.method]}
+                  </div>
+                ) },
+                { key: 'amount', header: 'Amount', align: 'right', sortValue: d => d.amount, cell: d => <span className="font-medium text-success">{formatCurrency(d.amount)}</span> },
+                { key: 'reference', header: 'Reference', cell: d => <span className="text-foreground-muted font-mono text-xs">{d.reference || '—'}</span> },
+                { key: 'notes', header: 'Notes', cell: d => <span className="text-foreground-muted block max-w-xs truncate">{d.notes || '—'}</span> },
+              ] satisfies Column<Deposit>[]}
+            />
           )}
 
           {/* RECEIVABLES TAB */}
           {activeTab === 'receivables' && (
-            receivables.length === 0 ? (
-              <Card><CardBody>
-                <EmptyState icon={<TrendingUp size={48} />} title="No receivables" description="Create your first invoice" action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Invoice</Button>} />
-              </CardBody></Card>
-            ) : (
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-background-subtle border-b border-border">
-                      <tr>
-                        <th className={TABLE_HEAD_CLASS}>Invoice #</th>
-                        <th className={TABLE_HEAD_CLASS}>Customer</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Balance</th>
-                        <th className={TABLE_HEAD_CLASS}>Due Date</th>
-                        <th className={TABLE_HEAD_CLASS}>Status</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {receivables.map(r => {
-                        const balance = r.amount - r.amountPaid;
-                        return (
-                          <tr key={r.id} className="hover:bg-accent/40 transition-colors">
-                            <td className="px-6 py-4 font-mono text-xs font-medium text-foreground">{r.invoiceNumber}</td>
-                            <td className="px-6 py-4 text-foreground-muted">{r.customerId}</td>
-                            <td className="px-6 py-4 text-right text-foreground">{formatCurrency(r.amount)}</td>
-                            <td className="px-6 py-4 text-right text-success">{formatCurrency(r.amountPaid)}</td>
-                            <td className={cn('px-6 py-4 text-right font-medium', r.status === 'overdue' ? 'text-danger' : 'text-foreground-muted')}>
-                              {formatCurrency(balance)}
-                            </td>
-                            <td className="px-6 py-4 text-foreground-muted">{r.dueDate ? formatDate(r.dueDate) : '—'}</td>
-                            <td className="px-6 py-4"><Badge variant={arStatusVariant(r.status)}>{formatStatus(r.status)}</Badge></td>
-                            <td className="px-6 py-4 text-right">
-                              <button onClick={() => handleEditReceivable(r)} className="text-primary hover:text-primary-hover" aria-label="Record payment"><Edit size={17} /></button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )
+            <DataTable<AccountsReceivable>
+              rows={filteredReceivables}
+              rowKey={r => r.id}
+              initialSort={{ key: 'dueDate', dir: 'asc' }}
+              csv={{
+                filename: 'receivables',
+                header: ['Invoice #', 'Customer', 'Amount', 'Paid', 'Balance', 'Due Date', 'Status'],
+                row: r => [r.invoiceNumber, r.customerId, r.amount, r.amountPaid, r.amount - r.amountPaid, r.dueDate, r.status],
+              }}
+              emptyState={
+                <CardBody>
+                  <EmptyState icon={<TrendingUp size={48} />} title="No receivables" description={searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Create your first invoice'} action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Invoice</Button>} />
+                </CardBody>
+              }
+              columns={[
+                { key: 'invoiceNumber', header: 'Invoice #', sortValue: r => r.invoiceNumber, cell: r => <span className="font-mono text-xs font-medium text-foreground">{r.invoiceNumber}</span> },
+                { key: 'customer', header: 'Customer', cell: r => <span className="text-foreground-muted">{r.customerId}</span> },
+                { key: 'amount', header: 'Amount', align: 'right', sortValue: r => r.amount, cell: r => <span className="text-foreground">{formatCurrency(r.amount)}</span> },
+                { key: 'paid', header: 'Paid', align: 'right', sortValue: r => r.amountPaid, cell: r => <span className="text-success">{formatCurrency(r.amountPaid)}</span> },
+                { key: 'balance', header: 'Balance', align: 'right', sortValue: r => r.amount - r.amountPaid, cell: r => (
+                  <span className={cn('font-medium', r.status === 'overdue' ? 'text-danger' : 'text-foreground-muted')}>
+                    {formatCurrency(r.amount - r.amountPaid)}
+                  </span>
+                ) },
+                { key: 'dueDate', header: 'Due Date', sortValue: r => r.dueDate, cell: r => <span className="text-foreground-muted">{r.dueDate ? formatDate(r.dueDate) : '—'}</span> },
+                { key: 'status', header: 'Status', sortValue: r => r.status, cell: r => <Badge variant={arStatusVariant(r.status)}>{formatStatus(r.status)}</Badge> },
+                { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: r => (
+                  <button onClick={() => handleEditReceivable(r)} className="text-primary hover:text-primary-hover" aria-label="Record payment"><Edit size={17} /></button>
+                ) },
+              ] satisfies Column<AccountsReceivable>[]}
+            />
           )}
 
           {/* PAYABLES TAB */}
           {activeTab === 'payables' && (
-            payables.length === 0 ? (
-              <Card><CardBody>
-                <EmptyState icon={<TrendingDown size={48} />} title="No payables" description="Record your first bill" action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Bill</Button>} />
-              </CardBody></Card>
-            ) : (
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-background-subtle border-b border-border">
-                      <tr>
-                        <th className={TABLE_HEAD_CLASS}>Invoice #</th>
-                        <th className={TABLE_HEAD_CLASS}>Vendor</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Balance</th>
-                        <th className={TABLE_HEAD_CLASS}>Due Date</th>
-                        <th className={TABLE_HEAD_CLASS}>Status</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {payables.map(p => {
-                        const balance = p.amount - p.amountPaid;
-                        return (
-                          <tr key={p.id} className="hover:bg-accent/40 transition-colors">
-                            <td className="px-6 py-4 font-mono text-xs font-medium text-foreground">{p.invoiceNumber}</td>
-                            <td className="px-6 py-4 text-foreground-muted">{vendors.find(v => v.id === p.vendorId)?.name ?? p.vendorId}</td>
-                            <td className="px-6 py-4 text-right text-foreground">{formatCurrency(p.amount)}</td>
-                            <td className="px-6 py-4 text-right text-success">{formatCurrency(p.amountPaid)}</td>
-                            <td className={cn('px-6 py-4 text-right font-medium', p.status === 'overdue' ? 'text-danger' : 'text-foreground-muted')}>
-                              {formatCurrency(balance)}
-                            </td>
-                            <td className="px-6 py-4 text-foreground-muted">{p.dueDate ? formatDate(p.dueDate) : '—'}</td>
-                            <td className="px-6 py-4"><Badge variant={arStatusVariant(p.status)}>{formatStatus(p.status)}</Badge></td>
-                            <td className="px-6 py-4 text-right">
-                              <button onClick={() => handleEditPayable(p)} className="text-primary hover:text-primary-hover" aria-label="Record payment"><Edit size={17} /></button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )
+            <DataTable<AccountsPayable>
+              rows={filteredPayables}
+              rowKey={p => p.id}
+              initialSort={{ key: 'dueDate', dir: 'asc' }}
+              csv={{
+                filename: 'payables',
+                header: ['Invoice #', 'Vendor', 'Amount', 'Paid', 'Balance', 'Due Date', 'Status'],
+                row: p => [p.invoiceNumber, vendors.find(v => v.id === p.vendorId)?.name ?? p.vendorId, p.amount, p.amountPaid, p.amount - p.amountPaid, p.dueDate, p.status],
+              }}
+              emptyState={
+                <CardBody>
+                  <EmptyState icon={<TrendingDown size={48} />} title="No payables" description={searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Record your first bill'} action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Bill</Button>} />
+                </CardBody>
+              }
+              columns={[
+                { key: 'invoiceNumber', header: 'Invoice #', sortValue: p => p.invoiceNumber, cell: p => <span className="font-mono text-xs font-medium text-foreground">{p.invoiceNumber}</span> },
+                { key: 'vendor', header: 'Vendor', sortValue: p => vendors.find(v => v.id === p.vendorId)?.name ?? p.vendorId, cell: p => <span className="text-foreground-muted">{vendors.find(v => v.id === p.vendorId)?.name ?? p.vendorId}</span> },
+                { key: 'amount', header: 'Amount', align: 'right', sortValue: p => p.amount, cell: p => <span className="text-foreground">{formatCurrency(p.amount)}</span> },
+                { key: 'paid', header: 'Paid', align: 'right', sortValue: p => p.amountPaid, cell: p => <span className="text-success">{formatCurrency(p.amountPaid)}</span> },
+                { key: 'balance', header: 'Balance', align: 'right', sortValue: p => p.amount - p.amountPaid, cell: p => (
+                  <span className={cn('font-medium', p.status === 'overdue' ? 'text-danger' : 'text-foreground-muted')}>
+                    {formatCurrency(p.amount - p.amountPaid)}
+                  </span>
+                ) },
+                { key: 'dueDate', header: 'Due Date', sortValue: p => p.dueDate, cell: p => <span className="text-foreground-muted">{p.dueDate ? formatDate(p.dueDate) : '—'}</span> },
+                { key: 'status', header: 'Status', sortValue: p => p.status, cell: p => <Badge variant={arStatusVariant(p.status)}>{formatStatus(p.status)}</Badge> },
+                { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: p => (
+                  <button onClick={() => handleEditPayable(p)} className="text-primary hover:text-primary-hover" aria-label="Record payment"><Edit size={17} /></button>
+                ) },
+              ] satisfies Column<AccountsPayable>[]}
+            />
           )}
         </>
       )}

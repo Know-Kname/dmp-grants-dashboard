@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { z } from 'zod';
 import {
   useContracts, useCreateContract,
@@ -13,7 +14,8 @@ import { useToast } from '../lib/toast';
 import type { Contract, ContractItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,
-  Badge, EmptyState, LoadingSpinner, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
+  Badge, EmptyState, LoadingSpinner, PageError, StatCard, AnimatedNumber,
+  ConfirmDialog, SkeletonTable, Tabs, TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, FileText, Edit, Trash2, RefreshCw, DollarSign, TrendingUp, X, CalendarDays } from 'lucide-react';
 
 /** Live form state — the input side of `contractFormSchema`, so the two cannot drift. */
@@ -73,11 +75,11 @@ function PaymentScheduleSection({ contractId }: { contractId: string }) {
       <table className="w-full text-xs">
         <thead className="bg-background-subtle">
           <tr>
-            <th className="px-3 py-2 text-left font-medium text-foreground-muted uppercase tracking-wider">#</th>
-            <th className="px-3 py-2 text-left font-medium text-foreground-muted uppercase tracking-wider">Due</th>
-            <th className="px-3 py-2 text-right font-medium text-foreground-muted uppercase tracking-wider">Amount</th>
-            <th className="px-3 py-2 text-right font-medium text-foreground-muted uppercase tracking-wider">Paid</th>
-            <th className="px-3 py-2 text-left font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+            <th className={TABLE_HEAD_CLASS}>#</th>
+            <th className={TABLE_HEAD_CLASS}>Due</th>
+            <th className={cn(TABLE_HEAD_CLASS, 'text-right')}>Amount</th>
+            <th className={cn(TABLE_HEAD_CLASS, 'text-right')}>Paid</th>
+            <th className={TABLE_HEAD_CLASS}>Status</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -120,7 +122,9 @@ export default function Contracts() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   // Form state + validation. onSubmit only runs once contractFormSchema parses.
@@ -208,10 +212,11 @@ export default function Contracts() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this contract? This cannot be undone.')) {
-      deleteMutation.mutate(id);
-    }
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+    });
   };
 
   const handleCloseModal = () => {
@@ -262,10 +267,10 @@ export default function Contracts() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Contracts" value={stats.total} icon={FileText} tone="info" />
-        <StatCard label="Active" value={stats.active} icon={TrendingUp} tone="success" />
-        <StatCard label="Total Value" value={formatCurrency(stats.totalValue)} icon={DollarSign} tone="primary" />
-        <StatCard label="Received" value={formatCurrency(stats.amountReceived)} icon={DollarSign} tone="success" />
+        <StatCard label="Total Contracts" value={<AnimatedNumber to={stats.total} />} icon={FileText} tone="info" />
+        <StatCard label="Active" value={<AnimatedNumber to={stats.active} />} icon={TrendingUp} tone="success" />
+        <StatCard label="Total Value" value={<AnimatedNumber to={stats.totalValue} format={formatCurrency} />} icon={DollarSign} tone="primary" />
+        <StatCard label="Received" value={<AnimatedNumber to={stats.amountReceived} format={formatCurrency} />} icon={DollarSign} tone="success" />
       </div>
 
       {/* Filters + Status Tabs */}
@@ -293,28 +298,23 @@ export default function Contracts() {
             </div>
             <span className="text-sm text-foreground-muted">{filteredContracts.length} of {contracts.length}</span>
           </div>
-          <div className="flex gap-1 p-1 bg-background-subtle rounded-lg border border-border w-fit">
-            {STATUS_TABS.map(tab => (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-                  statusFilter === tab.value
-                    ? 'bg-card shadow-sm text-foreground border border-border'
-                    : 'text-foreground-muted hover:text-foreground hover:bg-accent'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            tabs={STATUS_TABS.map(tab => ({
+              value: tab.value,
+              label: tab.label,
+              count: tab.value === 'all'
+                ? contracts.length
+                : contracts.filter(c => c.status === tab.value).length,
+            }))}
+            active={statusFilter}
+            onChange={(v) => setStatusFilter(v as StatusFilter)}
+          />
         </CardBody>
       </Card>
 
       {/* Table */}
       {isLoading ? (
-        <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+        <SkeletonTable rows={6} cols={7} />
       ) : filteredContracts.length === 0 ? (
         <Card>
           <CardBody>
@@ -362,7 +362,7 @@ export default function Contracts() {
                       <td className="px-6 py-4 text-foreground-muted">{c.signedDate ? formatDate(c.signedDate) : '—'}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                        <button onClick={() => handleDelete(c.id)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                        <button onClick={() => setDeleteTarget(c)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
                       </td>
                     </tr>
                   );
@@ -372,6 +372,21 @@ export default function Contracts() {
           </div>
         </Card>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete Contract"
+        loading={deleteMutation.isPending}
+        message={deleteTarget ? (
+          <>
+            Delete contract <span className="font-mono font-medium">{deleteTarget.contractNumber}</span> for{' '}
+            {customerName(deleteTarget.customerId)}? This cannot be undone.
+          </>
+        ) : null}
+      />
 
       {/* Modal */}
       <Modal
