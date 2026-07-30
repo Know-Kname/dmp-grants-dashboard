@@ -11,14 +11,46 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
     steps:
-      - uses: dependabot/fetch-metadata@d7284e0802b61a3abb4f35109f803bd9bbbb7978  # v2
+      # Re-pinned. The previous SHA (d7284e0...) does not exist in
+      # dependabot/fetch-metadata — verified by
+      # `git fetch https://github.com/dependabot/fetch-metadata <sha>`, which
+      # cannot resolve it. The SHA below is the commit that refs/tags/v2 and
+      # refs/tags/v2.5.0 both point at.
+      - uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a  # v2 (v2.5.0)
         id: metadata
 
+      # NOTE — this step cannot work with the default GITHUB_TOKEN.
+      #
+      # On a `pull_request` event raised by Dependabot, GitHub downgrades
+      # secrets.GITHUB_TOKEN to read-only regardless of the `permissions:`
+      # block above, because Dependabot PRs are treated as coming from a fork.
+      # `gh pr merge --auto --squash` therefore fails with a permissions error.
+      #
+      # There are two supported fixes; pick one and do the setup, or leave this
+      # workflow as a no-op and merge Dependabot PRs by hand:
+      #
+      #   A. Add a repository secret DEPENDABOT_AUTOMERGE_TOKEN holding a
+      #      fine-grained PAT with Contents: read/write and Pull requests:
+      #      read/write on this repo. The step below already prefers it.
+      #   B. Change the trigger to `pull_request_target` (which does get a
+      #      writable token) — but only with a hardened `if:` guard, since
+      #      pull_request_target runs with repo secrets against PR head code.
+      #
+      # Auto-merge must also be enabled in Settings -> General -> Pull Requests
+      # ("Allow auto-merge"), or `--auto` is rejected outright.
+      # See docs/13-ci-and-database-operations.md.
       - name: Auto-merge minor and patch updates
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
           steps.metadata.outputs.update-type == 'version-update:semver-patch'
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::DEPENDABOT_AUTOMERGE_TOKEN is not set and the default"
+            echo "::warning::GITHUB_TOKEN is read-only on Dependabot pull_request events."
+            echo "::warning::Skipping auto-merge — merge this PR manually."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}

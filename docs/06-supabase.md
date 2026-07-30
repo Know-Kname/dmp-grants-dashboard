@@ -425,8 +425,12 @@ WHERE email = 'user@detroitmemorialpark.com';
 > `supabase migration new description_here`, start it with the standard header
 > documented in `CONTRIBUTING.md`, and commit the file — a change that only exists in
 > the SQL Editor's history isn't really documented anywhere. This repo has already hit
-> the failure mode of migration files drifting from what's actually applied; see
-> `AUDIT_REPORT.md`'s Change Log for how that was reconciled.
+> the failure mode of migration files drifting from what's actually applied — twice.
+> See [docs/13-ci-and-database-operations.md](13-ci-and-database-operations.md) for
+> the current divergence log (including a migration that had to be recovered out of
+> production's `schema_migrations` table), and
+> [docs/archive/2026-05-06-platform-audit.md](archive/2026-05-06-platform-audit.md)'s
+> Change Log for how the first round was reconciled.
 
 **Process for adding a column:**
 

@@ -5,6 +5,12 @@ on:
     - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
   workflow_dispatch:       # Manual trigger from Actions tab
 
+# On a `schedule` event the default GITHUB_TOKEN is read-only, so the
+# github-script step below cannot open an issue without an explicit grant.
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   check-drift:
     runs-on: ubuntu-latest
@@ -13,25 +19,107 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@78e2f5c76c9df4afd4b7ed5cac1c5b2b0b8e7c71  # v1
+        # Pinned to the v1 branch ref, matching supabase-migrations.yml. The SHA
+        # that used to be here (78e2f5c...) does not exist in supabase/setup-cli
+        # — verified with `git fetch https://github.com/supabase/setup-cli <sha>`,
+        # which fails to resolve it. That is why all 12 scheduled runs of this
+        # workflow failed with "Unable to resolve action" before checkout even
+        # produced useful output.
+        uses: supabase/setup-cli@v1
         with:
           version: latest
 
+      # Fail with an actionable message rather than letting the Supabase CLI
+      # report a confusing login/link error when a secret is simply unset.
+      - name: Verify required secrets are configured
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PRODUCTION_PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_REF }}
+          PRODUCTION_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ]  || missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -n "$PRODUCTION_PROJECT_REF" ] || missing="$missing PRODUCTION_PROJECT_REF"
+          [ -n "$PRODUCTION_DB_PASSWORD" ] || missing="$missing PRODUCTION_DB_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            echo "See docs/13-ci-and-database-operations.md for exact values and steps."
+            exit 1
+          fi
+          echo "All required secrets are present."
+
       - name: Link to production project
         run: |
-          supabase link --project-ref ${{ secrets.PRODUCTION_PROJECT_REF }}
+          supabase link \
+            --project-ref "${{ secrets.PRODUCTION_PROJECT_REF }}" \
+            --password "${{ secrets.PRODUCTION_DB_PASSWORD }}"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Check migration sync state
         id: drift
-        run: |
-          supabase migration list 2>&1 | tee migration_status.txt
-          if grep -qE "^\s*│\s+[0-9]+.*│\s*$" migration_status.txt; then
-            echo "DRIFT_DETECTED=true" >> $GITHUB_ENV
-          fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -o pipefail
+          supabase migration list 2>&1 | tee migration_status.txt
+
+          # `supabase migration list` prints a box-drawing table:
+          #
+          #     Local          | Remote         | Time (UTC)
+          #    ----------------|----------------|---------------------
+          #     20260506002740 | 20260506002740 | 2026-05-06 00:27:40
+          #     20260523232936 |                | 2026-05-23 23:29:36
+          #
+          # A row is IN SYNC only when the Local and Remote cells are both
+          # non-empty and equal. The previous check here was
+          # `grep -qE "^\s*│\s+[0-9]+.*│\s*$"`, which matched any row whose
+          # first cell was numeric — i.e. every data row, in sync or not,
+          # because the Local column always holds a version number. It would
+          # have reported drift on 100% of runs. Compare the columns instead.
+          python3 - <<'PY'
+          import os, re
+
+          VERSION = re.compile(r"\d{14}$")
+
+          # The CLI's exact table style has varied across releases (outer
+          # borders present or absent, ASCII or box-drawing verticals), and a
+          # blank cell is indistinguishable from an absent one once outer
+          # borders are stripped. So do not rely on column positions. Instead:
+          # a data row is any row containing at least one 14-digit migration
+          # version, and it is IN SYNC only when it carries the version twice
+          # -- once in Local, once in Remote -- with both values equal.
+          # Exactly one occurrence means the version exists on one side only,
+          # which is precisely what drift is.
+          drifted_rows = []
+          checked = 0
+          with open("migration_status.txt", encoding="utf-8", errors="replace") as fh:
+              for raw in fh:
+                  line = raw.replace("│", "|").replace("┃", "|").rstrip("\n")
+                  if "|" not in line:
+                      continue
+                  versions = [c.strip() for c in line.split("|") if VERSION.match(c.strip())]
+                  if not versions:
+                      continue
+                  checked += 1
+                  if len(versions) != 2 or versions[0] != versions[1]:
+                      drifted_rows.append(line.strip())
+
+          if checked == 0:
+              print("::error::Could not parse any migration rows out of `supabase migration list`.")
+              print("The CLI output format may have changed; this check needs updating.")
+              raise SystemExit(1)
+
+          if drifted_rows:
+              print(f"Drift detected in {len(drifted_rows)} of {checked} migration rows:")
+              for row in drifted_rows:
+                  print(f"  {row}")
+              with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+                  env.write("DRIFT_DETECTED=true\n")
+          else:
+              print(f"No drift: all {checked} migration versions are present both locally and remotely.")
+          PY
 
       - name: Open GitHub Issue on drift detection
         if: env.DRIFT_DETECTED == 'true'
@@ -47,8 +135,8 @@ jobs:
               body: [
                 '## Database Drift Detected',
                 '',
-                'The weekly automated drift check found that local migration files',
-                'and the remote production database schema are out of sync.',
+                'The weekly automated drift check found at least one migration version',
+                'that is present locally but not remotely, or remotely but not locally.',
                 '',
                 '### Migration Status',
                 '```',
@@ -56,13 +144,15 @@ jobs:
                 '```',
                 '',
                 '### Remediation Steps',
-                '1. `supabase link --project-ref YOUR_REF`',
+                '1. `supabase link --project-ref mgpwjnxtqcnoyjgebytg`',
                 '2. `supabase migration list` — identify the discrepancy',
                 '3. If remote has changes not in local: `supabase db pull`',
                 '4. Commit the new migration file with header comment',
                 '5. Push: `supabase db push`',
                 '6. Verify: `supabase migration list`',
-                '7. Close this issue with a comment describing what was found'
+                '7. Close this issue with a comment describing what was found',
+                '',
+                'See `docs/13-ci-and-database-operations.md` for the known-divergence log.'
               ].join('\n'),
               labels: ['database', 'urgent', 'automated-alert']
             });

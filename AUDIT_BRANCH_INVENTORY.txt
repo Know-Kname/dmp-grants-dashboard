@@ -1,4 +1,0 @@
-* claude/finish-site-audit-2ICL3
-  remotes/origin/claude/finish-site-audit-2ICL3
-  main
-  remotes/origin/main

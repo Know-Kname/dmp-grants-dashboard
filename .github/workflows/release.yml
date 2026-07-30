@@ -3,6 +3,24 @@ name: Auto Tag and Release
 on:
   push:
     branches: [main]
+    # Gate on shipped code only. Without this the workflow patch-bumps the
+    # version on every push to main, including docs-only and CI-only commits,
+    # producing a stream of releases with no product change in them.
+    paths:
+      - 'src/**'
+      - 'api/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'vercel.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - 'tsconfig*.json'
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+    # Manual trigger for cutting a release that the path filter would skip.
 
 permissions:
   contents: write
@@ -17,7 +35,15 @@ jobs:
           fetch-depth: '0'
 
       - name: Bump version and push tag
-        uses: anothrNick/github-tag-action@a29250ad4c6e3b5a5d01e90c9a4f90aef9e07e55  # v1
+        # Re-pinned. The previous SHA (a29250a...) does not exist in
+        # anothrNick/github-tag-action — verified by
+        # `git fetch https://github.com/anothrNick/github-tag-action <sha>`,
+        # which cannot resolve it. That is why all 18 runs of this workflow
+        # failed with "Unable to resolve action" and the repo has never
+        # produced a git tag or a GitHub Release. The SHA below is the commit
+        # that refs/tags/v1 and refs/tags/1.75.0 both point at, confirmed via
+        # `git ls-remote --tags` plus a successful `git fetch` of the object.
+        uses: anothrNick/github-tag-action@4ed44965e0db8dab2b466a16da04aec3cc312fd8  # v1 (1.75.0)
         id: bump
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
