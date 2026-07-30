@@ -81,13 +81,13 @@ export default function App() {
       <QueryProvider>
         <ThemeProvider>
           <AuthProvider>
-            <ToastProvider>
-              <MotionProvider>
+            <MotionProvider>
+              <ToastProvider>
                 <ErrorBoundary>
                   <AppRoutes />
                 </ErrorBoundary>
-              </MotionProvider>
-            </ToastProvider>
+              </ToastProvider>
+            </MotionProvider>
           </AuthProvider>
         </ThemeProvider>
       </QueryProvider>

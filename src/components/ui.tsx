@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
-import { AlertCircle, type LucideIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
+import { m, AnimatePresence, scalePop, useCountUp } from '../lib/motion';
 
 // ============================================
 // PAGE ERROR
@@ -62,32 +63,96 @@ const STAT_TONES: Record<StatTone, { value: string; chip: string; icon: string }
 };
 
 /**
+ * Animated count-up number. Renders the in-flight value through `format`
+ * (defaults to a rounded locale string); jumps instantly under
+ * prefers-reduced-motion. Use inside StatCard values:
+ * `value={<AnimatedNumber to={total} format={formatCurrency} />}`.
+ */
+export function AnimatedNumber({ to, format }: { to: number; format?: (n: number) => string }) {
+  const v = useCountUp(to);
+  return <>{format ? format(v) : Math.round(v).toLocaleString()}</>;
+}
+
+/** Tiny inline SVG sparkline — deliberately not Recharts, to stay chunk-light. */
+function Sparkline({ data, className = '' }: { data: number[]; className?: string }) {
+  if (data.length < 2) return null;
+  const w = 88, h = 28, pad = 2;
+  const min = Math.min(...data);
+  const range = (Math.max(...data) - min) || 1;
+  const points = data
+    .map((v, i) => {
+      const x = pad + (i * (w - pad * 2)) / (data.length - 1);
+      const y = h - pad - ((v - min) / range) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden>
+      <polyline
+        points={points}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.7}
+      />
+    </svg>
+  );
+}
+
+/**
  * Headline metric tile: label, value, and a tinted icon chip.
  *
  * @param icon A lucide icon component (passed uninstantiated, e.g. `icon={Users}`).
+ * @param hint Optional secondary line under the value (subtitle, badge row…).
+ * @param trend Optional delta vs a prior period; sign drives color and arrow.
+ * @param sparkline Optional series drawn as a small inline line, tinted by tone.
  */
 export function StatCard({
   label,
   value,
   icon: Icon,
   tone = 'primary',
+  hint,
+  trend,
+  sparkline,
 }: {
   label: string;
   value: React.ReactNode;
   icon: LucideIcon;
   tone?: StatTone;
+  hint?: React.ReactNode;
+  trend?: { delta: number; label?: string };
+  sparkline?: number[];
 }) {
   const t = STAT_TONES[tone];
+  const trendUp = trend && trend.delta >= 0;
   return (
     <Card>
       <CardBody>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-sm text-foreground-muted mb-1">{label}</p>
             <p className={`text-2xl font-bold ${t.value}`}>{value}</p>
+            {trend && (
+              <p
+                className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${
+                  trendUp ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'
+                }`}
+              >
+                {trendUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {trendUp ? '+' : ''}{trend.delta.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                {trend.label && <span className="text-foreground-subtle font-normal">{trend.label}</span>}
+              </p>
+            )}
+            {hint && <div className="mt-1 text-xs text-foreground-muted">{hint}</div>}
           </div>
-          <div className={`p-3 ${t.chip} rounded-lg`}>
-            <Icon className={t.icon} size={24} />
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className={`p-3 ${t.chip} rounded-lg`}>
+              <Icon className={t.icon} size={24} />
+            </div>
+            {sparkline && <Sparkline data={sparkline} className={t.icon} />}
           </div>
         </div>
       </CardBody>
@@ -253,23 +318,56 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export function Modal({ isOpen, onClose, title, description, children, footer, size = 'md' }: ModalProps) {
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Wrapper so the panel gets a real exit animation: AnimatePresence needs the
+ * child to unmount, which the old `if (!isOpen) return null` made instant.
+ */
+export function Modal(props: ModalProps) {
+  return (
+    <AnimatePresence>
+      {props.isOpen && <ModalPanel key="modal" {...props} />}
+    </AnimatePresence>
+  );
+}
+
+function ModalPanel({ onClose, title, description, children, footer, size = 'md' }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
     const previous = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // Scroll lock while open
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'Tab') {
+        // Focus trap: cycle within the dialog
+        const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (!focusables || focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || active === dialogRef.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
       previous?.focus();
     };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const sizes = {
     sm: 'max-w-md',
@@ -281,22 +379,29 @@ export function Modal({ isOpen, onClose, title, description, children, footer, s
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+      <m.div
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div
+      <m.div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
+        variants={scalePop}
+        initial="hidden"
+        animate="show"
+        exit="exit"
         className={`
           relative bg-card text-card-foreground rounded-xl shadow-xl border border-border
           ${sizes[size]} w-full max-h-[90vh] flex flex-col outline-none
-          animate-scale-in
         `}
       >
         {/* Header */}
@@ -329,8 +434,61 @@ export function Modal({ isOpen, onClose, title, description, children, footer, s
             {footer}
           </div>
         )}
-      </div>
+      </m.div>
     </div>
+  );
+}
+
+// ============================================
+// CONFIRM DIALOG
+// ============================================
+
+/**
+ * Styled, themed replacement for `window.confirm()` on destructive actions.
+ * Renders on the shared Modal, so it inherits the focus trap, scroll lock,
+ * Escape handling, and animated exit.
+ */
+export function ConfirmDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = 'Delete',
+  loading = false,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: React.ReactNode;
+  confirmLabel?: string;
+  loading?: boolean;
+}) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={onConfirm} loading={loading}>
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-start gap-3">
+        <div className="p-2.5 rounded-lg bg-danger-100 dark:bg-danger-950 text-danger shrink-0">
+          <AlertTriangle size={20} />
+        </div>
+        <div className="text-sm text-foreground-muted leading-relaxed pt-1.5">{message}</div>
+      </div>
+    </Modal>
   );
 }
 
@@ -546,6 +704,148 @@ export function Avatar({ src, alt, fallback, size = 'md', className = '' }: Avat
   return (
     <div className={`${sizes[size]} rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 flex items-center justify-center font-medium ${className}`}>
       {fallback || '?'}
+    </div>
+  );
+}
+
+// ============================================
+// SKELETONS
+// ============================================
+
+/**
+ * Shimmering placeholder block (the `.skeleton` sweep from index.css).
+ * Size it with className, e.g. `<Skeleton className="h-4 w-32" />`.
+ */
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div aria-hidden className={`skeleton rounded-md ${className}`} />;
+}
+
+/** Placeholder row of stat cards, matching StatCard's real layout. */
+export function SkeletonStatRow({ count = 3 }: { count?: number }) {
+  return (
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${count >= 4 ? 'lg:grid-cols-4' : count === 2 ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-4`}>
+      {Array.from({ length: count }, (_, i) => (
+        <Card key={i}>
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-7 w-16" />
+              </div>
+              <Skeleton className="h-12 w-12 rounded-lg" />
+            </div>
+          </CardBody>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/** Placeholder table matching the shared table layout. */
+export function SkeletonTable({ rows = 6, cols = 5 }: { rows?: number; cols?: number }) {
+  return (
+    <Card>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-background-subtle border-b border-border">
+            <tr>
+              {Array.from({ length: cols }, (_, i) => (
+                <th key={i} className={TABLE_HEAD_CLASS}>
+                  <Skeleton className="h-3 w-20" />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {Array.from({ length: rows }, (_, r) => (
+              <tr key={r}>
+                {Array.from({ length: cols }, (_, c) => (
+                  <td key={c} className="px-6 py-4">
+                    <Skeleton className={`h-4 ${c === 0 ? 'w-32' : 'w-20'}`} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/** Placeholder chart block. */
+export function SkeletonChart({ height = 220 }: { height?: number }) {
+  return (
+    <div className="flex items-end gap-2 px-2" style={{ height }} aria-hidden>
+      {[42, 68, 55, 80, 62, 90, 74, 58, 84, 66, 48, 72].map((h, i) => (
+        <div key={i} className="skeleton flex-1 rounded-t-md" style={{ height: `${h}%` }} />
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// TABS
+// ============================================
+
+export interface TabItem {
+  value: string;
+  label: React.ReactNode;
+  count?: number;
+}
+
+/**
+ * Pill tab strip with a sliding active indicator (shared-layout animation).
+ * Controlled: pass the active value and an onChange handler.
+ */
+export function Tabs({
+  tabs,
+  active,
+  onChange,
+  className = '',
+}: {
+  tabs: TabItem[];
+  active: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const layoutId = useId();
+  return (
+    <div role="tablist" className={`inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-background-muted ${className}`}>
+      {tabs.map((tab) => {
+        const isActive = tab.value === active;
+        return (
+          <button
+            key={tab.value}
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(tab.value)}
+            className={`relative px-3.5 py-1.5 min-h-0 rounded-md text-sm font-medium transition-colors ${
+              isActive ? 'text-foreground' : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            {isActive && (
+              <m.span
+                layoutId={layoutId}
+                className="absolute inset-0 rounded-md bg-card shadow-sm border border-border"
+                transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
+              />
+            )}
+            <span className="relative inline-flex items-center gap-1.5">
+              {tab.label}
+              {tab.count !== undefined && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[11px] leading-none font-semibold ${
+                    isActive ? 'bg-primary-100 dark:bg-primary-950 text-primary' : 'bg-background-subtle text-foreground-muted'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

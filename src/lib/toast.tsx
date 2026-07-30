@@ -1,24 +1,37 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { m, AnimatePresence, EASE_LUX } from './motion';
 
 type Variant = 'success' | 'error' | 'warning' | 'info';
+
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+interface ToastOptions {
+  /** Optional action button (e.g. Undo). Extends the toast's lifetime. */
+  action?: ToastAction;
+}
 
 interface ToastItem {
   id: string;
   message: string;
   title?: string;
   variant: Variant;
+  action?: ToastAction;
 }
 
 interface ToastContextType {
-  success: (message: string, title?: string) => void;
-  error:   (message: string, title?: string) => void;
-  warning: (message: string, title?: string) => void;
-  info:    (message: string, title?: string) => void;
+  success: (message: string, title?: string, options?: ToastOptions) => void;
+  error:   (message: string, title?: string, options?: ToastOptions) => void;
+  warning: (message: string, title?: string, options?: ToastOptions) => void;
+  info:    (message: string, title?: string, options?: ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 const DURATION = 4000;
+const DURATION_WITH_ACTION = 7000; // give the user time to hit Undo
 
 const STYLE: Record<Variant, { bar: string; icon: string; iconBg: string; symbol: string }> = {
   success: { bar: 'border-l-success',  icon: 'text-success',  iconBg: 'bg-success-100 dark:bg-success-950',  symbol: '✓' },
@@ -31,16 +44,21 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
   const s = STYLE[item.variant];
 
   useEffect(() => {
-    const t = setTimeout(onDismiss, DURATION);
+    const t = setTimeout(onDismiss, item.action ? DURATION_WITH_ACTION : DURATION);
     return () => clearTimeout(t);
-  }, [onDismiss]);
+  }, [onDismiss, item.action]);
 
   return (
-    <div
+    <m.div
+      layout
+      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 24, transition: { duration: 0.18, ease: 'easeIn' } }}
+      transition={{ duration: 0.35, ease: EASE_LUX }}
       className={`
         flex items-start gap-3 bg-card border border-border border-l-4 ${s.bar}
         rounded-xl shadow-lg px-4 py-3 w-full max-w-sm
-        animate-slide-up pointer-events-auto
+        pointer-events-auto
       `}
     >
       <div className={`w-7 h-7 rounded-lg ${s.iconBg} ${s.icon} flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5`}>
@@ -51,6 +69,17 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
           <p className="text-sm font-semibold text-foreground leading-tight">{item.title}</p>
         )}
         <p className={`text-sm text-foreground-muted ${item.title ? 'mt-0.5' : ''}`}>{item.message}</p>
+        {item.action && (
+          <button
+            onClick={() => {
+              item.action?.onClick();
+              onDismiss();
+            }}
+            className="mt-1.5 min-h-0 text-sm font-semibold text-primary hover:text-primary-hover transition-colors"
+          >
+            {item.action.label}
+          </button>
+        )}
       </div>
       <button
         onClick={onDismiss}
@@ -61,7 +90,7 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
           <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
         </svg>
       </button>
-    </div>
+    </m.div>
   );
 }
 
@@ -72,16 +101,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const add = useCallback((message: string, variant: Variant, title?: string) => {
+  const add = useCallback((message: string, variant: Variant, title?: string, options?: ToastOptions) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setToasts(prev => [...prev.slice(-2), { id, message, variant, title }]);
+    setToasts(prev => [...prev.slice(-2), { id, message, variant, title, action: options?.action }]);
   }, []);
 
   const value: ToastContextType = {
-    success: (msg, title) => add(msg, 'success', title),
-    error:   (msg, title) => add(msg, 'error',   title),
-    warning: (msg, title) => add(msg, 'warning', title),
-    info:    (msg, title) => add(msg, 'info',    title),
+    success: (msg, title, opts) => add(msg, 'success', title, opts),
+    error:   (msg, title, opts) => add(msg, 'error',   title, opts),
+    warning: (msg, title, opts) => add(msg, 'warning', title, opts),
+    info:    (msg, title, opts) => add(msg, 'info',    title, opts),
   };
 
   return (
@@ -89,9 +118,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Toaster — above mobile nav on small screens, bottom-right on desktop */}
       <div className="fixed bottom-20 lg:bottom-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(item => (
-          <Toast key={item.id} item={item} onDismiss={() => dismiss(item.id)} />
-        ))}
+        <AnimatePresence mode="popLayout">
+          {toasts.map(item => (
+            <Toast key={item.id} item={item} onDismiss={() => dismiss(item.id)} />
+          ))}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   );
