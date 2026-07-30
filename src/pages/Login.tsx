@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence, EASE_LUX, stagger, fadeUp } from '../lib/motion';
 import Balancer from 'react-wrap-balancer';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
@@ -48,18 +48,6 @@ function GoogleIcon() {
   );
 }
 
-const EASE_LUX: [number, number, number, number] = [0.16, 1, 0.3, 1];
-
-const stagger = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
-};
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 1, ease: EASE_LUX } },
-};
-
 /** Word-mask reveal — same primitive as Memorial hero */
 function RevealWords({
   children,
@@ -89,14 +77,14 @@ function RevealWords({
             paddingBottom: '0.08em',
           }}
         >
-          <motion.span
+          <m.span
             style={{ display: 'inline-block' }}
             initial={{ y: '108%' }}
             animate={{ y: 0 }}
             transition={{ delay: delay + i * perWord, duration: 0.95, ease: EASE_LUX }}
           >
             {w}
-          </motion.span>
+          </m.span>
         </span>
       ))}
     </span>
@@ -177,7 +165,7 @@ export default function Login() {
       {/* ───── LEFT — duotone landscape + brand ───── */}
       <div className="hidden lg:flex lg:w-[55%] flex-col relative overflow-hidden" style={{ backgroundColor: BRAND.greenDeep }}>
         {/* Photo with Ken Burns + duotone */}
-        <motion.div
+        <m.div
           className="absolute inset-0"
           initial={{ scale: 1.06, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -206,31 +194,31 @@ export default function Login() {
         />
 
         {/* Content */}
-        <motion.div
+        <m.div
           className="relative flex flex-col h-full px-12 xl:px-16 py-14 justify-between"
           initial="hidden"
           animate="show"
           variants={stagger}
         >
           {/* Top: brand mark */}
-          <motion.div variants={fadeUp}>
+          <m.div variants={fadeUp}>
             <img
               src="/dmp-logo.png"
               alt="Detroit Memorial Park"
               className="h-12 w-auto"
               style={{ filter: 'brightness(0) saturate(100%) invert(1)', opacity: 0.92 }}
             />
-          </motion.div>
+          </m.div>
 
           {/* Middle: headline + tagline */}
           <div className="max-w-2xl">
-            <motion.div
+            <m.div
               variants={fadeUp}
               className="text-[10px] uppercase mb-8"
               style={{ color: BRAND.gold, letterSpacing: '0.32em', fontWeight: 500, opacity: 0.85 }}
             >
               A Century of Remembrance
-            </motion.div>
+            </m.div>
 
             <h1
               className="text-white leading-[0.96] mb-10"
@@ -253,13 +241,13 @@ export default function Login() {
               </span>
             </h1>
 
-            <motion.div
+            <m.div
               variants={fadeUp}
               className="mb-8"
               style={{ width: '48px', height: '1px', backgroundColor: BRAND.gold, opacity: 0.6 }}
             />
 
-            <motion.p
+            <m.p
               variants={fadeUp}
               className="text-base leading-relaxed max-w-md"
               style={{
@@ -274,11 +262,11 @@ export default function Login() {
                 A century of dignified service across three Michigan sanctuaries.
                 This system keeps our operations as enduring as our mission.
               </Balancer>
-            </motion.p>
+            </m.p>
           </div>
 
           {/* Bottom: locations + copyright */}
-          <motion.div variants={fadeUp}>
+          <m.div variants={fadeUp}>
             <div className="grid grid-cols-3 gap-6 mb-10 max-w-lg">
               {heroLocations.map((loc) => (
                 <div key={loc.name}>
@@ -299,8 +287,8 @@ export default function Login() {
             <p className="text-[10px] uppercase" style={{ color: 'rgba(245,241,234,0.32)', letterSpacing: '0.2em' }}>
               {COMPANY.legal.copyright} · State of Michigan Official Historic Site
             </p>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       </div>
 
       {/* ───── RIGHT — bone form panel ───── */}
@@ -330,21 +318,21 @@ export default function Login() {
         </div>
 
         <div className="flex-1 flex items-center justify-center px-6 py-16 sm:px-12">
-          <motion.div
+          <m.div
             className="w-full max-w-[420px]"
             initial="hidden"
             animate="show"
             variants={stagger}
           >
-            <motion.p
+            <m.p
               variants={fadeUp}
               className="text-[10px] uppercase mb-5"
               style={{ color: BRAND.green, letterSpacing: '0.28em', fontWeight: 600 }}
             >
               Staff Sign In
-            </motion.p>
+            </m.p>
 
-            <motion.h2
+            <m.h2
               variants={fadeUp}
               className="leading-tight mb-3"
               style={{
@@ -357,9 +345,9 @@ export default function Login() {
               }}
             >
               <Balancer>Welcome back.</Balancer>
-            </motion.h2>
+            </m.h2>
 
-            <motion.p
+            <m.p
               variants={fadeUp}
               className="text-sm mb-10"
               style={{
@@ -369,11 +357,11 @@ export default function Login() {
               }}
             >
               Sign in to access the {COMPANY.system.name}.
-            </motion.p>
+            </m.p>
 
             <AnimatePresence mode="wait">
               {error && (
-                <motion.div
+                <m.div
                   key={shakeKey}
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0, x: [0, -8, 8, -8, 8, -4, 4, 0] }}
@@ -391,12 +379,12 @@ export default function Login() {
                   >
                     ✕
                   </button>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
             <form onSubmit={handleSubmit}>
-              <motion.div variants={fadeUp} className="mb-5">
+              <m.div variants={fadeUp} className="mb-5">
                 <label
                   htmlFor="login-email"
                   className="block text-[10px] uppercase mb-2.5"
@@ -427,9 +415,9 @@ export default function Login() {
                     }}
                   />
                 </div>
-              </motion.div>
+              </m.div>
 
-              <motion.div variants={fadeUp} className="mb-8">
+              <m.div variants={fadeUp} className="mb-8">
                 <label
                   htmlFor="login-password"
                   className="block text-[10px] uppercase mb-2.5"
@@ -469,10 +457,10 @@ export default function Login() {
                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
-              </motion.div>
+              </m.div>
 
-              <motion.div variants={fadeUp}>
-                <motion.button
+              <m.div variants={fadeUp}>
+                <m.button
                   type="submit"
                   disabled={loading}
                   whileHover={loading ? {} : { scale: 1.005 }}
@@ -500,18 +488,18 @@ export default function Login() {
                       <ArrowRight size={14} />
                     </>
                   )}
-                </motion.button>
-              </motion.div>
+                </m.button>
+              </m.div>
             </form>
 
             {/* ── Google OAuth ── */}
-            <motion.div variants={fadeUp} className="mt-5">
+            <m.div variants={fadeUp} className="mt-5">
               <div className="flex items-center gap-4 mb-5">
                 <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
                 <span className="text-[10px] uppercase" style={{ color: 'rgba(26,26,26,0.4)', letterSpacing: '0.28em' }}>or</span>
                 <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(26,61,43,0.15)' }} />
               </div>
-              <motion.button
+              <m.button
                 type="button"
                 onClick={handleGoogle}
                 disabled={googleLoading || loading}
@@ -533,14 +521,14 @@ export default function Login() {
                   <GoogleIcon />
                 )}
                 Continue with Google
-              </motion.button>
-            </motion.div>
+              </m.button>
+            </m.div>
 
             {/* ── Demo (dev-only) ── */}
             {import.meta.env.DEV && (
               <>
-                <motion.div variants={fadeUp} className="mt-3">
-                  <motion.button
+                <m.div variants={fadeUp} className="mt-3">
+                  <m.button
                     type="button"
                     onClick={handleDemo}
                     whileHover={{ scale: 1.005 }}
@@ -557,10 +545,10 @@ export default function Login() {
                   >
                     <Sparkles size={12} style={{ color: BRAND.gold }} />
                     Explore Demo
-                  </motion.button>
-                </motion.div>
+                  </m.button>
+                </m.div>
 
-                <motion.p
+                <m.p
                   variants={fadeUp}
                   className="text-xs text-center mt-6"
                   style={{
@@ -572,11 +560,11 @@ export default function Login() {
                   Staff demo: <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin@dmp.com</span>
                   {' / '}
                   <span style={{ fontStyle: 'normal', color: 'rgba(26,26,26,0.6)' }}>admin123</span>
-                </motion.p>
+                </m.p>
               </>
             )}
 
-            <motion.div
+            <m.div
               variants={fadeUp}
               className="mt-14 pt-8"
               style={{ borderTop: '1px solid rgba(26,61,43,0.12)' }}
@@ -609,8 +597,8 @@ export default function Login() {
               >
                 {COMPANY.legal.copyright}
               </p>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         </div>
       </div>
     </div>

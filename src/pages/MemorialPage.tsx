@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import QRCode from 'react-qr-code';
-import { motion } from 'framer-motion';
+import { m, EASE_LUX } from '../lib/motion';
 import Balancer from 'react-wrap-balancer';
 import { usePublicBurial } from '../hooks/useData';
 import { formatDate } from '../lib/utils';
@@ -8,8 +8,6 @@ import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 
 const PHOTO_PLACEHOLDER = '/dmp-hero.jpg';
-
-const EASE_LUX: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 /**
  * Word-mask reveal: each word slides up from a clipped container.
@@ -41,7 +39,7 @@ function RevealHeadline({
             paddingBottom: '0.06em',
           }}
         >
-          <motion.span
+          <m.span
             style={{ display: 'inline-block' }}
             initial={{ y: '108%' }}
             animate={{ y: 0 }}
@@ -52,7 +50,7 @@ function RevealHeadline({
             }}
           >
             {word}
-          </motion.span>
+          </m.span>
         </span>
       ))}
     </h1>
@@ -135,7 +133,7 @@ export default function MemorialPage() {
         className="relative z-10 px-6 lg:px-12 py-5 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(26,61,43,0.10)' }}
       >
-        <motion.div
+        <m.div
           className="flex items-center gap-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -146,8 +144,8 @@ export default function MemorialPage() {
             alt="Detroit Memorial Park"
             className="h-7 w-auto"
           />
-        </motion.div>
-        <motion.span
+        </m.div>
+        <m.span
           className="text-[10px] uppercase hidden sm:block"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -155,13 +153,13 @@ export default function MemorialPage() {
           style={{ color: 'rgba(26,26,26,0.4)', letterSpacing: '0.22em', fontWeight: 500 }}
         >
           In Memoriam · Est. 1925
-        </motion.span>
+        </m.span>
       </header>
 
       {/* ───── HERO: split duotone portrait + nameplate ───── */}
       <section className="grid grid-cols-1 lg:grid-cols-[5fr_7fr]" style={{ minHeight: 'min(82vh, 760px)' }}>
         {/* Duotone portrait — 4:5 framing */}
-        <motion.div
+        <m.div
           className="relative overflow-hidden"
           initial={{ clipPath: 'inset(0 0 100% 0)' }}
           animate={{ clipPath: 'inset(0 0 0% 0)' }}
@@ -211,11 +209,11 @@ export default function MemorialPage() {
           >
             Plate I · Portrait
           </div>
-        </motion.div>
+        </m.div>
 
         {/* Nameplate — bone half */}
         <div className="flex flex-col justify-center px-8 sm:px-12 lg:px-20 py-16 lg:py-24">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
@@ -223,7 +221,7 @@ export default function MemorialPage() {
             style={{ color: BRAND.green, letterSpacing: '0.28em', fontWeight: 600 }}
           >
             In Loving Memory of
-          </motion.div>
+          </m.div>
 
           <RevealHeadline
             text={name}
@@ -239,7 +237,7 @@ export default function MemorialPage() {
           />
 
           {/* Gold rule above dates */}
-          <motion.div
+          <m.div
             className="mt-10 mb-5"
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
@@ -248,7 +246,7 @@ export default function MemorialPage() {
           />
 
           {lifespan && (
-            <motion.p
+            <m.p
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: EASE_LUX, delay: 1.0 }}
@@ -262,11 +260,11 @@ export default function MemorialPage() {
               }}
             >
               {lifespan}
-            </motion.p>
+            </m.p>
           )}
 
           {/* Sticky-ish metadata block */}
-          <motion.dl
+          <m.dl
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: EASE_LUX, delay: 1.15 }}
@@ -276,12 +274,12 @@ export default function MemorialPage() {
             <Field label="Died" value={death} />
             {burial.burialDate && <Field label="Interred" value={formatDate(burial.burialDate)} />}
             {plotLabel && <Field label="Plot" value={plotLabel} mono />}
-          </motion.dl>
+          </m.dl>
         </div>
       </section>
 
       {/* ───── PULL-QUOTE: full-bleed forest ───── */}
-      <motion.section
+      <m.section
         className="relative overflow-hidden"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -296,7 +294,7 @@ export default function MemorialPage() {
         <FilmGrain opacity={0.08} />
         <div className="relative max-w-3xl mx-auto px-8 text-center">
           <div className="mx-auto mb-10 w-px" style={{ height: '48px', backgroundColor: BRAND.gold, opacity: 0.55 }} />
-          <motion.p
+          <m.p
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.5 }}
@@ -316,14 +314,14 @@ export default function MemorialPage() {
               Those we love don't go away. They walk beside us every day —
               unseen, unheard, but always near.
             </Balancer>
-          </motion.p>
+          </m.p>
           <div className="mx-auto mt-10 w-px" style={{ height: '48px', backgroundColor: BRAND.gold, opacity: 0.55 }} />
         </div>
-      </motion.section>
+      </m.section>
 
       {/* ───── REMEMBRANCE + QR ───── */}
       <section className="px-6 lg:px-12 py-24 lg:py-32 grid grid-cols-1 lg:grid-cols-12 gap-12 max-w-6xl mx-auto">
-        <motion.div
+        <m.div
           className="lg:col-span-7 lg:col-start-1"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -363,9 +361,9 @@ export default function MemorialPage() {
             distant relatives, or print a keepsake. The grounds are open daily;
             we welcome you to walk them.
           </p>
-        </motion.div>
+        </m.div>
 
-        <motion.div
+        <m.div
           className="lg:col-span-4 lg:col-start-9 flex flex-col items-start lg:items-center gap-5"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -398,7 +396,7 @@ export default function MemorialPage() {
           >
             Print · Save QR
           </button>
-        </motion.div>
+        </m.div>
       </section>
 
       {/* ───── FOOTER ───── */}
@@ -465,7 +463,7 @@ function NotFound() {
       className="min-h-screen flex items-center justify-center px-6"
       style={{ backgroundColor: 'var(--bone)' }}
     >
-      <motion.div
+      <m.div
         className="text-center max-w-md"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -503,7 +501,7 @@ function NotFound() {
           className="mx-auto mt-10"
           style={{ width: '32px', height: '1px', backgroundColor: BRAND.gold, opacity: 0.4 }}
         />
-      </motion.div>
+      </m.div>
     </div>
   );
 }
