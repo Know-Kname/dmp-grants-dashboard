@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Send, Sparkles, RotateCcw, Bot } from 'lucide-react';
 import { streamMessage, type ChatMessage } from '../lib/gemini';
 import { BRAND } from '../config/brand';
+import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
 
 
 const STARTERS = [
@@ -93,16 +94,25 @@ export default function AIAssistant() {
       </button>
 
       {/* Panel */}
+      <AnimatePresence>
       {open && (
         <>
           {/* Mobile scrim */}
-          <div
+          <m.div
             className="lg:hidden fixed inset-0 bg-black/40 z-40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={() => setOpen(false)}
           />
 
-          <div
+          <m.div
             className="fixed z-50 flex flex-col shadow-2xl border border-border overflow-hidden"
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.97, transition: { duration: 0.15 } }}
+            transition={{ duration: 0.3, ease: EASE_LUX }}
             style={{
               bottom: '5rem',
               right: '1rem',
@@ -110,6 +120,7 @@ export default function AIAssistant() {
               height: 'min(560px, calc(100dvh - 7rem))',
               borderRadius: '1.25rem',
               backgroundColor: 'hsl(var(--card))',
+              transformOrigin: 'bottom right',
             }}
           >
             {/* Header */}
@@ -251,9 +262,10 @@ export default function AIAssistant() {
                 Enter to send · Shift+Enter for new line
               </p>
             </div>
-          </div>
+          </m.div>
         </>
       )}
+      </AnimatePresence>
     </>
   );
 }
