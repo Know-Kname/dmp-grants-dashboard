@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { z } from 'zod';
 import {
   useBurials, useCreateBurial,
@@ -12,7 +13,8 @@ import { useToast } from '../lib/toast';
 import type { Burial } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
-  EmptyState, LoadingSpinner, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
+  EmptyState, PageError, StatCard, AnimatedNumber, SkeletonTable, ConfirmDialog } from '../components/ui';
+import { DataTable, type Column } from '../components/DataTable';
 import { Plus, Search, BookOpen, Edit, Trash2, RefreshCw, Calendar, QrCode, Globe } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
 import QRCode from 'react-qr-code';
@@ -47,14 +49,17 @@ export default function Burials() {
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update burial record'),
   });
   const deleteMutation = useDeleteBurial({
-    onSuccess: () => toast.success('Burial record removed'),
+    onSuccess: () => { toast.success('Burial record removed'); setDeleteTarget(null); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete burial record'),
   });
 
+  const [searchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
   const [qrBurial, setQrBurial] = useState<Burial | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Burial | null>(null);
+  // Seeded from ?q= so other screens can deep-link a specific record
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   // Form state + validation. onSubmit only runs once the schema parses.
   const form = useForm({
     schema: burialFormSchema,
@@ -133,12 +138,6 @@ export default function Burials() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this burial record? This cannot be undone.')) {
-      deleteMutation.mutate(id);
-    }
-  };
-
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
@@ -164,8 +163,8 @@ export default function Burials() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <StatCard label="Total Records" value={stats.total.toLocaleString()} icon={BookOpen} tone="primary" />
-        <StatCard label="This Month" value={stats.thisMonth} icon={Calendar} tone="info" />
+        <StatCard label="Total Records" value={<AnimatedNumber to={stats.total} />} icon={BookOpen} tone="primary" />
+        <StatCard label="This Month" value={<AnimatedNumber to={stats.thisMonth} />} icon={Calendar} tone="info" />
       </div>
 
       {/* Filter */}
@@ -189,83 +188,92 @@ export default function Burials() {
 
       {/* Table */}
       {isLoading ? (
-        <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
-      ) : filteredBurials.length === 0 ? (
-        <Card>
-          <CardBody>
-            <EmptyState
-              icon={<BookOpen size={48} />}
-              title="No burial records found"
-              description={searchTerm ? 'Try a different search term' : 'Record your first burial to get started'}
-              action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Record Burial</Button> : undefined}
-            />
-          </CardBody>
-        </Card>
+        <SkeletonTable rows={6} cols={6} />
       ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-background-subtle border-b border-border">
-                <tr>
-                  <th className={TABLE_HEAD_CLASS}>Deceased</th>
-                  <th className={TABLE_HEAD_CLASS}>Plot Location</th>
-                  <th className={TABLE_HEAD_CLASS}>Burial Date</th>
-                  <th className={TABLE_HEAD_CLASS}>Contact</th>
-                  <th className={TABLE_HEAD_CLASS}>Permit #</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredBurials.map(b => (
-                  <tr key={b.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-foreground">{deceasedName(b)}</div>
-                      {b.dateOfDeath && (
-                        <div className="text-xs text-foreground-muted mt-0.5">d. {formatDate(b.dateOfDeath)}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs bg-background-subtle border border-border px-2 py-1 rounded text-foreground">
-                        {b.plotLocation || `${b.section}-${b.lot}-${b.grave}`}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-foreground-muted">
-                      {b.burialDate ? formatDate(b.burialDate) : '—'}
-                    </td>
-                    <td className="px-6 py-4">
-                      {b.contactName ? (
-                        <div>
-                          <div className="text-foreground">{b.contactName}</div>
-                          {b.contactPhone && <div className="text-xs text-foreground-muted">{b.contactPhone}</div>}
-                        </div>
-                      ) : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-6 py-4">
-                      {b.permitNumber
-                        ? <span className="font-mono text-xs text-foreground-muted">#{b.permitNumber}</span>
-                        : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {b.memorialPublished && (
-                        <button
-                          onClick={() => setQrBurial(b)}
-                          className="text-info hover:text-info-hover"
-                          aria-label="Show QR code"
-                          title="Memorial QR code"
-                        >
-                          <QrCode size={17} />
-                        </button>
-                      )}
-                      <button onClick={() => handleEdit(b)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                      <button onClick={() => handleDelete(b.id)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <DataTable<Burial>
+          rows={filteredBurials}
+          rowKey={b => b.id}
+          initialSort={{ key: 'burialDate', dir: 'desc' }}
+          csv={{
+            filename: 'burials',
+            header: ['Deceased', 'Plot Location', 'Burial Date', 'Date of Death', 'Contact', 'Contact Phone', 'Permit #'],
+            row: b => [deceasedName(b), b.plotLocation || `${b.section}-${b.lot}-${b.grave}`, b.burialDate, b.dateOfDeath, b.contactName, b.contactPhone, b.permitNumber],
+          }}
+          emptyState={
+            <CardBody>
+              <EmptyState
+                icon={<BookOpen size={48} />}
+                title="No burial records found"
+                description={searchTerm ? 'Try a different search term' : 'Record your first burial to get started'}
+                action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Record Burial</Button> : undefined}
+              />
+            </CardBody>
+          }
+          columns={[
+            { key: 'deceased', header: 'Deceased', sortValue: b => deceasedName(b), cell: b => (
+              <div>
+                <div className="font-medium text-foreground">{deceasedName(b)}</div>
+                {b.dateOfDeath && (
+                  <div className="text-xs text-foreground-muted mt-0.5">d. {formatDate(b.dateOfDeath)}</div>
+                )}
+              </div>
+            ) },
+            { key: 'plot', header: 'Plot Location', sortValue: b => b.plotLocation || `${b.section}-${b.lot}-${b.grave}`, cell: b => (
+              <span className="font-mono text-xs bg-background-subtle border border-border px-2 py-1 rounded text-foreground">
+                {b.plotLocation || `${b.section}-${b.lot}-${b.grave}`}
+              </span>
+            ) },
+            { key: 'burialDate', header: 'Burial Date', sortValue: b => b.burialDate, cell: b => (
+              <span className="text-foreground-muted">{b.burialDate ? formatDate(b.burialDate) : '—'}</span>
+            ) },
+            { key: 'contact', header: 'Contact', cell: b => (
+              b.contactName ? (
+                <div>
+                  <div className="text-foreground">{b.contactName}</div>
+                  {b.contactPhone && <div className="text-xs text-foreground-muted">{b.contactPhone}</div>}
+                </div>
+              ) : <span className="text-foreground-muted">—</span>
+            ) },
+            { key: 'permit', header: 'Permit #', cell: b => (
+              b.permitNumber
+                ? <span className="font-mono text-xs text-foreground-muted">#{b.permitNumber}</span>
+                : <span className="text-foreground-muted">—</span>
+            ) },
+            { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: b => (
+              <span className="space-x-2 whitespace-nowrap">
+                {b.memorialPublished && (
+                  <button
+                    onClick={() => setQrBurial(b)}
+                    className="text-info hover:text-info-hover"
+                    aria-label="Show QR code"
+                    title="Memorial QR code"
+                  >
+                    <QrCode size={17} />
+                  </button>
+                )}
+                <button onClick={() => handleEdit(b)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                <button onClick={() => setDeleteTarget(b)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+              </span>
+            ) },
+          ] satisfies Column<Burial>[]}
+        />
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
+        title="Delete Burial Record"
+        loading={deleteMutation.isPending}
+        message={
+          <>
+            Delete the burial record for{' '}
+            <span className="font-medium text-foreground">{deleteTarget ? deceasedName(deleteTarget) : ''}</span>?
+            This cannot be undone.
+          </>
+        }
+      />
 
       {/* QR Code Modal */}
       {qrBurial && (

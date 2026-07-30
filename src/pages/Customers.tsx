@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { z } from 'zod';
 import {
   useCustomers, useCreateCustomer,
@@ -11,7 +12,10 @@ import { formatDate } from '../lib/utils';
 import type { Customer } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
-  EmptyState, LoadingSpinner, Avatar, Badge, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
+  EmptyState, Avatar, Badge, PageError, StatCard, AnimatedNumber,
+  SkeletonTable, ConfirmDialog,
+} from '../components/ui';
+import { DataTable, type Column } from '../components/DataTable';
 import { Plus, Search, Users, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
@@ -36,13 +40,14 @@ export default function Customers() {
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update customer'),
   });
   const deleteMutation = useDeleteCustomer({
-    onSuccess: () => toast.success('Customer removed'),
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
   });
 
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   // Form state + validation. onSubmit only runs once customerFormSchema parses.
   const form = useForm({
     schema: customerFormSchema,
@@ -96,10 +101,30 @@ export default function Customers() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this customer? This cannot be undone.')) {
-      deleteMutation.mutate(id);
-    }
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    // Capture the record's fields so the undo action can re-create it
+    // (with a new id) after the delete succeeds.
+    const removed = deleteTarget;
+    const payload = {
+      firstName: removed.firstName,
+      lastName: removed.lastName,
+      email: removed.email || undefined,
+      phone: removed.phone || undefined,
+      address: removed.address || undefined,
+      city: removed.city || undefined,
+      state: removed.state || undefined,
+      zipCode: removed.zipCode || undefined,
+      notes: removed.notes || undefined,
+    };
+    deleteMutation.mutate(removed.id, {
+      onSuccess: () => {
+        setDeleteTarget(null);
+        toast.success('Customer removed', undefined, {
+          action: { label: 'Undo', onClick: () => createMutation.mutate(payload) },
+        });
+      },
+    });
   };
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -127,9 +152,9 @@ export default function Customers() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard label="Total Customers" value={customers.length} icon={Users} tone="primary" />
-        <StatCard label="With Email" value={customers.filter(c => c.email).length} icon={Mail} tone="info" />
-        <StatCard label="With Phone" value={customers.filter(c => c.phone).length} icon={Phone} tone="success" />
+        <StatCard label="Total Customers" value={<AnimatedNumber to={customers.length} />} icon={Users} tone="primary" />
+        <StatCard label="With Email" value={<AnimatedNumber to={customers.filter(c => c.email).length} />} icon={Mail} tone="info" />
+        <StatCard label="With Phone" value={<AnimatedNumber to={customers.filter(c => c.phone).length} />} icon={Phone} tone="success" />
       </div>
 
       {/* Filter */}
@@ -161,68 +186,69 @@ export default function Customers() {
 
       {/* Table */}
       {isLoading ? (
-        <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
-      ) : filteredCustomers.length === 0 ? (
-        <Card>
-          <CardBody>
-            <EmptyState
-              icon={<Users size={48} />}
-              title="No customers found"
-              description={searchTerm ? 'Try a different search term' : 'Add your first customer to get started'}
-              action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Customer</Button> : undefined}
-            />
-          </CardBody>
-        </Card>
+        <SkeletonTable rows={6} cols={5} />
       ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-background-subtle border-b border-border">
-                <tr>
-                  <th className={TABLE_HEAD_CLASS}>Name</th>
-                  <th className={TABLE_HEAD_CLASS}>Email</th>
-                  <th className={TABLE_HEAD_CLASS}>Phone</th>
-                  <th className={TABLE_HEAD_CLASS}>Location</th>
-                  <th className={TABLE_HEAD_CLASS}>Added</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredCustomers.map(c => (
-                  <tr key={c.id} className="hover:bg-accent/40 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar fallback={`${c.firstName[0] || '?'}${c.lastName[0] || '?'}`} size="sm" />
-                        <span className="font-medium text-foreground">{c.lastName}, {c.firstName}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {c.email
-                        ? <a href={`mailto:${c.email}`} className="text-primary hover:underline flex items-center gap-1"><Mail size={14} />{c.email}</a>
-                        : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-6 py-4">
-                      {c.phone
-                        ? <a href={`tel:${c.phone}`} className="text-foreground hover:text-primary flex items-center gap-1"><Phone size={14} />{c.phone}</a>
-                        : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-6 py-4 text-foreground-muted">
-                      {[c.city, c.state].filter(Boolean).join(', ') || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-foreground-muted">
-                      {c.createdAt ? formatDate(c.createdAt) : '—'}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                      <button onClick={() => handleDelete(c.id)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <DataTable<Customer>
+          rows={filteredCustomers}
+          rowKey={c => c.id}
+          initialSort={{ key: 'name', dir: 'asc' }}
+          csv={{
+            filename: 'customers',
+            header: ['Last Name', 'First Name', 'Email', 'Phone', 'City', 'State', 'ZIP', 'Added'],
+            row: c => [c.lastName, c.firstName, c.email, c.phone, c.city, c.state, c.zipCode, c.createdAt],
+          }}
+          emptyState={
+            <CardBody>
+              <EmptyState
+                icon={<Users size={48} />}
+                title="No customers found"
+                description={searchTerm ? 'Try a different search term' : 'Add your first customer to get started'}
+                action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Customer</Button> : undefined}
+              />
+            </CardBody>
+          }
+          columns={[
+            { key: 'name', header: 'Name', sortValue: c => `${c.lastName}, ${c.firstName}`, cell: c => (
+              <div className="flex items-center gap-3">
+                <Avatar fallback={`${c.firstName[0] || '?'}${c.lastName[0] || '?'}`} size="sm" />
+                <span className="font-medium text-foreground">{c.lastName}, {c.firstName}</span>
+              </div>
+            ) },
+            { key: 'email', header: 'Email', sortValue: c => c.email, cell: c => (
+              c.email
+                ? <a href={`mailto:${c.email}`} className="text-primary hover:underline flex items-center gap-1"><Mail size={14} />{c.email}</a>
+                : <span className="text-foreground-muted">—</span>
+            ) },
+            { key: 'phone', header: 'Phone', cell: c => (
+              c.phone
+                ? <a href={`tel:${c.phone}`} className="text-foreground hover:text-primary flex items-center gap-1"><Phone size={14} />{c.phone}</a>
+                : <span className="text-foreground-muted">—</span>
+            ) },
+            { key: 'location', header: 'Location', sortValue: c => [c.city, c.state].filter(Boolean).join(', '), cell: c => (
+              <span className="text-foreground-muted">{[c.city, c.state].filter(Boolean).join(', ') || '—'}</span>
+            ) },
+            { key: 'createdAt', header: 'Added', sortValue: c => c.createdAt, cell: c => (
+              <span className="text-foreground-muted">{c.createdAt ? formatDate(c.createdAt) : '—'}</span>
+            ) },
+            { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: c => (
+              <span className="space-x-2">
+                <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                <button onClick={() => setDeleteTarget(c)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+              </span>
+            ) },
+          ] satisfies Column<Customer>[]}
+        />
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Delete customer"
+        message={deleteTarget ? <>Delete <strong>{deleteTarget.firstName} {deleteTarget.lastName}</strong>? You can undo this right after.</> : ''}
+        loading={deleteMutation.isPending}
+      />
 
       {/* Modal */}
       <Modal

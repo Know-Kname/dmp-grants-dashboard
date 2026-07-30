@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { z } from 'zod';
 import {
   useInventory, useCreateInventoryItem,
@@ -11,7 +12,8 @@ import { formatCurrency, cn } from '../lib/utils';
 import type { InventoryItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,
-  Badge, EmptyState, LoadingSpinner, PageError, TABLE_HEAD_CLASS } from '../components/ui';
+  Badge, EmptyState, PageError, StatCard, AnimatedNumber, SkeletonTable, ConfirmDialog,
+  TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, Package, Edit, Trash2, RefreshCw, AlertTriangle, DollarSign } from 'lucide-react';
 import { useToast } from '../lib/toast';
 
@@ -45,13 +47,16 @@ export default function Inventory() {
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to update item'),
   });
   const deleteMutation = useDeleteInventoryItem({
-    onSuccess: () => toast.success('Item removed'),
+    onSuccess: () => { toast.success('Item removed'); setDeleteTarget(null); },
     onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete'),
   });
 
+  const [searchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+  // Seeded from ?q= so other screens can deep-link a specific item
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [lowStockOnly, setLowStockOnly] = useState(false);
   // Form state + validation. onSubmit only runs once the schema parses.
@@ -112,12 +117,6 @@ export default function Inventory() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this inventory item? This cannot be undone.')) {
-      deleteMutation.mutate(id);
-    }
-  };
-
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
@@ -143,51 +142,27 @@ export default function Inventory() {
 
       {/* Stats — urgency first */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Low Stock</p>
-                <p className="text-2xl font-bold text-warning">{stats.lowStock}</p>
-                <p className="text-xs text-foreground-muted mt-1">need reordering</p>
-              </div>
-              <div className="relative p-3 bg-warning-100 dark:bg-warning-950 rounded-lg">
-                <AlertTriangle className="text-warning" size={24} />
-                {stats.lowStock > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-warning rounded-full animate-pulse" />
-                )}
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Items</p>
-                <p className="text-2xl font-bold text-info">{stats.total}</p>
-                <p className="text-xs text-foreground-muted mt-1">in stock</p>
-              </div>
-              <div className="p-3 bg-info-100 dark:bg-info-950 rounded-lg">
-                <Package className="text-info" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-foreground-muted mb-1">Total Value</p>
-                <p className="text-2xl font-bold text-success">{formatCurrency(stats.totalValue)}</p>
-                <p className="text-xs text-foreground-muted mt-1">inventory worth</p>
-              </div>
-              <div className="p-3 bg-success-100 dark:bg-success-950 rounded-lg">
-                <DollarSign className="text-success" size={24} />
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        <StatCard
+          label="Low Stock"
+          value={<AnimatedNumber to={stats.lowStock} />}
+          icon={AlertTriangle}
+          tone={stats.lowStock > 0 ? 'danger' : 'warning'}
+          hint="need reordering"
+        />
+        <StatCard
+          label="Total Items"
+          value={<AnimatedNumber to={stats.total} />}
+          icon={Package}
+          tone="info"
+          hint="in stock"
+        />
+        <StatCard
+          label="Total Value"
+          value={<AnimatedNumber to={stats.totalValue} format={formatCurrency} />}
+          icon={DollarSign}
+          tone="success"
+          hint="inventory worth"
+        />
       </div>
 
       {/* Filters */}
@@ -226,7 +201,7 @@ export default function Inventory() {
 
       {/* Table */}
       {isLoading ? (
-        <Card><CardBody><LoadingSpinner className="py-8" /></CardBody></Card>
+        <SkeletonTable rows={6} cols={8} />
       ) : filteredItems.length === 0 ? (
         <Card>
           <CardBody>
@@ -275,7 +250,7 @@ export default function Inventory() {
                       <td className="px-6 py-4 text-foreground-muted">{item.location || '—'}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button onClick={() => handleEdit(item)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                        <button onClick={() => handleDelete(item.id)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                        <button onClick={() => setDeleteTarget(item)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
                       </td>
                     </tr>
                   );
@@ -285,6 +260,21 @@ export default function Inventory() {
           </div>
         </Card>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
+        title="Delete Inventory Item"
+        loading={deleteMutation.isPending}
+        message={
+          <>
+            Delete <span className="font-medium text-foreground">{deleteTarget?.name}</span>?
+            This cannot be undone.
+          </>
+        }
+      />
 
       {/* Modal */}
       <Modal
