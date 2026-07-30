@@ -1,6 +1,6 @@
 # 11 — Design System
 
-> **TL;DR:** The app uses a custom design system built on Tailwind CSS with CSS custom properties. DMP brand colors (forest green `#1a3d2b`, gold `#c49a2c`) live as hardcoded constants in `Layout.tsx` — not CSS variables — because the sidebar must stay dark regardless of light/dark mode. All other UI uses semantic Tailwind tokens that automatically adapt to the current theme.
+> **TL;DR:** The app uses a custom design system built on Tailwind CSS with CSS custom properties. DMP brand colors (forest green `#1a3d2b`, gold `#c49a2c`) have exactly two definitions — the `BRAND` object in `src/config/brand.ts` for `.tsx` files, and `--brand-green`/`--brand-gold` CSS variables in `src/styles/index.css` for CSS — deliberately declared outside the light/dark token swap, because the sidebar and login hero must stay dark regardless of theme. All other UI uses semantic Tailwind tokens that automatically adapt to the current theme.
 
 ---
 
@@ -48,14 +48,29 @@ These are the official Detroit Memorial Park colors. They appear in the sidebar 
 | Dark green (deeper) | `#0f2419` | ~145° 47% 10% | Sidebar hover state, gradient backgrounds |
 | Light gold | `#d4aa3c` | ~42° 62% 53% | Gold hover state |
 
-**Where these constants live:** `src/components/Layout.tsx` at the very top:
+**Where these live:** exactly two places, both intentional (CLAUDE.md is explicit that
+a third copy must not be added — a stray duplicate existed briefly and was removed,
+see CHANGELOG.md):
 
-```tsx
-const DMP_GREEN = '#1a3d2b';
-const DMP_GOLD = '#c49a2c';
+```ts
+// src/config/brand.ts — import this from any .tsx file
+export const BRAND = {
+  green: '#1a3d2b', greenDeep: '#0f2419',
+  gold: '#c49a2c', goldLight: '#d4aa3c',
+} as const;
 ```
 
-**Important:** These are used as **inline styles** on the sidebar and mobile nav, not as CSS variables or Tailwind classes. This is intentional — see [The sidebar exception](#the-sidebar-exception) below.
+```css
+/* src/styles/index.css — use these from CSS (e.g. gradients) */
+--brand-green: #1a3d2b;
+--brand-green-deep: #0f2419;
+--brand-gold: #c49a2c;
+```
+
+**Important:** Both are declared outside the light/dark token swap — the `--brand-*`
+variables aren't touched inside `.dark {}`, and `BRAND` is a plain constant object,
+not a theme-aware token. This is intentional; see
+[The sidebar exception](#the-sidebar-exception) below.
 
 ---
 
@@ -201,24 +216,26 @@ The sidebar breaks the standard theming system. Here's why and how.
 
 **The problem:** CSS custom property tokens like `--background` change between light and dark mode. If the sidebar used `bg-sidebar` (which points to `--sidebar`), it would show as white in light mode — the exact opposite of the DMP branded look we want.
 
-**The solution:** The sidebar uses hardcoded inline styles that are always dark green, regardless of the theme class:
+**The solution:** `Layout.tsx`'s sidebar look comes from dedicated Tailwind tokens
+(`bg-sidebar` and friends, wired to CSS variables that `.dark {}` never overrides) —
+but the pieces that most need a *guaranteed*-fixed brand color, like the Login page's
+hero panel, use `BRAND` directly as an inline style instead of a class:
 
 ```tsx
-// src/components/Layout.tsx
-const DMP_GREEN = '#1a3d2b';
-const DMP_GOLD = '#c49a2c';
+import { BRAND } from '../config/brand';
 
-// Sidebar element:
-<aside style={{ backgroundColor: DMP_GREEN }}>
-
-// Active nav item gold bar:
-<span style={{ backgroundColor: DMP_GOLD }} />
-
-// Navigation item text (always light, since background is dark):
-<span style={{ color: '#fff' }}>
+<div style={{ background: `linear-gradient(135deg, ${BRAND.greenDeep} 0%, ${BRAND.green} 50%, #2d5a3d 100%)` }}>
 ```
 
-**Why inline styles instead of CSS variables?** If we added `--dmp-green: #1a3d2b` to `:root` and used it, it would still change in `.dark {}` if we set a dark-mode variant. Inline styles can't be overridden by CSS class rules (highest specificity short of `!important`), so the sidebar color is guaranteed to stay dark green regardless of the theme.
+Per CLAUDE.md, inline `style={}` is reserved specifically for this brand-color case —
+everything else in the app should use Tailwind classes.
+
+**Why not a theme-aware CSS variable?** If `--brand-green` changed value inside
+`.dark {}` the way `--primary`/`--background` do, a dark-mode pass could make the
+sidebar or hero panel render light-colored — the exact opposite of the DMP branded
+look. Declaring `--brand-green` in a `:root` block that `.dark {}` never touches is
+what actually guarantees this; the color's fixedness comes from where it's declared,
+not from being an inline style specifically.
 
 **Where CSS variables ARE used in the sidebar:** The sidebar item hover state uses `rgba(255,255,255,0.1)` (white at 10% opacity) — this works whether the background is green or any other dark color.
 
@@ -232,12 +249,11 @@ All reusable components live in `src/components/ui.tsx`. Here is the complete in
 
 ```tsx
 <Button
-  variant="primary" | "secondary" | "outline" | "ghost" | "destructive"
+  variant="primary" | "secondary" | "success" | "danger" | "ghost" | "outline"
   size="sm" | "md" | "lg"
   disabled={false}
-  isLoading={false}   // shows spinner, disables interaction
-  leftIcon={<Icon />}
-  rightIcon={<Icon />}
+  loading={false}   // shows spinner, disables interaction
+  icon={<Icon />}   // one leading-icon prop, not separate left/right props
   onClick={() => {}}
 >
   Label
@@ -245,23 +261,36 @@ All reusable components live in `src/components/ui.tsx`. Here is the complete in
 ```
 
 Variants:
-- `primary` — DMP primary blue, white text, filled
+- `primary` — brand primary color, filled
 - `secondary` — subtle background, secondary foreground
-- `outline` — transparent with border
+- `success` — filled, for confirm/save-adjacent actions
+- `danger` — red background for delete/dangerous actions. The prop value is `danger`
+  (not `destructive`) — internally it styles via the `--destructive` CSS token family,
+  which is a separate naming detail from the prop itself
 - `ghost` — transparent, shows background on hover
-- `destructive` — red background for delete/dangerous actions
+- `outline` — transparent with border
 
-### Alert
+### PageError
 
 ```tsx
-<Alert
-  title="Error title"
-  message="Descriptive error message"
-  details="Optional stack trace or extra info"
-  variant="error" | "warning" | "success" | "info"
-  onDismiss={() => setError(null)}   // omit for non-dismissible
-/>
+<PageError error={combinedError} />
 ```
+
+Not a general-purpose alert component — it takes the *raw thrown error* (typically a
+combined query/mutation error) rather than pre-formatted props, and derives the
+message/detail-list/request-ID itself via `src/lib/errors.ts`. Renders nothing when
+`error` is falsy, so every CRUD page can pass a combined error straight through
+without an `if` guard. There is no `<Alert>` component — it, along with `<Tooltip>`,
+`<Divider>`, and `<Skeleton>`, was removed as unused dead code (see CHANGELOG.md).
+
+### StatCard
+
+```tsx
+<StatCard label="Total Vendors" value={vendors.length} icon={Building2} tone="primary" />
+```
+
+A metric tile: label, big value, and a tinted icon chip. `tone` is one of `primary` |
+`info` | `success` | `warning` | `danger`.
 
 ### Card / CardHeader / CardBody / CardFooter
 
@@ -279,13 +308,15 @@ Variants:
 
 ```tsx
 <Badge
-  variant="primary" | "secondary" | "success" | "warning" | "danger" | "info" | "neutral"
-  size="sm" | "md"
-  dot={true}   // shows a colored dot instead of text
+  variant="primary" | "success" | "warning" | "danger" | "info" | "secondary" | "outline"
+  size="sm" | "md" | "lg"
+  dot={true}   // shows a colored dot alongside the text (not instead of it)
 >
   Status text
 </Badge>
 ```
+
+There is no `neutral` variant — use `secondary` or `outline`.
 
 Used extensively in work order status (Pending, In Progress, Completed) and burial status.
 
@@ -349,15 +380,14 @@ All three handle the label + error + hint pattern. The `id` prop connects the la
 
 Used when a table or list has no data to display.
 
-### LoadingSpinner / Skeleton
+### LoadingSpinner
 
 ```tsx
 <LoadingSpinner size="sm" | "md" | "lg" />
-
-<Skeleton className="h-4 w-32" />   // use like a div placeholder
 ```
 
-`Skeleton` uses a CSS animation shimmer. Compose them to match the shape of the loading content.
+There is no `Skeleton` component — it was removed as unused dead code. `index.css`
+still defines a `skeleton-loading` keyframe if you want to build one.
 
 ### Avatar
 
@@ -370,29 +400,26 @@ Used when a table or list has no data to display.
 />
 ```
 
-### Tooltip
-
-```tsx
-<Tooltip content="This action cannot be undone">
-  <Button variant="destructive">Delete</Button>
-</Tooltip>
-```
-
-Shows on hover. The `content` is the tooltip text; `children` is the element that triggers it.
-
 ---
 
 ## Typography
 
-The app uses the system font stack (no custom font loaded):
+The app loads three Google Fonts (see the `<link>` tags in `index.html`), exposed as
+CSS variables in `src/styles/index.css`:
 
-```css
-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
-  'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-  'Helvetica Neue', sans-serif;
-```
+- **Fraunces** (`--font-display`) — display serif; large headings, the Login page's
+  hero headline, and Dashboard/Memorial page titles
+- **Source Serif 4** (`--font-serif`) — secondary serif for editorial-feeling copy
+- **Inter** (`--font-sans`) — the workhorse sans-serif for everything else (tables,
+  forms, body text across the CMS pages)
 
-This means: on Mac it's San Francisco, on Windows it's Segoe UI, on Linux it's Roboto/Ubuntu. This avoids a font download, which matters for a frequently-used internal tool.
+This replaced an earlier system-font-stack approach — the "museum-monograph" redesign
+of the Login and Memorial pages (see CHANGELOG.md's `v1.3.0`/`v2.0.0` entries)
+specifically introduced Fraunces as a more dignified display face for a cemetery
+management product. The 10 authenticated CMS pages themselves stay on Inter for
+table-row-density readability; Fraunces/Source Serif 4 are reserved for Login and
+MemorialPage, the two pages built as a distinct "editorial" visual subsystem (they're
+also the only consumers of Framer Motion and `react-wrap-balancer`).
 
 **Text size scale (Tailwind defaults):**
 

@@ -89,35 +89,29 @@ This means: "when selecting from the `users` table, only return rows where the r
 
 ### Our RLS pattern
 
-All tables in the DMP CMS use the same basic pattern:
+Every table in the DMP CMS uses the **same one policy** — not separate per-operation
+policies, and no role distinction:
 
 ```sql
--- Allow authenticated users to read all rows
-CREATE POLICY "authenticated_select" ON burials
-  FOR SELECT
-  USING (auth.role() = 'authenticated');
-
--- Allow authenticated users to insert
-CREATE POLICY "authenticated_insert" ON burials
-  FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated');
-
--- Allow authenticated users to update
-CREATE POLICY "authenticated_update" ON burials
-  FOR UPDATE
-  USING (auth.role() = 'authenticated');
-
--- Only admins can delete
-CREATE POLICY "admin_delete" ON burials
-  FOR DELETE
-  USING (
-    auth.uid() IN (
-      SELECT id FROM users WHERE role = 'admin'
-    )
-  );
+CREATE POLICY "auth_all" ON public.TABLE_NAME
+  FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
 ```
 
-**The key principle:** Any user who is not logged in (`auth.role() = 'anon'`) cannot read, write, or modify any data. RLS enforces this at the database layer — the frontend has no say in the matter.
+**The key principle:** Any user who is not logged in cannot read, write, or modify any
+data — RLS enforces this at the database layer regardless of what the frontend does.
+But among users who *are* logged in, there is currently **no** distinction: any
+authenticated session gets full read/write access to every table. This is a
+deliberate choice for a closed, staff-only tool (see the migration header on
+`20260506002815_enable_rls_all_business_tables.sql` and `RUNBOOK.md`'s "RLS Policy
+Reference"), not a partial implementation of role-based access — `User.role` exists
+as a client-side TypeScript field, but nothing in the database reads it. See
+[RBAC](#future-security-improvements) below.
+
+**One exception:** `burials` also has `anon_memorial_read`, allowing anonymous
+`SELECT` on rows where `memorial_published = true` — this is what powers the public
+`/memorial/:id` pages. See [Current gaps worth noting](#current-gaps-worth-noting)
+for a real limitation of this specific policy.
 
 ### What happens when RLS blocks a query
 
@@ -217,9 +211,20 @@ Every response from Vercel includes these headers, configured in `vercel.json:14
 
 **What that means:** When a user on your site clicks a link to an external site, the browser normally sends a `Referer` header telling the external site what URL the user came from. If your URL contained a sensitive token (e.g., `/reset-password?token=abc123`), the external site could see it. `strict-origin-when-cross-origin` sends only the domain (not the full path) when navigating cross-origin.
 
+### `Strict-Transport-Security` and `Permissions-Policy`
+
+Also set in `vercel.json`:
+- `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` — forces
+  HTTPS for the next 2 years on this domain and its subdomains, even for a user who
+  types `http://` explicitly.
+- `Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()` —
+  allows the Geolocation API only for this origin (used by the cemetery map's GPS
+  "Use my location" capture), and explicitly blocks camera/microphone/payment APIs,
+  none of which the app uses.
+
 ### Missing: Content-Security-Policy (CSP)
 
-The current config does not include a CSP header. CSP is the most powerful XSS protection available (it tells the browser exactly which domains can load scripts, styles, images, etc.). Adding CSP is listed in the roadmap — it requires careful tuning for Vite + Supabase.
+The current config does not include a CSP header. CSP is the most powerful XSS protection available (it tells the browser exactly which domains can load scripts, styles, images, etc.). Adding CSP is listed in the roadmap — it requires careful tuning for Vite + Supabase + the map tile hosts (OpenFreeMap, ESRI) + Google Fonts + OpenRouter, and a wrong policy fails silently (it just breaks the feature whose request it blocks) rather than with a build error, so it needs to be verified against a live/preview deploy rather than added blind.
 
 ---
 
@@ -285,8 +290,10 @@ The OWASP Top 10 is the industry standard list of the most critical web security
 
 ### Current gaps worth noting
 
-- **No CSP header** — A CSP would provide defense-in-depth against XSS. Currently absent.
+- **No CSP header** — A CSP would provide defense-in-depth against XSS. Currently absent (HSTS and Permissions-Policy have been added; CSP is the one still missing).
 - **OpenRouter key** — Now proxied server-side via the `/api/chat` Edge Function (`OPENROUTER_API_KEY`); the key is no longer in the frontend bundle.
+- **`/api/chat` has no authentication or rate limiting** — the handler checks only the HTTP method; it never verifies a Supabase session, so anyone who can reach the deployed URL can call it and consume the OpenRouter budget, whether or not they're a logged-in DMP staff member. A basic request-size guard (message count and per-message length caps) rejects obviously-abusive payloads, but that's a resource-exhaustion mitigation, not access control.
+- **`anon_memorial_read` exposes more columns than the app intends** — the RLS policy on `burials` filters by row (`memorial_published = true`) but not by column. A direct PostgREST call with the anon key can read `contact_name`/`contact_phone`/`contact_email`/`permit_number`/`notes` on any published burial, not just the name/dates the memorial page renders. See [docs/06-supabase.md](06-supabase.md#row-level-security-rls) for the full explanation and the fix this needs (a column-restricted view or `SECURITY DEFINER` function).
 - **No rate limiting on login** — Supabase has some built-in protection, but adding `fail2ban`-style IP blocking for repeated failed logins is not configured.
 - **No audit log** — Who edited a burial record when? Currently no audit trail. This matters for a funeral home where data changes may have legal implications.
 
@@ -366,19 +373,30 @@ When `isDemo` is true, `isAuthenticated` is true — the user sees all pages. Bu
 
 Listed in priority order:
 
-1. **Content Security Policy (CSP)** — Whitelist only `*.supabase.co` and `openrouter.ai` as script/fetch destinations. Most impactful XSS mitigation.
+1. **Content Security Policy (CSP)** — Whitelist `*.supabase.co`, `openrouter.ai`, the map tile hosts, and Google Fonts as script/style/fetch destinations. The single most impactful remaining browser-side mitigation; still not implemented (see [Missing: CSP](#missing-content-security-policy-csp) above for why it wasn't added blind alongside the other headers).
 
 2. ~~**Server-side AI proxy**~~ ✅ **Done** — OpenRouter calls now route through the
    `/api/chat` Vercel Edge Function (`api/chat.ts`), with the key in the server-only
    `OPENROUTER_API_KEY` env var instead of the JS bundle.
 
-3. **Audit log table** — Add a `change_log` table in Supabase with triggers that record `(user_id, table_name, row_id, operation, old_values, new_values, timestamp)` for every INSERT/UPDATE/DELETE. Critical for a legal/compliance context.
+3. ~~**HSTS / Permissions-Policy headers**~~ ✅ **Done** — added to `vercel.json`
+   alongside the pre-existing `X-Content-Type-Options`/`X-Frame-Options`/etc.
 
-4. **Role-based access control (RBAC)** — The current RLS allows any authenticated user to edit any record. Adding a `role` column to the `users` table and writing role-aware RLS policies would let admins have more permissions than staff.
+4. **Authenticate (or at least rate-limit) `/api/chat`** — it currently has no session
+   check at all; a request-size guard was added as a stopgap against trivial abuse,
+   but not access control. Verifying the caller's Supabase JWT server-side in the
+   Edge Function would close this properly.
 
-5. **IP allow-listing** — For maximum security, Supabase supports IP restrictions on the database connection. Pair this with Vercel Edge Functions as a proxy layer.
+5. **Restrict `anon_memorial_read` to safe columns** — currently row-filtered but not
+   column-filtered; see [Current gaps worth noting](#current-gaps-worth-noting) above.
 
-6. **Azure Key Vault** — For enterprise deployments, move all secrets to Azure Key Vault and use managed identity instead of API keys in env vars.
+6. **Audit log table** — Add a `change_log` table in Supabase with triggers that record `(user_id, table_name, row_id, operation, old_values, new_values, timestamp)` for every INSERT/UPDATE/DELETE. Critical for a legal/compliance context.
+
+7. **Role-based access control (RBAC)** — The current RLS allows any authenticated user to edit any record. Adding a `role` column to the `users` table and writing role-aware RLS policies would let admins have more permissions than staff.
+
+8. **IP allow-listing** — For maximum security, Supabase supports IP restrictions on the database connection. Pair this with Vercel Edge Functions as a proxy layer.
+
+9. **Azure Key Vault** — For enterprise deployments, move all secrets to Azure Key Vault and use managed identity instead of API keys in env vars.
 
 ---
 

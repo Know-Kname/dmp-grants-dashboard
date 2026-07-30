@@ -139,9 +139,15 @@ If clicking "View Demo" does nothing (no redirect, no error):
    ```
 3. Check that `AuthProvider` in `src/lib/auth.tsx` is listening for this event (see line 41-45).
 
-### Demo mode shows blank data
+### Demo mode shows blank data (or errors)
 
-Expected behavior: demo mode shows fake/mock data, not real Supabase data. The mock data is in `src/lib/demo-data.ts` — if a hook returns empty results in demo mode, check that the hook has a demo-mode branch that returns mock data.
+**This is expected, not a bug.** Demo mode only bypasses Supabase authentication — it
+does not provide mock data. Every `useData.ts` hook queries live Supabase regardless
+of demo mode, so without real `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` values set,
+every page will show empty lists or a failed-to-load state. If you need to see the app
+populated with data, configure real Supabase credentials (see
+[docs/08-environment.md](08-environment.md)) — there is no demo-mode branch in any
+hook to fix; none was ever built.
 
 ### Can't exit demo mode
 
@@ -329,12 +335,17 @@ The `<AIAssistant />` component is rendered in `src/components/Layout.tsx` only 
 
 Check the console for the exact error. Common causes:
 
-**"OpenRouter API key not configured"**
+**"OpenRouter API key not configured" / AI assistant returns a 503**
 
-`VITE_OPENROUTER_API_KEY` is missing from your `.env.local` (local) or Vercel env vars (production).
+In production this means `OPENROUTER_API_KEY` (no `VITE_` prefix, server-only) is
+missing from Vercel's environment variables — that's the one `/api/chat` actually
+reads. Locally with plain `npm run dev`, it means `VITE_OPENROUTER_API_KEY` is
+missing from `.env.local` (or you need `vercel dev` instead, which serves `/api/chat`
+locally using `OPENROUTER_API_KEY`).
 
-Fix local: add to `.env.local`, restart dev server.
-Fix production: add to Vercel → Settings → Environment Variables → redeploy.
+Fix local: add `VITE_OPENROUTER_API_KEY` to `.env.local`, restart dev server.
+Fix production: add `OPENROUTER_API_KEY` (not the `VITE_` one) to Vercel → Settings →
+Environment Variables → redeploy.
 
 **"429 Too Many Requests"**
 

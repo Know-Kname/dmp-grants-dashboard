@@ -26,6 +26,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Dark mode**: toast icon chips rendered with no background (the referenced `950`
   shades were never declared in the Tailwind config), and the `ErrorBoundary` crash
   screen ignored the theme entirely.
+- **Work order creation failed 100% of the time** — the same class of bug as grants:
+  `work_orders.status` is `NOT NULL` with no database default, and the create form has
+  no status field. `useCreateWorkOrder` now omits `status` from its input and opens
+  every work order at `pending`.
+- **Two more schemas didn't match their own forms**, so wiring them up unchanged would
+  have rejected valid input: `workOrderFormSchema.assignedTo` was declared as a `uuid`
+  for what is actually a free-text staff name field; `burialFormSchema` required
+  `plotLocation` (a derived field the form never collects — it's built from
+  section/lot/grave at submit) and had no `memorialPublished` (a real field the form
+  does have).
+- **`contractFormSchema` didn't describe the form it validates** — it required
+  `paymentPlan` and `items`, neither of which is a form input (the plan renders
+  read-only; line items are held in separate state and merged at submit), and it
+  omitted `status`, a real field. Now describes the six fields the form actually has.
+- **The "Deploy Supabase Migrations" workflow failed on every run in its history** —
+  `supabase/setup-cli` was pinned to a commit SHA that doesn't correspond to any real
+  commit in that repo. Re-pinned to the `v1` tag; `grants.created_by` (above) was
+  applied directly via the Supabase MCP as a result, then reconciled into the migration
+  history the same way three earlier MCP-applied migrations already were.
+- Dashboard's "100 Years / 1925 – 2025" milestone banner was a hardcoded literal that
+  had already gone stale; now computed from `COMPANY.established`.
+- `CemeteryMap`'s "no available graves" case used a blocking `alert()` instead of the
+  toast system every other user-facing message in the app goes through.
 
 ### Added
 - **Generated Supabase schema types** (`src/types/database.ts`) and a typed client,
@@ -42,12 +65,44 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   production builds.
 - **Contract line items now persist** — `useCreateContract` / `useUpdateContract`
   insert and sync `contract_items` rows (previously the nested `items` were dropped).
+- **Form validation now covers every CRUD page except one.** Customers, Inventory,
+  Work Orders, Burials, Vendors, Contracts, and Financial's three create forms are all
+  converted to the `useForm` + Zod pattern (previously only Grants was). Financial's
+  two payment-recording forms stay on plain `useState` by design — they capture a
+  single amount against an existing invoice, not a new record. `Cemeteries.tsx`'s four
+  forms are the one remaining gap, and are documented as such in `CLAUDE.md` rather
+  than left silently inconsistent.
+- **`vendorFormSchema`** — Vendors had no validation schema at all before this.
+- Six tests for `useForm`, covering the two defects fixed alongside it: field
+  validation against a `.refine()`d schema silently no-op'ing (`ZodEffects` has no
+  `.shape`), and form values that are a coerced string on the way in but a number on
+  the way out.
+- Toast feedback on create/update/delete for Burials, Vendors, Work Orders, and
+  Contracts, matching the pattern already used on Customers/Inventory/Grants/Financial.
+- Basic request-size validation on `/api/chat` (message count and per-message length
+  caps) — a partial mitigation for the endpoint having no authentication at all; see
+  `docs/09-security.md` for the full gap.
+- `Strict-Transport-Security` and a scoped `Permissions-Policy` response header
+  (`geolocation=(self)` for the cemetery map's GPS capture; camera/microphone/payment
+  blocked, since nothing in the app uses them).
 
 ### Changed
 - **TypeScript strict mode enabled** (`strict: true`). The Supabase result helper
   now throws on a null/undefined payload instead of masking it with `!`.
 - **Case transformers guard against circular references** via a `WeakSet`, so a
   cyclic object no longer overflows the stack.
+- `tsconfig.json`: `noUnusedLocals` and `noUnusedParameters` turned on.
+- `.eslintrc.cjs`: `no-explicit-any` and `ban-ts-comment` raised from `off` to
+  `error`, matching what `CLAUDE.md` already claimed as policy.
+- Extracted the duplicated ESRI satellite map style out of `CemeteryMap.tsx` and
+  `LocationsMap.tsx` into a shared `src/lib/mapStyles.ts`.
+- Full documentation pass across README/CONTRIBUTING/RUNBOOK/`docs/`: fixed the GitHub
+  remote URL (the repo was renamed from `dmpgrants` to `dmp-grants-dashboard` without
+  updating any doc that referenced it), corrected several pages describing RLS
+  policies, environment variables, and CI workflows that no longer matched the shipped
+  code, removed two claims of a mock-data "demo tour" that demo mode has never
+  provided, and removed two real user credentials that had been committed to `docs/`
+  in plaintext.
 
 ### Removed
 - Roughly 1,000 lines of dead code, each verified unreferenced first: 9 unused
@@ -59,6 +114,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   restated all three cemetery addresses instead of reading `config/company.ts`.
 - Stale `vitest.config.server.ts` and the dead Vite dev proxy to the removed
   Express backend (`/api → localhost:3000`).
+- Unused dependencies `gsap` and `@tailwindcss/typography` — zero imports of either
+  anywhere in `src/`, and the Tailwind plugin was never registered in
+  `tailwind.config.js` (`plugins: []`).
 
 ---
 
@@ -151,10 +209,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Demo mode with mock data
 - Basic Dashboard, Grants, Login pages
 
-[Unreleased]: https://github.com/Know-Kname/dmpgrants/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/Know-Kname/dmpgrants/compare/v1.3.0...v2.0.0
-[1.3.0]: https://github.com/Know-Kname/dmpgrants/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/Know-Kname/dmpgrants/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/Know-Kname/dmpgrants/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/Know-Kname/dmpgrants/compare/v0.1.0...v1.0.0
-[0.1.0]: https://github.com/Know-Kname/dmpgrants/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Know-Kname/dmp-grants-dashboard/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/Know-Kname/dmp-grants-dashboard/compare/v1.3.0...v2.0.0
+[1.3.0]: https://github.com/Know-Kname/dmp-grants-dashboard/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Know-Kname/dmp-grants-dashboard/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Know-Kname/dmp-grants-dashboard/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Know-Kname/dmp-grants-dashboard/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/Know-Kname/dmp-grants-dashboard/releases/tag/v0.1.0

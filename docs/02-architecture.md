@@ -74,10 +74,15 @@ Follow what happens when a user opens the Burials page and creates a new burial 
    → Toast notification appears: "Burial record created"
 ```
 
-The `api.ts` file wraps the raw Supabase calls and handles:
-- Converting camelCase TypeScript types → snake_case DB columns (and back)
-- Extracting the Supabase error and turning it into a standard `Error` object
-- 401 handling (redirect to login)
+There is no wrapper client — `src/hooks/useData.ts` hooks call `supabase.from(...)`
+directly. What a hypothetical `api.ts` client would do is split across a few small,
+focused modules instead:
+- `src/lib/utils.ts` — `toSnakeCaseKeys`/`toCamelCaseKeys` convert between the
+  camelCase TypeScript types and snake_case DB columns, recursively
+- `src/lib/api.ts` — just the `ApiRequestError` type and an `isApiError` guard,
+  consumed by the retry policy in `query.tsx` and the message helpers in `errors.ts`
+- A small `sb()` helper inside `useData.ts` unwraps Supabase's `{ data, error }`
+  shape, throwing on either an error or a null/undefined payload
 
 ---
 
@@ -87,6 +92,9 @@ All routes are defined in `src/App.tsx`. The app uses **React Router DOM v6** wi
 
 ```
 /login                    → Login page (public, no auth required)
+/memorial/:id             → Public memorial page (public, no auth required —
+                             reached via a QR code printed from a published
+                             burial record; see MemorialPage.tsx)
 /                         → Protected by ProtectedRoute wrapper
   /                       → Dashboard (default)
   /work-orders            → Work Orders
@@ -96,7 +104,12 @@ All routes are defined in `src/App.tsx`. The app uses **React Router DOM v6** wi
   /contracts              → Contracts
   /grants                 → Grants
   /customers              → Customers
+  /vendors                → Vendors
+  /cemeteries             → Cemetery → Section → Lot → Grave hierarchy + map
 ```
+
+Every route above except `Dashboard` and `Login` is `React.lazy()`-loaded — its chunk
+only downloads the first time a user navigates there.
 
 **How protection works:**
 
@@ -146,7 +159,13 @@ The `CustomEvent` is the key design choice here. Because `AuthProvider` is a Rea
 
 ### Demo mode data
 
-When in demo mode, the data hooks in `useData.ts` **do not** call Supabase. Instead they return the mock data from `src/lib/demo-data.ts`. This contains realistic sample burials, work orders, contracts, etc.
+Demo mode only changes what `isAuthenticated` resolves to — it does **not** change
+what the data hooks do. Every hook in `useData.ts` calls Supabase exactly as it would
+for a real session. `src/lib/demo-data.ts` contains a single fake `DEMO_USER` identity
+and the enable/disable toggle, not a mock dataset — an earlier set of `DEMO_*` sample
+datasets existed and was removed as dead code, since nothing ever branched on demo
+mode to read them. In practice, demo mode without real Supabase credentials configured
+shows empty lists or failed-to-load states on every page, not sample data.
 
 ### Authorization (who can do what)
 
@@ -204,24 +223,28 @@ Components available:
 | `<Select>` | Dropdown select with label |
 | `<Textarea>` | Multi-line text input |
 | `<Modal>` | Centered dialog with title, content slot, footer slot, and close button |
-| `<Badge>` | Colored pill label (variants: success, warning, danger, info, secondary) |
-| `<Alert>` | Error/info banner with title, message, optional detail list, dismiss button |
+| `<Badge>` | Colored pill label (variants: primary, success, warning, danger, info, secondary, outline) |
+| `<PageError>` | The standard error banner at the top of every CRUD page — pass it a raw thrown error; renders nothing if falsy |
+| `<StatCard>` | Metric tile: label, value, tinted icon chip |
 | `<EmptyState>` | "No data" placeholder with icon, heading, description, optional action button |
 | `<LoadingSpinner>` | Animated spinner (used during data loads) |
 | `<Avatar>` | Circle with initials fallback |
-| `<Pagination>` | Page-number controls |
+| `<Pagination>` | Page-number controls — built and exported, but not currently imported by any page |
+
+There is no `<Alert>`, `<Tooltip>`, `<Divider>`, or `<Skeleton>` component. All four
+were removed as unused dead code (see CHANGELOG.md) — pages use `<PageError>` for
+errors, and no page currently needs the other three.
 
 ---
 
 ## Key library files
 
 ### `src/lib/api.ts`
-Low-level fetch wrapper. All requests go through this. It:
-- Prepends the Supabase base URL
-- Attaches the auth header from the current session
-- Transforms request body keys from camelCase to snake_case before sending
-- Transforms response keys from snake_case to camelCase after receiving
-- Throws a structured `ApiError` with status, message, and request ID
+Not a fetch wrapper — there is no HTTP client in this app. Exports only the
+`ApiError`/`ApiRequestError` type hierarchy (message, status code, error code,
+details, request ID) and an `isApiError` type guard, consumed by `query.tsx`'s retry
+policy and `errors.ts`'s message helpers. Request/response key transformation lives
+in `utils.ts` instead.
 
 ### `src/lib/auth.tsx`
 The `AuthProvider` component + `useAuth` hook. Manages:
@@ -248,9 +271,32 @@ Pure utility functions:
 - `toSnakeCase` / `toCamelCase` — used by `api.ts` for key transformation
 
 ### `src/lib/gemini.ts`
-OpenRouter API client for the AI assistant. Two exported functions:
+Client for the AI assistant. Two exported functions:
 - `sendMessage(messages)` — non-streaming, returns full response string
 - `streamMessage(messages)` — async generator, yields text chunks as they arrive
+
+Both POST to `/api/chat` by default — a Vercel Edge Function (`api/chat.ts`) that
+holds the OpenRouter key server-side and streams the upstream response straight back.
+A dev-only fallback calls OpenRouter directly from the browser when
+`import.meta.env.DEV` is true and `VITE_OPENROUTER_API_KEY` is set; Vite hardcodes
+`DEV` to `false` in production builds, so that branch (and the key it would need) is
+dead-code-eliminated from what ships. See [docs/09-security.md](09-security.md).
+
+### `src/lib/schemas.ts` + `src/hooks/useForm.ts`
+Zod schemas for every form (`workOrderFormSchema`, `grantFormSchema`, etc.), paired
+with a generic `useForm` hook whose live-state type is derived from the schema
+(`z.input<typeof xFormSchema>`) so the two can't drift. This is the standard form
+pattern for every CRUD page except `Cemeteries.tsx` (not yet converted — a real gap,
+tracked in `CLAUDE.md`) and Financial's two payment-recording forms (intentionally
+plain `useState`, since they capture a single amount against an existing invoice
+rather than creating a record).
+
+### `src/lib/theme.tsx`
+`ThemeProvider` + `useTheme()`. Tracks `'light' | 'dark' | 'system'`, persisted in
+`localStorage`, toggling the `dark` class on `<html>` that `tailwind.config.js`'s
+`darkMode: 'class'` and the CSS variables in `index.css` key off of. The DMP brand
+green/gold live outside this system entirely (see [docs/11-design-system.md](11-design-system.md))
+so they don't change with the toggle.
 
 ### `src/lib/errors.ts`
 Three helpers for extracting info from any error type:
@@ -266,10 +312,16 @@ All data model types are in `src/types/index.ts`. One type per database table:
 
 ```
 User, WorkOrder, Grant, Burial, Customer, InventoryItem,
-Contract, ContractItem, Deposit, AccountsReceivable, AccountsPayable, Vendor
+Contract, ContractItem, PaymentPlan, Deposit, AccountsReceivable, AccountsPayable,
+Vendor, PaymentScheduleEntry, Cemetery, Section, Lot, Grave
 ```
 
-All types use camelCase (matching the JS convention), even though the database uses snake_case. The `api.ts` transformation layer handles the conversion.
+All types use camelCase (matching the JS convention), even though the database uses
+snake_case. `src/types/database.ts` is the other half of the boundary — GENERATED
+snake_case types matching the live schema exactly (regenerate via the Supabase MCP
+`generate_typescript_types` tool, or `supabase gen types typescript --linked`; never
+hand-edit it). The `toCamelCaseKeys`/`toSnakeCaseKeys` transforms in `lib/utils.ts`
+convert between the two at every read/write.
 
 ---
 
@@ -280,9 +332,14 @@ All types use camelCase (matching the JS convention), even though the database u
 Test files live alongside source files or in `src/tests/`:
 - `src/tests/setup.ts` — configures jest-dom matchers and JSDOM polyfills
 - `src/lib/errors.test.ts` — unit tests for error helper functions
-- `src/lib/utils.test.ts` — unit tests for formatting utilities
+- `src/lib/utils.test.ts` — unit tests for formatting/case-transform utilities
+- `src/hooks/useForm.test.ts` — form validation + Zod coercion behavior
 - `src/components/ErrorBoundary.test.tsx` — component tests
 - `src/pages/Login.test.tsx` — login form behavior
+
+Coverage is intentionally narrow, not exhaustive — these are regression tests for
+specific defects that were found and fixed (each test's comments say which), not a
+full suite. `useData.ts` (every data hook) and 11 of 12 pages currently have no tests.
 
 Run with `npm test` (watch mode) or `npm run test:run` (once, for CI).
 

@@ -33,7 +33,7 @@ Think of it as: **GitHub holds the code → Vercel turns the code into a live we
 
 ## Understanding the repository
 
-**Repository URL:** `https://github.com/Know-Kname/dmpgrants`
+**Repository URL:** `https://github.com/Know-Kname/dmp-grants-dashboard`
 
 Key folders you'll interact with on GitHub:
 
@@ -93,27 +93,36 @@ A Pull Request (PR) is a formal proposal to merge one branch into another. Even 
 ### How to open a PR
 
 1. Push your feature branch to GitHub (see above).
-2. Go to `https://github.com/Know-Kname/dmpgrants`.
+2. Go to `https://github.com/Know-Kname/dmp-grants-dashboard`.
 3. You'll see a yellow banner: **"Compare & pull request"** — click it.
 4. Fill in the PR template (see below).
 5. Click **"Create pull request"**.
 
 ### The PR template
 
-The repo includes a PR template that prompts you to answer:
+The repo includes a PR template (`.github/PULL_REQUEST_TEMPLATE.md`) that prompts you
+to answer:
 
 ```markdown
-## Summary
-What does this PR do and why?
+## What does this PR do?
 
-## Testing
-How was this tested?
+<!-- Describe the changes in 1-3 sentences -->
+
+## Type of change
+
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to change)
+- [ ] Documentation update
+- [ ] Refactoring (no functional changes)
 
 ## Checklist
-- [ ] npm run build succeeds
-- [ ] npm run lint passes
-- [ ] Tests pass (npm run test:run)
-- [ ] No secrets/credentials added to code
+
+- [ ] My code builds without errors (`npm run build` / `vite build`)
+- [ ] I have tested this change locally
+- [ ] I have updated documentation if needed
+- [ ] No new lint warnings introduced
+- [ ] No hardcoded secrets or API keys
 ```
 
 **Fill this out.** Even if you're the only reviewer, it forces you to think through the change and creates a useful record.
@@ -128,40 +137,83 @@ After merging, delete the feature branch (GitHub offers a button for this — ke
 
 ## CI / Automated checks
 
-Three workflows run automatically. Find them under the **Actions** tab.
+**Eight** workflows run automatically — find them all under the **Actions** tab.
 
 ### `ci-typescript.yml` — Main CI pipeline
 
 Triggers on: every push to `main`, every PR to `main`.
 
-Runs on **Node.js 20 and 22** (both versions, in parallel):
+A single job on **Node.js 22** — not a multi-version matrix:
 1. `npm ci` — fresh install of dependencies
 2. `npm run lint` — ESLint check (zero warnings)
-3. `tsc --noEmit` — TypeScript type-check
+3. `npx tsc --noEmit --pretty` — TypeScript type-check
 4. `npm run build` — full production build
-5. `npm test` — Vitest test suite
+5. `npm run test:run` — Vitest test suite
 
 **What each step means:**
 - **Lint:** Catches code style issues, unused variables, invalid hook usage.
 - **Type check:** Ensures TypeScript types are all correct. A type error here means runtime crashes are likely.
 - **Build:** Proves the app can actually be compiled to production. If this fails, Vercel won't be able to deploy either.
-- **Test:** Runs all Vitest tests. A failure means something that worked before now doesn't.
+- **Test:** Runs all Vitest tests. Any failure fails the whole job — it is not a warning-only step.
 
 ### `pr-checks.yml` — PR size warning
 
-Triggers on: every PR opened or updated.
+Triggers on: every PR opened, synced, or reopened.
 
-Automatically adds a comment if a PR changes more than 500 lines, reminding you to consider splitting large changes into smaller PRs. This is just a warning — it doesn't block merging.
+Adds a comment if a PR changes more than 500 lines, reminding you to consider splitting large changes into smaller PRs. This is just a warning — it doesn't block merging.
 
 ### `security-scan.yml` — Security scanning
 
-Triggers on: schedule (weekly) + every push to `main`.
+Triggers on: every push to `main` + every Monday at 09:00 UTC.
 
-Runs `npm audit` to check for known vulnerabilities in dependencies. If a high-severity vulnerability is found, it creates a GitHub Security alert. **Don't ignore these** — update the affected dependency.
+Two independent jobs:
+- **CodeQL analysis** — GitHub's semantic static-analysis scanner, looking for actual
+  vulnerability *patterns* in the JS/TS source (injection, unsafe regex, etc.), not
+  just dependency versions.
+- **Dependency audit** — `npm audit --audit-level=high`, checking dependencies for
+  known high/critical CVEs.
+
+If either finds something, a Security alert appears in the **Security** tab. **Don't ignore these** — update the affected dependency, or investigate the CodeQL finding.
+
+### `dependabot-automerge.yml` — Auto-merge safe dependency bumps
+
+Triggers on: any pull request opened by Dependabot.
+
+Automatically merges (squash) any Dependabot PR that's a **minor or patch** version
+bump. Major version bumps are left for manual review — those are the ones most likely
+to carry breaking changes.
+
+### `release.yml` — Auto-tag and release
+
+Triggers on: every push to `main`.
+
+Bumps a SemVer tag (patch by default) and creates a GitHub Release with
+auto-generated release notes from the commit history since the last tag.
+
+### `supabase-migrations.yml` — Deploy DB migrations
+
+Triggers on: push to `main` touching `supabase/migrations/**` or `supabase/seed.sql`,
+or manual dispatch from the Actions tab.
+
+Links to the production Supabase project and runs `supabase db push`. Pinned to
+`supabase/setup-cli@v1` (a version tag, unlike the SHA-pinned actions elsewhere in
+this repo — see the inline comment in the workflow file for the reasoning). If this
+workflow fails, the fallback is to apply the migration by hand and reconcile the
+migration file's timestamp afterward — see `RUNBOOK.md`'s Database Migrations section.
+
+### `drift-check.yml` — Weekly schema drift check
+
+Triggers on: every Monday at 09:00 UTC, or manual dispatch.
+
+Compares local `supabase/migrations/` against the live production schema. If they've
+drifted apart, opens a GitHub Issue with the diagnosis and remediation steps.
 
 ### `stale-bot.yml` — Stale issue/PR cleanup
 
-Automatically marks issues and PRs as stale after 30 days of no activity, then closes them after another 7 days. Keeps the issues list clean.
+Triggers on: daily schedule.
+
+Marks issues and PRs as stale after 30 days of no activity, then closes them after
+another 7 days. Issues/PRs labeled `pinned`, `security`, or `in-progress` are exempt.
 
 ---
 
@@ -170,7 +222,7 @@ Automatically marks issues and PRs as stale after 30 days of no activity, then c
 GitHub Secrets are encrypted environment variables accessible to CI workflows. They're **not** the same as the app's runtime env vars (those live in Vercel — see [docs/05-vercel.md](05-vercel.md)).
 
 **Where to manage them:**
-`https://github.com/Know-Kname/dmpgrants/settings/secrets/actions`
+`https://github.com/Know-Kname/dmp-grants-dashboard/settings/secrets/actions`
 
 **Currently stored secrets:**
 
@@ -248,14 +300,19 @@ This keeps the issue backlog clean and means closed issues were either resolved 
 
 ## Security scanning
 
-The `security-scan.yml` workflow runs `npm audit --audit-level=high` weekly (and on every `main` push). This checks whether any of the project's npm dependencies have known CVEs (Common Vulnerabilities and Exposures) at high or critical severity.
+The `security-scan.yml` workflow runs two jobs on every `main` push and every Monday
+at 09:00 UTC: a **CodeQL** semantic scan of the JS/TS source, and
+`npm audit --audit-level=high` against dependencies. See [CI / Automated checks](#ci--automated-checks) above for what each catches.
 
 If the scan finds something:
 1. A failed workflow run appears in the Actions tab
 2. A Security alert appears in the Security tab
-3. Dependabot will likely also open a PR to fix it
+3. For dependency CVEs, Dependabot will likely also open a PR to fix it
 
-**How to fix:** Usually `npm audit fix` resolves it, or Dependabot's PR does. For complex issues, `npm audit` gives you the specific package and CVE to research.
+**How to fix a dependency finding:** Usually `npm audit fix` resolves it, or
+Dependabot's PR does. For complex issues, `npm audit` gives you the specific package
+and CVE to research. **How to fix a CodeQL finding:** read the alert detail in the
+Security tab — it points at the exact line and the vulnerability class.
 
 ---
 
