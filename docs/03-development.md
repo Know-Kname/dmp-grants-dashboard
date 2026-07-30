@@ -145,6 +145,65 @@ function Reports() {
 
 ---
 
+## Form validation (Zod + useForm)
+
+Every CRUD page's create/edit form follows the same pattern — this is the standard
+convention, not optional. `src/pages/Grants.tsx` is the clearest full example to copy
+from.
+
+1. **Define a schema** in `src/lib/schemas.ts`:
+   ```ts
+   export const reportFormSchema = z.object({
+     title: z.string().min(3, 'Title must be at least 3 characters'),
+     type: z.enum(['summary', 'detail']),
+   });
+   ```
+
+2. **Derive the form's live-state type from the schema** with `z.input`, not
+   `z.infer`, and don't hand-declare it separately — that guarantees the two can't
+   drift:
+   ```ts
+   type ReportFormData = z.input<typeof reportFormSchema>;
+   ```
+   `z.input` matters whenever a field coerces, e.g.
+   `amount: z.union([z.string().transform(Number), z.number()])` — the *input* type is
+   what an `<input>` gives you (a string), the *output* type (`z.infer`) is what
+   `onSubmit` receives (a number). Collapsing both into one type makes `values` lie
+   about what it actually holds.
+
+3. **Wire the hook in the page component:**
+   ```tsx
+   const form = useForm({
+     schema: reportFormSchema,
+     initialValues: { title: '', type: 'summary' },
+     onSubmit: (data) => {
+       // data is the *parsed* output — already coerced and validated
+       createReport.mutate(data);
+     },
+   });
+   ```
+
+4. **Bind each field** with `getFieldProps` + `getFieldError` (the latter only shows
+   an error once the field has been touched):
+   ```tsx
+   <Input
+     label="Title"
+     {...form.getFieldProps('title')}
+     error={getFieldError('title', form.errors, form.touched)}
+     required
+   />
+   ```
+
+**Documented exception:** Financial.tsx's two payment-recording forms (they capture a
+single amount against an existing invoice, not a new record — a schema would add
+ceremony without adding a real check) stay on plain `useState` by design.
+**Undocumented gap:** `Cemeteries.tsx`'s four forms (Cemetery/Section/Lot/Grave) still
+use plain `useState` with inline `parseInt`/`parseFloat` — no schema exists for them
+yet. If you're touching that page, converting it to this pattern is the highest-value
+follow-up; see `CLAUDE.md` for the gap being tracked explicitly rather than silently.
+
+---
+
 ## Code conventions
 
 ### TypeScript
@@ -267,7 +326,10 @@ npm run lint -- --fix     # Auto-fix what can be fixed automatically
 Key rules enforced:
 - `@typescript-eslint/no-unused-vars` — unused variables are errors (except `_prefixed` vars)
 - `react-hooks/rules-of-hooks` — hooks must be called at the top level, never conditionally
-- `react-hooks/exhaustive-deps` — dependency arrays must be complete (currently warned, not errored)
+- `react-hooks/exhaustive-deps` — currently **disabled entirely** (`'off'`) in
+  `.eslintrc.cjs`, not just downgraded to a warning. This rule normally catches
+  stale-closure bugs in `useEffect`/`useCallback` dependency arrays — double-check
+  your own deps by hand, since lint won't catch a missing/wrong one right now.
 - `no-useless-escape` — no unnecessary backslashes in regexes
 
 **Before committing:** always run `npm run lint`. If it shows errors, fix them. Don't commit with lint errors.

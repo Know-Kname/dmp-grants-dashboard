@@ -37,8 +37,10 @@ The app uses Supabase Auth for logins and the REST API (via the JS client) for a
 ## Accessing the dashboard
 
 1. Go to [supabase.com](https://supabase.com) and sign in.
-2. Select the **dmpgrants** project.
-3. The project reference ID is `mgpwjnxtqcnoyjgebytg`.
+2. Select the project with reference ID `mgpwjnxtqcnoyjgebytg` (region: us-east-1).
+   Its internal Supabase project id was corrected from an earlier `dmpgrants`
+   misconfiguration to `supaduba` — don't look for a project literally named
+   "dmpgrants."
 
 **Key sections:**
 
@@ -56,11 +58,10 @@ The app uses Supabase Auth for logins and the REST API (via the JS client) for a
 
 ## The database tables
 
-The app has 13 tables. Each one maps to a module in the UI.
+The app has 16 tables. Each one maps to a module in the UI.
 
 | Table | Module | What it stores |
 |---|---|---|
-| `users` | — | Staff accounts (email, name, role) |
 | `work_orders` | Work Orders | Maintenance and service tasks |
 | `grants` | Grants | Grant opportunities and applications |
 | `burials` | Burials | Deceased records with plot locations |
@@ -71,7 +72,16 @@ The app has 13 tables. Each one maps to a module in the UI.
 | `deposits` | Financial | Cash/check/card deposits received |
 | `accounts_receivable` | Financial | Money owed to DMP |
 | `accounts_payable` | Financial | Money DMP owes to vendors |
-| `vendors` | Financial | Vendor information for AP |
+| `vendors` | Vendors / Financial | Supplier records, referenced by Accounts Payable |
+| `cemeteries` | Cemeteries | The 3 DMP locations — root of the plot hierarchy |
+| `sections` | Cemeteries | Sections within a cemetery |
+| `lots` | Cemeteries | Lots within a section |
+| `graves` | Cemeteries | Individual graves within a lot — GPS-taggable, status-tracked |
+| `payment_schedule` | Contracts | Installment schedule for pre-need contracts |
+
+There is no `users` table — staff accounts live in Supabase's built-in `auth.users`.
+An earlier `public.users` table (a redundant, zero-row mirror with no application
+reads) was dropped via migration; don't recreate it.
 
 **Column naming:** All columns use `snake_case` (e.g. `first_name`, `burial_date`, `created_at`). The JavaScript code uses `camelCase` (`firstName`, `burialDate`, `createdAt`). The `api.ts` layer converts between them automatically.
 
@@ -109,11 +119,12 @@ The app has 13 tables. Each one maps to a module in the UI.
 Supabase Auth handles user logins. There are two accounts of interest:
 
 ### Real user login
-```
-Email:    chughes@detroitmemorialpark.com
-Password: DMP2025!
-Role:     admin (stored in user_metadata)
-```
+
+Staff accounts are Supabase Auth users, with `role` stored in `user_metadata` (e.g.
+`admin`). Ask a Supabase project admin to create you an account (Authentication →
+Users → "Add user") rather than relying on any credential written down in a doc —
+none are recorded in this file, and if you find one committed anywhere in this repo's
+history, treat it as compromised and rotate it immediately.
 
 To add another user:
 1. Supabase dashboard → Authentication → Users → "Add user"
@@ -150,20 +161,46 @@ Tokens auto-refresh before expiry. If the browser is closed and reopened within 
 
 RLS policies are SQL rules attached to a table. When any request comes in, PostgreSQL evaluates the policy for that user. If the policy doesn't return `true`, the operation is denied.
 
-**Example — a table with RLS enabled:**
-```sql
--- Policy: authenticated users can read all burials
-CREATE POLICY "Authenticated users can read burials"
-ON burials FOR SELECT
-TO authenticated
-USING (true);   -- 'true' means: allow for all rows
+### The actual policy this app uses
 
--- Policy: only the creator can delete
-CREATE POLICY "Only creator can delete burial"
-ON burials FOR DELETE
-TO authenticated
-USING (auth.uid() = created_by::uuid);
+Every table uses the same **one** flat policy — not separate per-operation policies:
+
+```sql
+CREATE POLICY "auth_all" ON public.TABLE_NAME
+  FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
 ```
+
+This is a deliberate, documented design choice (see the header of migration
+`20260506002815_enable_rls_all_business_tables.sql` and `RUNBOOK.md`'s "RLS Policy
+Reference" section) — not an oversight. DMP CMS has no public user accounts; every
+authenticated session is a staff member who was issued credentials, so **any
+authenticated user currently has full read/write access to every table.** There is no
+role-based restriction anywhere in the database today, despite `User.role` existing as
+a client-side TypeScript field — RBAC is a tracked future improvement, not something
+partially built (see [docs/12-roadmap.md](12-roadmap.md)).
+
+**One exception:** `burials` also carries an anonymous-read policy, which is what
+powers the public `/memorial/:id` pages:
+```sql
+CREATE POLICY "anon_memorial_read" ON public.burials
+  FOR SELECT TO anon
+  USING (memorial_published = true);
+```
+
+⚠️ **Known gap, not yet fixed:** this policy filters *rows* (only published burials),
+not *columns*. RLS policies can't restrict which columns a SELECT returns — so an
+anonymous caller querying the table directly (bypassing the app's own narrower
+`select()`) can read every column on a published row, including
+`contact_name`/`contact_phone`/`contact_email`/`permit_number`/internal `notes`, not
+just the name and dates a memorial page actually displays. The app's own
+`usePublicBurial()` hook (`src/hooks/useData.ts`) already selects a safe, narrow
+column list, but that's an application-layer convention, not a database-enforced one
+— anyone with the (intentionally public) anon key can query the base table with a
+wider `select()`. The correct fix is a column-restricted view or `SECURITY DEFINER`
+function for anonymous reads instead of a policy on the base table; that requires a
+coordinated schema + app-code change, so it's flagged here rather than silently
+patched.
 
 ### Current RLS status
 
@@ -173,34 +210,11 @@ If a table has **no policies**, it depends on whether RLS is enabled:
 - RLS **disabled** → all operations allowed for all users (risky!)
 - RLS **enabled** with no policies → all operations **blocked** (safe but non-functional)
 
-**Recommended minimum policies for each table:**
+**The policy to add for any new table** (matching every existing table):
 ```sql
--- Allow authenticated users to SELECT all rows
-CREATE POLICY "read_all" ON table_name FOR SELECT TO authenticated USING (true);
-
--- Allow authenticated users to INSERT
-CREATE POLICY "insert_authenticated" ON table_name FOR INSERT TO authenticated WITH CHECK (true);
-
--- Allow authenticated users to UPDATE
-CREATE POLICY "update_authenticated" ON table_name FOR UPDATE TO authenticated USING (true);
-
--- Allow authenticated users to DELETE
-CREATE POLICY "delete_authenticated" ON table_name FOR DELETE TO authenticated USING (true);
-```
-
-For a more restrictive policy (e.g., only admins can delete):
-```sql
-CREATE POLICY "only_admin_delete"
-ON burials FOR DELETE TO authenticated
-USING (
-  (SELECT role FROM auth.users WHERE id = auth.uid()) = 'admin'
-  OR
-  EXISTS (
-    SELECT 1 FROM auth.users
-    WHERE id = auth.uid()
-    AND raw_user_meta_data->>'role' = 'admin'
-  )
-);
+ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_all" ON public.new_table
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
 ```
 
 ---
@@ -236,9 +250,9 @@ The pattern:
    insert/update payloads
 4. React Query handles caching/refetching via `queryKey` invalidation
 
-There is no Express/REST layer — `api.ts` only exports the error type hierarchy
-(`ApiRequestError`, `NetworkError`, `TimeoutError`) used by the retry policy in
-`query.tsx` and the user-facing message helpers in `errors.ts`.
+There is no Express/REST layer — `api.ts` only exports the `ApiRequestError` type
+used by the retry policy in `query.tsx` and the user-facing message helpers in
+`errors.ts`.
 
 ---
 
@@ -300,6 +314,17 @@ WHERE email = 'user@detroitmemorialpark.com';
 
 > ⚠️ Schema changes affect the live production database. Be careful.
 
+> **The SQL Editor steps below are for prototyping only.** Anything that should
+> actually ship needs to be a committed migration file in `supabase/migrations/` —
+> that's the only thing that keeps this repo's migration history able to reproduce the
+> schema, and it's what `supabase-migrations.yml`/`drift-check.yml`
+> ([docs/04-github.md](04-github.md)) depend on. Create one with
+> `supabase migration new description_here`, start it with the standard header
+> documented in `CONTRIBUTING.md`, and commit the file — a change that only exists in
+> the SQL Editor's history isn't really documented anywhere. This repo has already hit
+> the failure mode of migration files drifting from what's actually applied; see
+> `AUDIT_REPORT.md`'s Change Log for how that was reconciled.
+
 **Process for adding a column:**
 
 1. Open SQL Editor in Supabase dashboard.
@@ -327,13 +352,12 @@ WHERE email = 'user@detroitmemorialpark.com';
      created_by uuid REFERENCES auth.users(id)
    );
    ```
-2. Enable RLS and add policies:
+2. Enable RLS and add the standard policy (see [Row-Level Security](#row-level-security-rls) above — one `FOR ALL` policy, not separate per-operation ones):
    ```sql
    ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
-   CREATE POLICY "auth_read" ON reports FOR SELECT TO authenticated USING (true);
-   CREATE POLICY "auth_insert" ON reports FOR INSERT TO authenticated WITH CHECK (true);
+   CREATE POLICY "auth_all" ON reports FOR ALL TO authenticated USING (true) WITH CHECK (true);
    ```
-3. Add the TypeScript type, API hooks, and UI.
+3. Add the TypeScript type, data hooks in `useData.ts`, and UI.
 
 ---
 

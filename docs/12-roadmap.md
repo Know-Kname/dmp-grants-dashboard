@@ -25,20 +25,23 @@ The DMP CMS is a working application managing data for three Detroit Memorial Pa
 - **Gracelawn** — Beverly Hills, MI
 
 **Working modules:**
-- ✅ Dashboard — overview stats, location cards, recent activity
-- ✅ Burials — burial record management (create, read, update)
+- ✅ Dashboard — overview stats, location cards, recent activity, locations map
+- ✅ Burials — burial record management + public QR-code memorial pages
 - ✅ Work Orders — maintenance/service order tracking
-- ✅ Contracts — pre-need and at-need contract management
+- ✅ Contracts — pre-need/at-need contracts, line items, payment schedules
 - ✅ Customers — family/customer record management
+- ✅ Vendors — supplier records linked to Accounts Payable
 - ✅ Inventory — cemetery property/plot inventory
-- ✅ Financial — revenue tracking, reports, charts
-- ✅ Grants — grant application tracking
-- ✅ AI Assistant — Gemini 2.5 Pro chat (via OpenRouter), cemetery-specific context
-- ✅ Authentication — Supabase Auth (email/password, JWT, session persistence)
-- ✅ Demo Mode — mock data walkthrough without real credentials
-- ✅ Dark/Light Mode — full theme toggle
+- ✅ Financial — AR/AP/deposits across 3 tabs, revenue charts
+- ✅ Grants — grant/benefit opportunity tracking (this repo's namesake)
+- ✅ Cemeteries — Cemetery → Section → Lot → Grave hierarchy + interactive plot map
+- ✅ AI Assistant — Gemini 2.5 Pro via OpenRouter, proxied server-side through `/api/chat`
+- ✅ Authentication — Supabase Auth (email/password + Google OAuth, JWT, session persistence)
+- ⚠️ Demo Mode — auth-bypass only; does not provide mock data (see [Known limitations](#known-limitations))
+- ✅ Dark/Light/System Mode — full theme toggle
 - ✅ Responsive Layout — iPad-primary, works on mobile and desktop
-- ✅ CI/CD — GitHub Actions + Vercel automatic deployments
+- ✅ Form validation — Zod + `useForm` on every CRUD page except `Cemeteries.tsx`
+- ✅ CI/CD — 8 GitHub Actions workflows + Vercel automatic deployments
 
 ---
 
@@ -79,11 +82,24 @@ CREATE TRIGGER burials_audit AFTER INSERT OR UPDATE OR DELETE ON burials
 
 ### 2. No role-based access control (RBAC)
 
-All authenticated users have the same permissions. A front-desk staff member can delete a burial record. A temporary contractor can view all financial data.
+All authenticated users share the same database-level permissions — the single
+`auth_all` RLS policy present on every table (see `RUNBOOK.md`'s "RLS Policy
+Reference" and [docs/06-supabase.md](06-supabase.md)) grants full read/write to any
+authenticated session. **This is a deliberate choice, not an oversight** — the
+migration that added it explicitly frames DMP CMS as a closed, staff-only tool where
+every authenticated session is assumed to be a credentialed employee, with per-role
+restriction meant to layer on top of `auth_all` later if the trust model changes.
+It's listed here because that trade-off is worth revisiting as the team grows: a
+front-desk staff member can currently delete a burial record, and a temporary
+contractor can view all financial data, with nothing at the database layer
+distinguishing them.
 
-**Impact:** Medium. Currently a single-location team, but as the organization grows this becomes a problem.
+**Impact:** Medium. Fine for a small single-location team; becomes a real gap as headcount or location count grows.
 
-**Fix:** Add a `role` column to the `users` table (`admin`, `manager`, `staff`, `read_only`) and write role-aware RLS policies:
+**Fix:** `src/types/index.ts`'s `User.role` already exists client-side (from Supabase
+`user_metadata`) with no database enforcement behind it yet. Layer a more restrictive
+policy for specific operations on top of `auth_all` — don't replace it, per
+`RUNBOOK.md`'s documented migration path:
 ```sql
 -- Only admins can delete
 CREATE POLICY "admin_delete" ON burials
@@ -99,11 +115,13 @@ const { currentUser } = useAuth()
 {currentUser?.role === 'admin' && <Button variant="destructive">Delete</Button>}
 ```
 
-### 3. OpenRouter key exposed in frontend bundle
+### 3. ~~OpenRouter key exposed in frontend bundle~~ ✅ Done
 
-The AI assistant API key (`VITE_OPENROUTER_API_KEY`) is baked into the compiled JavaScript. Anyone can extract it from browser DevTools. For an internal-only tool, the risk is low (but not zero).
-
-**Fix:** Create a Vercel Edge Function that proxies the OpenRouter request server-side. The key lives in a server-side env var (not `VITE_`-prefixed). See [Long-term improvements](#long-term--architectural-improvements).
+Resolved: `api/chat.ts` (a Vercel Edge Function) proxies OpenRouter server-side, and
+the key lives in the server-only `OPENROUTER_API_KEY` env var — never shipped to the
+browser. See [docs/09-security.md](09-security.md). (The dev-only
+`VITE_OPENROUTER_API_KEY` fallback still exists for local `npm run dev` without
+`vercel dev`, but it's dead-code-eliminated from production builds.)
 
 ### 4. No offline support
 
@@ -111,26 +129,63 @@ If the internet is unavailable (bad Wi-Fi, network outages at the cemetery), the
 
 **Fix:** Service worker with IndexedDB offline storage. React Query supports offline-first patterns with background sync. Complex to implement correctly.
 
-### 5. No print/export functionality
+### 5. No bulk print/export functionality
 
-Staff often need to print burial certificates, work order summaries, or financial reports. Currently there is no "print" or "export to PDF/CSV" feature.
+A narrow print capability already exists: Burials' memorial-QR modal and the public
+`/memorial/:id` page both support `window.print()` with `@media print` CSS rules
+(`src/styles/index.css`) for printing a single QR code or memorial as a marker insert.
+What's still missing is anything at the *list* level — staff can't export a table
+(Burials, Work Orders, Customers, etc.) to CSV, or print a formatted burial
+certificate or financial report.
 
-**Fix:** Add a print-friendly CSS stylesheet (`@media print`) and a PDF generation step using the browser's `window.print()` or a library like `@react-pdf/renderer`.
+**Fix:** A CSV export button per list page (the data's already sitting in React
+Query's cache — no extra Supabase query needed) and a dedicated print stylesheet per
+record-detail view would cover most real requests. `@react-pdf/renderer` is only
+worth it for a specific formatted document (e.g. a burial certificate); plain
+`window.print()` + `@media print` is enough for "print this table."
 
-### 6. Large JavaScript bundle
+### 6. ~~Large JavaScript bundle~~ ⚠️ Partially done
 
-The initial JS bundle is around 400–600KB (before gzip). This is within acceptable range but could be improved with code splitting.
+Page-level code splitting is done: every route except `Dashboard`/`Login` is
+`React.lazy()`-loaded (`src/App.tsx`), and `vite.config.ts` further splits
+`recharts`, `@supabase/supabase-js`, and the React core into their own vendor chunks.
 
-**Fix:** Use React.lazy() + Suspense for page-level code splitting:
-```tsx
-const Burials = lazy(() => import('./pages/Burials'))
-const Financial = lazy(() => import('./pages/Financial'))
-```
-Each page would only load when navigated to, reducing initial load time significantly. Recharts is a large dependency that only Financial needs — keeping it in a lazy-loaded chunk would help.
+**What's still large:** `npm run build` warns about one chunk over the 500KB
+threshold — `maplibre-gl`, roughly 1MB pre-gzip (285KB gzipped), shared by
+`CemeteryMap` and `LocationsMap`. It's already lazy-loaded (only downloads when a
+user opens Cemeteries or the Dashboard's map card), so this matters far less than an
+unsplit bundle would, but a lighter map library or a load-on-interaction pattern
+would still help first paint on those two specific views.
+
+### 7. Data-integrity gaps found in the most recent schema review
+
+Two issues worth tracking, neither fixed in this pass since both touch live
+production DDL rather than application code (full detail in
+[docs/06-supabase.md](06-supabase.md)):
+- **`updated_at` is never refreshed on UPDATE**, for any table, except the 3 pg_cron
+  overdue-sweep jobs — and only for that one status transition. Every other edit made
+  through the app (recording a payment, editing a work order) leaves `updated_at`
+  sitting at its `created_at` value. Needs a `BEFORE UPDATE` trigger.
+- **11 of 16 tables have no `CREATE TABLE` statement anywhere in `supabase/migrations/`**
+  — only `cemeteries`/`sections`/`lots`/`graves`/`payment_schedule` have full DDL
+  history in this repo; the rest (customers, contracts, the financial tables, etc.)
+  predate the migrations folder. The live schema currently can't be rebuilt from this
+  repo alone; a `supabase db pull` capturing the missing base tables as a migration
+  would close the gap.
 
 ---
 
 ## Near-term improvements (high value, low effort)
+
+### Wire up the existing Pagination component
+
+`src/components/Pagination.tsx` — the `<Pagination>` component and its `usePagination`
+hook — is fully built (page-size selector, first/prev/numbered/next/last controls,
+already styled to match the rest of the UI) but isn't imported by any page today.
+Every list page currently renders its entire result set with no paging, which is a
+real scaling concern given DMP's multi-decade operating history. Wiring it into the
+highest-traffic pages (Burials, Customers) is close to free, since the component
+already exists and just needs a query call site.
 
 ### Export to CSV/Excel
 
@@ -169,15 +224,16 @@ When a work order status changes to "Completed", automatically email the relevan
 
 ## Medium-term features (significant effort, significant value)
 
-### Cemetery map integration
+### ~~Cemetery map integration~~ ✅ Done
 
-The three DMP cemetery maps are available as PDFs (from the DMP website). A proper implementation would:
-1. Convert PDF maps to SVG or PNG tile layers
-2. Render them as an interactive canvas (using Leaflet.js or similar)
-3. Link plot numbers in the map to burial records
-4. Allow clicking a plot to view or assign a record
-
-This would be the most visually impressive feature and directly useful for staff guiding families.
+Shipped in v2.0.0: `src/components/CemeteryMap.tsx` (MapLibre GL, not Leaflet as
+originally sketched here) renders an interactive plot map with satellite/street
+toggle, color-coded grave-status markers, GPS drop-pin capture, "find nearest
+available" plot, and grave-number search — reached via `/cemeteries`. A second,
+separate map (`LocationsMap.tsx`) shows the 3 DMP sites on the Dashboard. What's
+*not* built: a map-marker click doesn't open a burial-assignment form directly — the
+Cemeteries page's grave detail is a separate drill-down from the map, not a popup
+form. That specific connection is the one piece of the original vision left.
 
 ### Document management
 
@@ -216,29 +272,16 @@ React Native with Expo + the same Supabase backend would share most of the data 
 
 ## Long-term / architectural improvements
 
-### Server-side AI proxy (Vercel Edge Function)
+### ~~Server-side AI proxy~~ ✅ Done
 
-Move the OpenRouter API call to a Vercel Edge Function:
-
-```ts
-// api/ai-chat.ts (Vercel Edge Function)
-export const config = { runtime: 'edge' }
-
-export default async function handler(req: Request) {
-  const { messages } = await req.json()
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,  // server-side, not VITE_
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: 'google/gemini-2.5-pro', messages, stream: true }),
-  })
-  return response  // stream back to browser
-}
-```
-
-The browser calls `/api/ai-chat`, the Edge Function calls OpenRouter with the secret key. The key is never in the browser bundle. 
+Shipped as `api/chat.ts` — the real route is `/api/chat`, not `/api/ai-chat` as
+originally sketched here. The browser calls `/api/chat`; the Edge Function calls
+OpenRouter with the secret `OPENROUTER_API_KEY`, which is never shipped to the
+browser. What the original sketch didn't anticipate: the shipped version also has no
+caller authentication at all (not just "the key is hidden" — literally anyone who can
+reach the URL can call it) and now does basic request-size validation as a stopgap.
+See [docs/09-security.md](09-security.md#future-security-improvements) for that
+follow-up item.
 
 ### Azure Key Vault
 
@@ -282,9 +325,12 @@ Setup:
 
 ### Current chunk size warning
 
-Running `npm run build` shows a warning about chunk size. The main offenders are:
-- `recharts` — only used on the Financial page, but included in the main bundle
-- `@supabase/supabase-js` — necessary, but large
+`npm run build` still shows a chunk-size warning, but the picture has changed since
+this was written: `vite.config.ts` already splits `recharts` and
+`@supabase/supabase-js` into their own vendor chunks, and every page except
+Dashboard/Login is lazy-loaded (see [Known limitations #6](#known-limitations) above).
+The chunk actually over the 500KB threshold today is `maplibre-gl` (~1MB pre-gzip),
+shared by `CemeteryMap` and `LocationsMap`.
 
 **To check current bundle size:**
 ```bash
@@ -302,39 +348,24 @@ npm install --save-dev rollup-plugin-visualizer
 # A browser window opens showing the bundle treemap
 ```
 
-### React Query cache settings
+### ~~React Query cache settings~~ ✅ Already tuned
 
-Current default: `staleTime: 0` (data is always considered stale). For a business app where data doesn't change every second, increasing staleTime reduces Supabase reads:
-
-```ts
-// In src/lib/query.tsx, when creating the QueryClient:
-new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,  // 5 minutes — don't refetch if data is fresh
-      gcTime: 10 * 60 * 1000,    // 10 minutes — keep unused data in cache
-    }
-  }
-})
-```
-
-This would significantly reduce Supabase API calls on pages the user navigates back to frequently.
+This section originally suggested raising `staleTime` from React Query's `0` default.
+`src/lib/query.tsx` already sets `staleTime: 5 * 60 * 1000` (5 minutes) and
+`gcTime: 30 * 60 * 1000` (30 minutes), plus a retry policy that skips retrying
+auth/validation/not-found errors. Nothing further needed here.
 
 ---
 
 ## Security roadmap
 
-In priority order (see [docs/09-security.md](09-security.md) for full details):
-
-1. **Content Security Policy header** — Add to `vercel.json`. Most impactful browser-side security improvement. Requires testing to avoid breaking Supabase/OpenRouter connections.
-
-2. **Audit log** — Add `change_log` table with PostgreSQL triggers. Especially important for burial records.
-
-3. **RBAC** — Role column in users table + role-aware RLS policies.
-
-4. **Server-side AI proxy** — Move OpenRouter key out of frontend bundle.
-
-5. **IP restrictions** — Allow-list known office IP addresses in Supabase.
+The maintained, current-priority version of this list lives in
+[docs/09-security.md](09-security.md#future-security-improvements) — kept in one
+place rather than duplicated here, since an independently-drifting second copy is
+exactly how "server-side AI proxy" sat in this list for a full release cycle after it
+had already shipped. As of this doc's last update, the two highest-value remaining
+items are **CSP** and **authenticating (or rate-limiting) `/api/chat`**; **audit log**
+and **RBAC** are the two highest-value non-header items.
 
 ---
 

@@ -35,13 +35,13 @@ Your Machine
          │          GitHub Actions CI                     │
          │  ┌──────────────────────────────────────────┐ │
          │  │  ci-typescript.yml                        │ │
-         │  │  Runs on Node 20 AND Node 22 (parallel)   │ │
+         │  │  Single job, Node 22                      │ │
          │  │                                           │ │
          │  │  1. npm ci (fresh install)                │ │
          │  │  2. npm run lint       ← fails = blocked  │ │
          │  │  3. tsc --noEmit       ← fails = blocked  │ │
          │  │  4. npm run build      ← fails = blocked  │ │
-         │  │  5. npm run test:run   ← fails = warning  │ │
+         │  │  5. npm run test:run   ← fails = blocked  │ │
          │  └──────────────────────────────────────────┘ │
          └───────────────────────────────────────────────┘
               │
@@ -100,13 +100,13 @@ Compressing objects: 100% (3/3), done.
 Writing objects: 100% (3/3), 1.23 KiB | 1.23 MiB/s, done.
 remote: Bypassed rule violations for refs/heads/main:
 remote: - Changes must be made through a pull request.
-To github.com:Know-Kname/dmpgrants
+To github.com:Know-Kname/dmp-grants-dashboard
    abc1234..def5678  main -> main
 ```
 
 ### 4. Watch the deploy
 
-- **GitHub Actions:** `github.com/Know-Kname/dmpgrants/actions` — should show a running workflow
+- **GitHub Actions:** `github.com/Know-Kname/dmp-grants-dashboard/actions` — should show a running workflow
 - **Vercel:** `vercel.com` → dmpgrants → Deployments — should show "Building"
 
 ### 5. Verify the live site
@@ -147,7 +147,7 @@ When you're satisfied with the preview:
 
 ## When CI fails — what to do
 
-Go to `github.com/Know-Kname/dmpgrants/actions`, click the failed run, click the job that failed.
+Go to `github.com/Know-Kname/dmp-grants-dashboard/actions`, click the failed run, click the job that failed.
 
 **Lint failure:**
 ```

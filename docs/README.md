@@ -42,4 +42,15 @@ Read in this order:
 
 ---
 
+## Repo-health audit history
+
+`/AUDIT_REPORT.md` at the repo root records the most recent full platform audit
+(GitHub/Vercel/Supabase hygiene, security findings, remediation log), alongside
+point-in-time snapshots (`AUDIT_BRANCH_INVENTORY.txt`, `AUDIT_COMMIT_LOG.txt`,
+`AUDIT_TAG_INVENTORY.txt`). These are historical records as of their audit date —
+treat them as a snapshot, not a living doc; check the actual repo state for anything
+time-sensitive.
+
+---
+
 ← Back to [README.md](../README.md)

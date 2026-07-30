@@ -7,6 +7,8 @@ import {
 import { useForm, getFieldError } from '../hooks/useForm';
 import { burialFormSchema } from '../lib/schemas';
 import { formatDate, formatDateForInput } from '../lib/utils';
+import { getErrorMessage } from '../lib/errors';
+import { useToast } from '../lib/toast';
 import type { Burial } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
@@ -34,10 +36,20 @@ function deceasedName(b: Burial): string {
 
 export default function Burials() {
   const { data: burials = [], isLoading, error, refetch } = useBurials();
+  const toast = useToast();
 
-  const createMutation = useCreateBurial({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
-  const updateMutation = useUpdateBurial({ onSuccess: () => { setShowModal(false); setEditingBurial(null); form.reset(initialForm); } });
-  const deleteMutation = useDeleteBurial();
+  const createMutation = useCreateBurial({
+    onSuccess: () => { toast.success('Burial record created successfully'); setShowModal(false); form.reset(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create burial record'),
+  });
+  const updateMutation = useUpdateBurial({
+    onSuccess: () => { toast.success('Burial record updated'); setShowModal(false); setEditingBurial(null); form.reset(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update burial record'),
+  });
+  const deleteMutation = useDeleteBurial({
+    onSuccess: () => toast.success('Burial record removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete burial record'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);

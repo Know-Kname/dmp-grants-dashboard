@@ -21,7 +21,7 @@
 
 | Tool | Minimum version | How to check | How to get it |
 |---|---|---|---|
-| **Node.js** | 18.x | `node --version` | [nodejs.org](https://nodejs.org) — download the LTS version |
+| **Node.js** | 20.x | `node --version` | [nodejs.org](https://nodejs.org) — also pinned in `.nvmrc` |
 | **npm** | 9.x | `npm --version` | Comes with Node.js |
 | **Git** | any recent | `git --version` | [git-scm.com](https://git-scm.com) |
 | **A code editor** | — | — | [VS Code](https://code.visualstudio.com) recommended |
@@ -35,13 +35,13 @@
 Open a terminal and run:
 
 ```bash
-git clone https://github.com/Know-Kname/dmpgrants.git
-cd dmpgrants
+git clone https://github.com/Know-Kname/dmp-grants-dashboard.git
+cd dmp-grants-dashboard
 ```
 
-> **What is this doing?** `git clone` downloads a complete copy of the project from GitHub to your machine. `cd dmpgrants` moves you into the project folder.
+> **What is this doing?** `git clone` downloads a complete copy of the project from GitHub to your machine. `cd dmp-grants-dashboard` moves you into the project folder.
 
-You should now see a `dmpgrants/` folder. You can open it in VS Code with:
+You should now see a `dmp-grants-dashboard/` folder. You can open it in VS Code with:
 
 ```bash
 code .
@@ -106,9 +106,9 @@ You should see output like:
 
 Open [http://localhost:5173](http://localhost:5173) in your browser. You should see the DMP login page.
 
-**Sign in with:**
-- Email: `chughes@detroitmemorialpark.com`
-- Password: `DMP2025!`
+**Sign in with:** an existing Supabase user account (ask a Supabase project admin to
+add you in Authentication → Users — see [docs/06-supabase.md](06-supabase.md)), or
+sign in with Google if OAuth is configured.
 
 Or click **Preview Demo** (no credentials needed — see next section).
 
@@ -118,14 +118,24 @@ Or click **Preview Demo** (no credentials needed — see next section).
 
 ## Demo mode (no setup required)
 
-If you don't have Supabase credentials, or just want to explore, click **Preview Demo** on the login page. You'll get:
+If you don't have Supabase credentials, or just want to explore the UI, click
+**Preview Demo** on the login page. You'll get:
 
-- A full app experience with **realistic mock data**
-- All 8 pages working (Dashboard, Burials, Work Orders, Inventory, etc.)
-- The AI assistant (if you have an OpenRouter key) or graceful degradation without
-- A yellow "Preview Mode" banner at the top to remind you it's not real data
+- Instant access to all 10 authenticated pages without creating an account
+- A "Preview Mode" banner at the top with an "Exit Preview" button to log out
 
-**How it works:** Demo mode sets a flag in your browser's `localStorage` and bypasses Supabase auth entirely. All data comes from `src/lib/demo-data.ts`. Click "Exit Preview" to return to the login page.
+**What demo mode is NOT:** it does not provide sample/mock data. It only bypasses
+Supabase authentication — under the hood it fakes a signed-in admin identity in
+`localStorage`, but every page still queries live Supabase data exactly as it would
+for a real login. Without real `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` values
+set, most pages will show empty lists rather than sample records. It's useful for
+reviewing the UI shell and navigation without an account, not a curated data
+walkthrough.
+
+**How it works:** `enableDemoMode()` (`src/lib/demo-data.ts`) sets a flag in your
+browser's `localStorage` and dispatches a `dmp-demo-change` event that `AuthProvider`
+listens for, so `isAuthenticated` becomes `true` with no Supabase session involved.
+Click "Exit Preview" to log out and return to the login page.
 
 ---
 
@@ -134,52 +144,69 @@ If you don't have Supabase credentials, or just want to explore, click **Preview
 After setup, here's the most important files and folders to know:
 
 ```
-dmpgrants/
+dmp-grants-dashboard/
 │
 ├── src/                        ← All application source code
-│   ├── pages/                  ← Each page is one file
+│   ├── pages/                  ← Each page is one file, one per route
 │   │   ├── Dashboard.tsx       ← Charts + KPI cards overview
-│   │   ├── Burials.tsx         ← Burial records management
+│   │   ├── Burials.tsx         ← Burial records + public memorial QR codes
 │   │   ├── WorkOrders.tsx      ← Maintenance task tracking
 │   │   ├── Inventory.tsx       ← Stock management
-│   │   ├── Financial.tsx       ← AR, AP, and deposits
-│   │   ├── Contracts.tsx       ← Contract lifecycle
+│   │   ├── Financial.tsx       ← AR, AP, and deposits (3 tabs)
+│   │   ├── Contracts.tsx       ← Pre-need/at-need contract lifecycle
 │   │   ├── Customers.tsx       ← Customer/family database
-│   │   ├── Grants.tsx          ← Grant opportunities
+│   │   ├── Vendors.tsx         ← Supplier records
+│   │   ├── Cemeteries.tsx      ← Cemetery → Section → Lot → Grave + interactive map
+│   │   ├── Grants.tsx          ← Grant/benefit opportunities (this repo's namesake)
+│   │   ├── MemorialPage.tsx    ← Public, unauthenticated `/memorial/:id` page
 │   │   └── Login.tsx           ← Login + demo mode entry
 │   │
 │   ├── components/
-│   │   ├── Layout.tsx          ← Dark-green sidebar + topbar + mobile nav
+│   │   ├── Layout.tsx          ← Sidebar + topbar + mobile nav (DMP branding)
 │   │   ├── AIAssistant.tsx     ← Floating Gemini chat panel
-│   │   ├── ui.tsx              ← All shared UI components (Button, Card, etc.)
+│   │   ├── ui.tsx              ← All shared UI components (Button, Card, Modal, etc.)
+│   │   ├── CemeteryMap.tsx     ← Interactive plot map (MapLibre GL)
+│   │   ├── LocationsMap.tsx    ← Dashboard's 3-site locations map
+│   │   ├── Pagination.tsx      ← Pagination controls (built, not wired to a page yet)
 │   │   └── ErrorBoundary.tsx   ← Catches JS errors, shows friendly message
 │   │
 │   ├── hooks/
-│   │   └── useData.ts          ← Every React Query hook for every module
+│   │   ├── useData.ts          ← Every React Query hook for every module
+│   │   └── useForm.ts          ← Zod-validated controlled-form hook
 │   │
 │   ├── lib/
 │   │   ├── auth.tsx            ← Login/logout/demo state (AuthProvider)
-│   │   ├── api.ts              ← Fetch client (handles snake_case↔camelCase)
-│   │   ├── supabase.ts         ← Supabase JS client
+│   │   ├── api.ts              ← ApiRequestError type (no HTTP client — see 02)
+│   │   ├── supabase.ts         ← Typed Supabase JS client
 │   │   ├── query.tsx           ← React Query config + all cache keys
-│   │   ├── gemini.ts           ← AI assistant (OpenRouter streaming)
+│   │   ├── schemas.ts          ← Zod validation schemas for every form
+│   │   ├── gemini.ts           ← AI assistant client (calls `/api/chat`)
+│   │   ├── mapStyles.ts        ← Shared MapLibre satellite tile style
+│   │   ├── theme.tsx           ← Light/dark/system theme provider
 │   │   ├── toast.tsx           ← Toast notifications
-│   │   ├── utils.ts            ← formatCurrency, formatDate, cn(), etc.
+│   │   ├── utils.ts            ← formatCurrency, formatDate, case transforms, cn()
 │   │   ├── errors.ts           ← getErrorMessage, getErrorDetails
-│   │   └── demo-data.ts        ← Mock data + demo mode toggle
+│   │   └── demo-data.ts        ← DEMO_USER + demo mode toggle (no mock dataset)
 │   │
 │   ├── config/
-│   │   └── company.ts          ← DMP name, 3 locations, phones (source of truth)
+│   │   ├── company.ts          ← DMP name, 3 locations, phones (source of truth)
+│   │   └── brand.ts            ← DMP forest-green/gold brand hex constants
 │   │
 │   ├── types/
-│   │   └── index.ts            ← TypeScript types for every data model
+│   │   ├── index.ts            ← Hand-written camelCase domain types
+│   │   └── database.ts         ← GENERATED snake_case Supabase schema types
 │   │
 │   └── styles/
 │       └── index.css           ← Tailwind imports + all CSS design tokens
 │
+├── api/
+│   └── chat.ts                 ← Vercel Edge Function: server-side OpenRouter proxy
+├── supabase/
+│   ├── migrations/              ← Versioned schema migrations
+│   └── config.toml
 ├── public/                     ← Static files (logo, photos) — served as-is
 ├── docs/                       ← 📚 This documentation
-├── .github/                    ← GitHub Actions CI, PR templates
+├── .github/                    ← GitHub Actions CI, PR/issue templates, Dependabot
 ├── vercel.json                 ← Vercel deploy config
 ├── .env.example                ← Template for .env.local (safe to commit)
 ├── .env.local                  ← YOUR secrets (gitignored, never commit)

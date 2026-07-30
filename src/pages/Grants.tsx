@@ -5,7 +5,7 @@ import { useForm, getFieldError } from '../hooks/useForm';
 import { grantFormSchema } from '../lib/schemas';
 import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, formatDateForInput } from '../lib/utils';
-import { Grant } from '../types';
+import type { Grant } from '../types';
 import { Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState, LoadingSpinner, PageError, StatCard } from '../components/ui';
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';

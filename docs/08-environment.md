@@ -1,6 +1,6 @@
 # 08 — Environment Variables
 
-> **TL;DR:** The app uses exactly 3 environment variables — all prefixed `VITE_`. Set them in `.env.local` for local dev and in Vercel → Settings → Environment Variables for production. Never commit `.env.local`.
+> **TL;DR:** The app uses 4 environment variables — 3 prefixed `VITE_` (client-exposed) and one that deliberately isn't (`OPENROUTER_API_KEY`, server-only). Set them in `.env.local` for local dev and in Vercel → Settings → Environment Variables for production. Never commit `.env.local`.
 
 ---
 
@@ -27,7 +27,7 @@ Environment variables are key-value pairs that configure the app at startup, wit
 
 ---
 
-## The three variables
+## The four variables
 
 ### `VITE_SUPABASE_URL`
 
@@ -67,22 +67,51 @@ Environment variables are key-value pairs that configure the app at startup, wit
 
 ---
 
-### `VITE_OPENROUTER_API_KEY`
+### `OPENROUTER_API_KEY`
 
-**What it is:** API key for the OpenRouter service, which routes requests to AI models (we use Gemini 2.5 Pro).
+**What it is:** Server-only API key for the OpenRouter service (Gemini 2.5 Pro),
+read exclusively by the `/api/chat` Vercel Edge Function (`api/chat.ts`).
+Deliberately has **no** `VITE_` prefix, so Vite never inlines it into the browser
+bundle — this is the variable that actually matters for production.
 
 **Format:** `sk-or-v1-` followed by a long hex string
 
-**Used in:** `src/lib/gemini.ts:1`
+**Used in:** `api/chat.ts`
 
 **How to find it / get one:**
 1. Go to [openrouter.ai](https://openrouter.ai)
 2. Sign in → go to Keys page
 3. Create or copy your key
 
-**Security classification:** 🔴 This is a secret key. If exposed, others can use your API quota. Treat it like a password. In practice, since it's embedded in the frontend JS bundle, a determined person could extract it from devtools — but this requires actual effort and the usage is logged. For a private internal app, this level of exposure is acceptable.
+**Security classification:** 🟢 Stays server-side, never shipped to the browser.
 
-**What happens if it's missing:** The AI assistant floating button still appears, but clicking it shows an error. The rest of the app works fine.
+**What happens if it's missing:** `/api/chat` returns a `503` with
+`{ error: 'AI assistant is not configured...' }`. The rest of the app works fine.
+
+---
+
+### `VITE_OPENROUTER_API_KEY`
+
+**What it is:** Optional, **dev-only** convenience so `npm run dev` can call
+OpenRouter directly from the browser, without needing `vercel dev` running to serve
+`/api/chat` locally. Gated behind `import.meta.env.DEV`, which Vite hardcodes to
+`false` in production builds — this branch, and the key it would need, is
+dead-code-eliminated from anything actually deployed.
+
+**Format:** `sk-or-v1-` followed by a long hex string
+
+**Used in:** `src/lib/gemini.ts`
+
+**How to find it / get one:** same as `OPENROUTER_API_KEY` above.
+
+**Security classification:** 🟡 Client-exposed when set — but only in your local dev
+build. **Do not set this one in Vercel** — set `OPENROUTER_API_KEY` there instead.
+
+**What happens if it's missing:** Nothing breaks — `streamMessage()`/`sendMessage()`
+call `/api/chat` instead of OpenRouter directly. Locally, without `vercel dev` running,
+that means the AI assistant button appears but clicking it fails (plain `npm run dev`
+has no route to serve `/api/chat`). Either set this var for local-direct calls, or run
+`vercel dev` instead of `vite dev`.
 
 ---
 

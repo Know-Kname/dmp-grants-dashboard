@@ -6,10 +6,12 @@ import {
 } from '../hooks/useData';
 import { useForm, getFieldError } from '../hooks/useForm';
 import { workOrderFormSchema } from '../lib/schemas';
+import { getErrorMessage } from '../lib/errors';
+import { useToast } from '../lib/toast';
 import type { WorkOrder } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select, Textarea,
-  Badge, EmptyState, LoadingSpinner, PageError, StatCard } from '../components/ui';
+  Badge, EmptyState, LoadingSpinner, PageError, StatCard, TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { isThisMonth } from 'date-fns';
@@ -65,10 +67,20 @@ const STATUS_FILTER_OPTIONS = [
 
 export default function WorkOrders() {
   const { data: workOrders = [], isLoading, error, refetch } = useWorkOrders();
+  const toast = useToast();
 
-  const createMutation = useCreateWorkOrder({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
-  const updateMutation = useUpdateWorkOrder({ onSuccess: () => { setShowModal(false); setEditingOrder(null); form.reset(initialForm); } });
-  const deleteMutation = useDeleteWorkOrder();
+  const createMutation = useCreateWorkOrder({
+    onSuccess: () => { toast.success('Work order created successfully'); setShowModal(false); form.reset(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create work order'),
+  });
+  const updateMutation = useUpdateWorkOrder({
+    onSuccess: () => { toast.success('Work order updated'); setShowModal(false); setEditingOrder(null); form.reset(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update work order'),
+  });
+  const deleteMutation = useDeleteWorkOrder({
+    onSuccess: () => toast.success('Work order removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete work order'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
@@ -215,11 +227,13 @@ export default function WorkOrders() {
             <table className="w-full">
               <thead className="bg-background-subtle border-b border-border">
                 <tr>
-                  {['Work Order', 'Type', 'Priority', 'Status', 'Assigned To', 'Due Date', ''].map(h => (
-                    <th key={h} className={`px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider ${!h ? 'text-right' : ''}`}>
-                      {h}
-                    </th>
-                  ))}
+                  <th className={TABLE_HEAD_CLASS}>Work Order</th>
+                  <th className={TABLE_HEAD_CLASS}>Type</th>
+                  <th className={TABLE_HEAD_CLASS}>Priority</th>
+                  <th className={TABLE_HEAD_CLASS}>Status</th>
+                  <th className={TABLE_HEAD_CLASS}>Assigned To</th>
+                  <th className={TABLE_HEAD_CLASS}>Due Date</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -256,7 +270,7 @@ export default function WorkOrders() {
                         <button onClick={() => handleEdit(wo)} className="text-primary hover:text-primary-hover transition-colors" aria-label="Edit">
                           <Edit size={16} />
                         </button>
-                        <button onClick={() => handleDelete(wo.id)} className="text-destructive hover:text-destructive-hover transition-colors" aria-label="Delete">
+                        <button onClick={() => handleDelete(wo.id)} className="text-danger hover:text-danger-hover transition-colors" aria-label="Delete">
                           <Trash2 size={16} />
                         </button>
                       </div>

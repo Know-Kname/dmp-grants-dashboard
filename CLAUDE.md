@@ -35,7 +35,7 @@ src/
   hooks/
     useData.ts   ALL React Query hooks for every module
   lib/
-    api.ts       Error type hierarchy (ApiRequestError, NetworkError, TimeoutError)
+    api.ts       Error type hierarchy (ApiRequestError)
     auth.tsx     AuthProvider + useAuth hook (Supabase + demo mode)
     supabase.ts  Supabase client init
     gemini.ts    OpenRouter streaming client
@@ -43,7 +43,9 @@ src/
     toast.tsx    Toast notification system
     errors.ts    getErrorMessage / getErrorDetails / getErrorRequestId
     utils.ts     formatCurrency, formatDate, formatDateForInput, cn()
-    demo-data.ts Mock data + enableDemoMode / disableDemoMode
+    demo-data.ts DEMO_USER + enableDemoMode / disableDemoMode (auth bypass only —
+                 every screen still reads live Supabase data in demo mode, there
+                 is no mock dataset)
   config/
     company.ts   DMP name, 3 locations, phones, tagline (source of truth)
   types/
@@ -91,11 +93,17 @@ git push -u origin main   # Push → triggers Vercel auto-deploy
   pass `getFieldError(...)` into the `error` prop on `Input`/`Select`/`Textarea`.
   Derive the form's state type from the schema (`z.input<typeof xFormSchema>`)
   rather than hand-declaring it, so the two cannot drift.
-  Every CRUD page follows this; **Grants is the clearest example**. The only
-  exception is the two payment-recording forms in `Financial.tsx`, which capture a
-  single amount against an existing invoice and stay on plain `useState`.
+  Every CRUD page follows this except two documented gaps: the two payment-recording
+  forms in `Financial.tsx`, which capture a single amount against an existing invoice
+  and stay on plain `useState` (intentional — no schema would add a check); and
+  `Cemeteries.tsx`'s four forms (Cemetery/Section/Lot/Grave), which still use plain
+  `useState` with inline `parseInt`/`parseFloat` coercion and have no schemas in
+  `schemas.ts` yet (not yet converted — a real gap, not a deliberate exception).
+  **Grants is the clearest example of the converted pattern.**
 - **Error handling:** surface via `getErrorMessage(err)` from `src/lib/errors.ts`.
-  Show errors with the `<Alert>` component from `ui.tsx`.
+  Show errors with the `<PageError>` component from `ui.tsx` (renders nothing when
+  passed a falsy error, so a page can pass a combined query/mutation error straight
+  through without guarding).
 
 ---
 

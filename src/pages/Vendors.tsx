@@ -7,6 +7,8 @@ import {
 import { useForm, getFieldError } from '../hooks/useForm';
 import { vendorFormSchema } from '../lib/schemas';
 import { formatDate } from '../lib/utils';
+import { getErrorMessage } from '../lib/errors';
+import { useToast } from '../lib/toast';
 import type { Vendor } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Textarea,
@@ -22,10 +24,20 @@ const initialForm: VendorFormData = {
 
 export default function Vendors() {
   const { data: vendors = [], isLoading, error, refetch } = useVendors();
+  const toast = useToast();
 
-  const createMutation = useCreateVendor({ onSuccess: () => { setShowModal(false); form.reset(initialForm); } });
-  const updateMutation = useUpdateVendor({ onSuccess: () => { setShowModal(false); setEditingVendor(null); form.reset(initialForm); } });
-  const deleteMutation = useDeleteVendor();
+  const createMutation = useCreateVendor({
+    onSuccess: () => { toast.success('Vendor added successfully'); setShowModal(false); form.reset(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to save vendor'),
+  });
+  const updateMutation = useUpdateVendor({
+    onSuccess: () => { toast.success('Vendor updated'); setShowModal(false); setEditingVendor(null); form.reset(initialForm); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update vendor'),
+  });
+  const deleteMutation = useDeleteVendor({
+    onSuccess: () => toast.success('Vendor removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete vendor'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);

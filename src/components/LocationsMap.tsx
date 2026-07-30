@@ -1,10 +1,10 @@
 import { Map as MapLibreMap, Marker, Popup, NavigationControl, type MapRef } from 'react-map-gl/maplibre';
 import { useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { StyleSpecification } from 'maplibre-gl';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
 import { Phone } from 'lucide-react';
+import { SATELLITE_STYLE } from '../lib/mapStyles';
 
 type LocKey = keyof typeof COMPANY.locations;
 
@@ -13,23 +13,6 @@ const LOCATIONS = (
 ).map(([key, loc]) => ({ key, ...loc }));
 
 const STREET_STYLE = 'https://tiles.openfreemap.org/styles/positron';
-
-const SATELLITE_STYLE: StyleSpecification = {
-  version: 8,
-  name: 'Satellite',
-  sources: {
-    esri: {
-      type: 'raster',
-      tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      ],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DigitalGlobe, GeoEye',
-    },
-  },
-  layers: [{ id: 'satellite', type: 'raster', source: 'esri' }],
-};
 
 const lats = LOCATIONS.map(l => l.coordinates.lat);
 const lngs = LOCATIONS.map(l => l.coordinates.lng);

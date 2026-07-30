@@ -16,8 +16,8 @@ Internal management system for **Detroit Memorial Park Association, Inc.** — o
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Know-Kname/dmpgrants.git
-cd dmpgrants
+git clone https://github.com/Know-Kname/dmp-grants-dashboard.git
+cd dmp-grants-dashboard
 
 # 2. Install dependencies
 npm install
@@ -32,7 +32,7 @@ npm run dev
 # → Opens at http://localhost:5173
 ```
 
-> **No Supabase credentials yet?** Click **Preview Demo** on the login page — you get a full tour with realistic mock data, no account needed.
+> **No Supabase credentials yet?** Click **Preview Demo** on the login page to bypass login, no account needed. Demo mode only bypasses authentication, though — every page still queries live Supabase data, so you'll also want real `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` values to see real records instead of empty states (see [docs/08-environment.md](docs/08-environment.md)).
 
 ---
 
@@ -43,13 +43,16 @@ npm run dev
 | UI framework | React 18 + TypeScript 5 | Component-based SPA |
 | Build tool | Vite 4 | Dev server + production bundler |
 | Styling | Tailwind CSS 3 + CSS variables | Design tokens, dark/light mode |
-| Routing | React Router DOM v6 | Client-side page routing |
+| Routing | React Router DOM v6 | Client-side page routing, incl. one public unauthenticated route |
 | Server state | TanStack React Query v5 | Data fetching, caching, mutations |
-| Database | Supabase (PostgreSQL) | 13 tables, row-level security |
-| Auth | Supabase Auth | Email/password + demo mode |
-| AI assistant | OpenRouter → Gemini 2.5 Pro | Floating chat panel in the app |
+| Validation | Zod 3 | Schema-driven form validation (`useForm` + `lib/schemas.ts`) |
+| Database | Supabase (PostgreSQL) | 16 tables, row-level security |
+| Auth | Supabase Auth | Email/password + Google OAuth + demo mode |
+| Maps | MapLibre GL + react-map-gl | Cemetery plot map + locations map (keyless OpenFreeMap/ESRI tiles) |
+| AI assistant | OpenRouter → Gemini 2.5 Pro | Floating chat panel, proxied server-side via `/api/chat` |
 | Deployment | Vercel | Auto CI/CD from `main` branch |
 | Charts | Recharts 2 | Dashboard visualizations |
+| Animation | Framer Motion + Lenis | Login/memorial page transitions, app-wide smooth scroll |
 | Icons | Lucide React | SVG icon library |
 
 ---
@@ -57,7 +60,7 @@ npm run dev
 ## Project Structure
 
 ```
-dmpgrants/
+dmp-grants-dashboard/
 ├── src/
 │   ├── pages/          # One file per page (Dashboard, Burials, Inventory…)
 │   ├── components/     # Layout, AIAssistant, shared ui.tsx component library

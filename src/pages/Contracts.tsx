@@ -8,6 +8,8 @@ import {
 import { useForm, getFieldError } from '../hooks/useForm';
 import { contractFormSchema } from '../lib/schemas';
 import { formatCurrency, formatDate, formatDateForInput, cn } from '../lib/utils';
+import { getErrorMessage } from '../lib/errors';
+import { useToast } from '../lib/toast';
 import type { Contract, ContractItem } from '../types';
 import {
   Card, CardBody, Button, Modal, Input, Select,
@@ -101,10 +103,20 @@ function PaymentScheduleSection({ contractId }: { contractId: string }) {
 export default function Contracts() {
   const { data: contracts = [], isLoading, error, refetch } = useContracts();
   const { data: customers = [] } = useCustomers();
+  const toast = useToast();
 
-  const createMutation = useCreateContract({ onSuccess: () => { setShowModal(false); form.reset(initialForm); setLineItems([]); } });
-  const updateMutation = useUpdateContract({ onSuccess: () => { setShowModal(false); setEditingContract(null); form.reset(initialForm); setLineItems([]); } });
-  const deleteMutation = useDeleteContract();
+  const createMutation = useCreateContract({
+    onSuccess: () => { toast.success('Contract created successfully'); setShowModal(false); form.reset(initialForm); setLineItems([]); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to create contract'),
+  });
+  const updateMutation = useUpdateContract({
+    onSuccess: () => { toast.success('Contract updated'); setShowModal(false); setEditingContract(null); form.reset(initialForm); setLineItems([]); },
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to update contract'),
+  });
+  const deleteMutation = useDeleteContract({
+    onSuccess: () => toast.success('Contract removed'),
+    onError: (err) => toast.error(getErrorMessage(err), 'Failed to delete contract'),
+  });
 
   const [showModal, setShowModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);

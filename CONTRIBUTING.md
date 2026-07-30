@@ -3,8 +3,8 @@
 ## Development Setup
 
 ```bash
-git clone https://github.com/Know-Kname/dmpgrants.git
-cd dmpgrants
+git clone https://github.com/Know-Kname/dmp-grants-dashboard.git
+cd dmp-grants-dashboard
 npm install
 cp .env.example .env.local   # fill in real values from Supabase Dashboard
 npm run dev                  # → http://localhost:5173

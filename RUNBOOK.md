@@ -84,7 +84,11 @@ vercel deploy --prod                     # redeploy to apply new value
 Current variables (names only — values from Key Vault):
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_OPENROUTER_API_KEY`
+- `OPENROUTER_API_KEY` — server-only (no `VITE_` prefix), read by the `/api/chat`
+  Vercel Edge Function. Required in Vercel for the AI assistant to work in production.
+- `VITE_OPENROUTER_API_KEY` — optional, dev-only fallback so `npm run dev` can call
+  OpenRouter directly without `vercel dev` running. Do **not** set this one in Vercel —
+  see docs/09-security.md.
 
 ---
 
@@ -112,13 +116,14 @@ vercel logs --environment production --status-code 5xx --since 72h
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
-| `ci-typescript.yml` | Every PR + push | typecheck + lint + build |
+| `ci-typescript.yml` | Every PR + push to `main` | lint + typecheck + build + test (single Node 22 job) |
+| `pr-checks.yml` | PR opened/updated | Comments if the PR changes >500 lines (warning only, doesn't block) |
 | `release.yml` | Push to `main` | Auto-creates SemVer tag + GitHub Release |
-| `supabase-migrations.yml` | Push to `main` (migrations only) | Auto-deploys DB migrations |
+| `supabase-migrations.yml` | Push to `main` (migrations only) | Auto-deploys DB migrations. Uses `supabase/setup-cli@v1` (a tag, not a verified SHA — see the inline comment in the workflow file for why) |
 | `drift-check.yml` | Every Monday 09:00 UTC | Opens Issue if DB drift detected |
-| `security-scan.yml` | Push + schedule | CodeQL + npm audit |
-| `stale-bot.yml` | Schedule | Closes stale PRs/issues |
-| `dependabot-automerge.yml` | Dependabot PRs | Auto-merges minor/patch bumps |
+| `security-scan.yml` | Push to `main` + every Monday 09:00 UTC | CodeQL static analysis + `npm audit --audit-level=high` |
+| `stale-bot.yml` | Daily schedule | Closes stale PRs/issues (30 days inactive → labeled, +7 days → closed) |
+| `dependabot-automerge.yml` | Any Dependabot PR | Auto-merges minor/patch version bumps only |
 
 ---
 
@@ -170,5 +175,5 @@ When per-role policies become necessary (e.g., read-only field staff):
 
 - **Operations Coordinator:** Christian Hughes — chughes@detroitmemorialpark.com
 - **Supabase project:** mgpwjnxtqcnoyjgebytg (us-east-1)
-- **GitHub:** https://github.com/Know-Kname/dmpgrants
+- **GitHub:** https://github.com/Know-Kname/dmp-grants-dashboard
 - **Vercel:** dmpgrants project (auto-deploy from `main`)

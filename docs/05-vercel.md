@@ -36,7 +36,7 @@ You don't manage servers, you don't configure nginx, you don't pay for compute w
 
 ## Accessing the Vercel dashboard
 
-1. Go to [vercel.com](https://vercel.com) and sign in (use the GitHub account that owns `Know-Kname/dmpgrants`).
+1. Go to [vercel.com](https://vercel.com) and sign in (use the GitHub account that owns `Know-Kname/dmp-grants-dashboard`).
 2. You'll see the **dmpgrants** project on the dashboard.
 3. Click it to see the project page.
 
@@ -111,7 +111,8 @@ Preview deployments use the **Preview** tier environment variables (see next sec
 
 ## Environment variables in Vercel
 
-This is where the app's secrets live. The frontend JavaScript needs three values to run:
+This is where the app's secrets live: two values the frontend JavaScript needs to
+run, plus one server-only value the `/api/chat` Edge Function needs.
 
 ### Where to set them
 
@@ -137,7 +138,8 @@ Most of the time, set all three variables to the same values across all three sc
 |---|---|---|---|
 | `VITE_SUPABASE_URL` | Supabase → Settings → API → Project URL | All | ✅ Required |
 | `VITE_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public key | All | ✅ Required |
-| `VITE_OPENROUTER_API_KEY` | openrouter.ai → Keys | All | Optional (AI chat won't work without it) |
+| `OPENROUTER_API_KEY` | openrouter.ai → Keys | All | ✅ Required for the AI assistant to work — server-only, read by the `/api/chat` Edge Function (`api/chat.ts`) |
+| `VITE_OPENROUTER_API_KEY` | openrouter.ai → Keys | — | ❌ **Do not set this one in Vercel.** It's a dev-only fallback for `npm run dev` without `vercel dev` running, gated behind `import.meta.env.DEV` and stripped from production builds. See [docs/09-security.md](09-security.md). |
 
 ### How env vars flow into the app
 
@@ -160,12 +162,13 @@ The `vercel.json` file in the root of the repo configures how Vercel builds and 
 ```json
 {
   "version": 2,
+  "name": "dmpgrants",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": null,
-  "installCommand": "npm install",
+  "installCommand": "npm ci",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [...],
   "cleanUrls": true,
@@ -175,19 +178,25 @@ The `vercel.json` file in the root of the repo configures how Vercel builds and 
 
 **Line-by-line explanation:**
 
+`"name": "dmpgrants"` — The Vercel *project* name (unrelated to the GitHub repo name — the repo is `dmp-grants-dashboard`, this is just what Vercel's dashboard/URLs call the project).
+
 `"buildCommand": "npm run build"` — Run this to compile the app. Our script runs TypeScript + Vite.
 
 `"outputDirectory": "dist"` — After building, the compiled files are in `dist/`. Vercel uploads this folder.
 
+`"installCommand": "npm ci"` — Clean install from `package-lock.json` (not `npm install`), so CI/deploys always get exactly the locked versions.
+
 `"framework": null` — We're not using a framework-specific preset (like Next.js). Vite handles everything.
 
-`"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]` — This is the **crucial SPA rule**. When a user navigates to `/burials` directly (or refreshes), Vercel would return a 404 (there's no `burials.html` file). This rule says: for *any* URL, serve `index.html` instead. React Router then reads the URL and shows the right page.
+`"rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]` — This is the **crucial SPA rule**. When a user navigates to `/burials` directly (or refreshes), Vercel would return a 404 (there's no `burials.html` file). This rule says: for any URL that *doesn't* start with `/api/`, serve `index.html` instead — React Router then reads the URL and shows the right page. The `(?!api/)` negative-lookahead exists so this rule doesn't swallow requests meant for the `/api/chat` Edge Function.
 
 `"headers"` — Security headers added to every response:
 - `X-Content-Type-Options: nosniff` — Prevents browsers from guessing file types (protects against certain attacks)
 - `X-Frame-Options: DENY` — Prevents the site from being embedded in an iframe (protects against clickjacking)
 - `X-XSS-Protection: 1; mode=block` — Legacy XSS protection in older browsers
 - `Referrer-Policy: strict-origin-when-cross-origin` — Controls what URL is sent when navigating to external sites
+- `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` — Forces HTTPS for the next 2 years on this domain and its subdomains, even if a user types `http://`
+- `Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()` — Allows the Geolocation API only for this origin (used by the cemetery map's GPS-capture feature), and explicitly blocks camera/microphone/payment APIs, none of which the app uses
 
 `"headers": [{ "source": "/assets/(.*)", "Cache-Control": "public, max-age=31536000, immutable" }]` — Tells browsers to cache all files in `/assets/` (Vite puts hashed JS/CSS bundles here) for 1 year. When files change, Vite generates new hash-named files, so browsers always get fresh content.
 
