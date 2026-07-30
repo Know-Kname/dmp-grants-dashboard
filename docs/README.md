@@ -32,6 +32,7 @@ Read in this order:
 | 10 | [Troubleshooting](10-troubleshooting.md) | Common errors and exactly how to fix them |
 | 11 | [Design System](11-design-system.md) | Colors, components, dark mode, Tailwind tokens |
 | 12 | [Roadmap](12-roadmap.md) | Upcoming features, known limitations |
+| 13 | [CI & Database Operations](13-ci-and-database-operations.md) | Required Actions secrets, drift check, repo↔production DB divergence |
 
 ---
 
@@ -44,12 +45,17 @@ Read in this order:
 
 ## Repo-health audit history
 
-`/AUDIT_REPORT.md` at the repo root records the most recent full platform audit
-(GitHub/Vercel/Supabase hygiene, security findings, remediation log), alongside
-point-in-time snapshots (`AUDIT_BRANCH_INVENTORY.txt`, `AUDIT_COMMIT_LOG.txt`,
-`AUDIT_TAG_INVENTORY.txt`). These are historical records as of their audit date —
-treat them as a snapshot, not a living doc; check the actual repo state for anything
-time-sensitive.
+[`archive/2026-05-06-platform-audit.md`](archive/2026-05-06-platform-audit.md)
+records the 2026-05-06 full platform audit (GitHub/Vercel/Supabase hygiene,
+security findings, remediation log). It was previously `/AUDIT_REPORT.md` at the
+repo root, alongside three raw scratch dumps (`AUDIT_BRANCH_INVENTORY.txt`,
+`AUDIT_COMMIT_LOG.txt`, `AUDIT_TAG_INVENTORY.txt`); those were `git rm`'d — they
+were unannotated point-in-time output reproducible from `git branch`, `git log`,
+and `git tag`, and had gone stale.
+
+Treat the archived report as a snapshot, not a living doc; check the actual repo
+state for anything time-sensitive. For current CI and database-divergence facts
+see [13 — CI & Database Operations](13-ci-and-database-operations.md).
 
 ---
 

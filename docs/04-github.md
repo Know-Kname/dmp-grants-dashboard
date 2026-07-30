@@ -232,6 +232,20 @@ GitHub Secrets are encrypted environment variables accessible to CI workflows. T
 | `VERCEL_ORG_ID` | Vercel integration | Identifies the Vercel account |
 | `VERCEL_PROJECT_ID` | Vercel integration | Identifies the specific Vercel project |
 
+**Referenced by workflows but NOT yet stored — these must be added by hand:**
+
+| Secret | Used by | Purpose |
+|---|---|---|
+| `SUPABASE_ACCESS_TOKEN` | `supabase-migrations.yml`, `drift-check.yml` | Authenticates the Supabase CLI |
+| `PRODUCTION_PROJECT_REF` | `supabase-migrations.yml`, `drift-check.yml` | Target project (`mgpwjnxtqcnoyjgebytg`) |
+| `PRODUCTION_DB_PASSWORD` | `supabase-migrations.yml`, `drift-check.yml` | Postgres password for `supabase link` |
+| `DEPENDABOT_AUTOMERGE_TOKEN` | `dependabot-automerge.yml` | Optional PAT; the default `GITHUB_TOKEN` is read-only on Dependabot PRs |
+
+Both Supabase workflows fail fast with an explicit error naming the missing
+secrets, so a run that gets past "Verify required secrets are configured"
+confirms they are set. Step-by-step instructions and exact values:
+[docs/13-ci-and-database-operations.md](13-ci-and-database-operations.md).
+
 > 🔑 **GitHub Secrets vs. app env vars:**
 > - **GitHub Secrets** → used inside `.github/workflows/*.yml` files (CI scripts)
 > - **Vercel env vars** → used in the running app (frontend JavaScript)
