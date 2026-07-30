@@ -1,7 +1,10 @@
 node_modules
 dist
-.env
-.env.local
+# Ignore every dotenv variant (.env.production, .env.development,
+# .env.local.backup, ...) — the previous two-line list only covered .env and
+# .env.local, so any other variant would have been committed.
+.env*
+!.env.example
 .DS_Store
 *.log
 coverage
