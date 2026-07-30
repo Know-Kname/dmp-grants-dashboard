@@ -76,8 +76,12 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // The v7_startTransition / v7_relativeSplatPath future flags were removed
+  // when this app moved to react-router-dom 7 — both behaviours are the
+  // default in v7, and the `future` prop no longer accepts them. Opting in
+  // on v6 was exactly what made this a no-behaviour-change upgrade.
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       <QueryProvider>
         <ThemeProvider>
           <AuthProvider>
