@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { supabase } from '../lib/supabase';
 import { isUUID, toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
+import { burialTrendSchema, dashboardSummarySchema, revenueTrendSchema } from '../lib/schemas';
 import { affectedRow, affectedRows, WriteBlockedError } from '../lib/writeResult';
 import { profilesTable, type Profile, type ProfileRow } from '../lib/profiles';
 import { toAppRole, type AppRole } from '../lib/permissions';
@@ -175,6 +176,61 @@ function mutationSideEffects<T>(
 }
 
 // ============================================
+// DASHBOARD AGGREGATES
+// ============================================
+
+/**
+ * Every dashboard KPI, in one round trip.
+ *
+ * This replaces seven whole-table queries the Dashboard used to reduce in the
+ * browser. That path was unbounded, and PostgREST caps a response at ~1000 rows
+ * *with no truncation signal* — past that the KPIs did not error, they quietly
+ * went wrong, dropping the oldest rows first.
+ *
+ * The RPC returns a single `jsonb` object with camelCase keys (it builds them in
+ * SQL), so `toCamelCaseKeys` does not apply here; what does apply is validation,
+ * because a jsonb blob off the network is `unknown`. `dashboardSummarySchema`
+ * parses it once, at the edge, and coerces the numeric fields explicitly.
+ */
+export function useDashboardSummary() {
+  return useQuery({
+    queryKey: queryKeys.dashboard.summary(),
+    queryFn: async () => dashboardSummarySchema.parse(await sb(supabase.rpc('dashboard_summary'))),
+  });
+}
+
+/**
+ * Interments per month, zero-filled and ordered ascending by the database.
+ *
+ * Deliberately separate from {@link useDashboardSummary}: the 6M/12M/24M control
+ * changes only this range, and bundling the trends into the summary would
+ * refetch every KPI on each toggle.
+ *
+ * @param months How many months back to return, inclusive of the current one.
+ */
+export function useBurialTrend(months: number) {
+  return useQuery({
+    queryKey: queryKeys.dashboard.burialTrend(months),
+    queryFn: async () =>
+      burialTrendSchema.parse(await sb(supabase.rpc('monthly_burial_trend', { p_months: months }))),
+  });
+}
+
+/**
+ * Deposit totals per month, zero-filled and ordered ascending by the database.
+ * Separate from the summary for the same reason as {@link useBurialTrend}.
+ *
+ * @param months How many months back to return, inclusive of the current one.
+ */
+export function useRevenueTrend(months: number) {
+  return useQuery({
+    queryKey: queryKeys.dashboard.revenueTrend(months),
+    queryFn: async () =>
+      revenueTrendSchema.parse(await sb(supabase.rpc('monthly_revenue_trend', { p_months: months }))),
+  });
+}
+
+// ============================================
 // WORK ORDERS
 // ============================================
 
@@ -182,6 +238,33 @@ export function useWorkOrders() {
   return useQuery({
     queryKey: queryKeys.workOrders.list(),
     queryFn: () => fetchAll<WorkOrder>('work_orders', 'created_at'),
+  });
+}
+
+/** The columns the dashboard activity feed renders for a work order. */
+export type RecentWorkOrder = Pick<WorkOrder, 'id' | 'title' | 'status' | 'createdAt'>;
+
+/**
+ * The newest `limit` work orders, for the dashboard activity feed.
+ *
+ * The feed used to slice `useWorkOrders()`, i.e. it downloaded the whole table
+ * to show five rows. `.limit()` in the database is the point of this hook — do
+ * not "simplify" it back to a client-side slice of the full list.
+ *
+ * @param limit Maximum rows to return.
+ */
+export function useRecentWorkOrders(limit: number) {
+  return useQuery({
+    queryKey: queryKeys.workOrders.recent(limit),
+    queryFn: async () =>
+      fromRows<RecentWorkOrder>(
+        await sb(
+          supabase.from('work_orders')
+            .select('id, title, status, created_at')
+            .order('created_at', { ascending: false })
+            .limit(limit)
+        )
+      ),
   });
 }
 
@@ -425,6 +508,33 @@ export function useBurials() {
   return useQuery({
     queryKey: queryKeys.burials.list(),
     queryFn: () => fetchAll<Burial>('burials', 'created_at'),
+  });
+}
+
+/** The columns the dashboard activity feed renders for a burial. */
+export type RecentBurial = Pick<
+  Burial,
+  'id' | 'deceasedFirstName' | 'deceasedLastName' | 'plotLocation' | 'burialDate'
+>;
+
+/**
+ * The most recently recorded `limit` burials, for the dashboard activity feed.
+ * Bounded in the database for the same reason as {@link useRecentWorkOrders}.
+ *
+ * @param limit Maximum rows to return.
+ */
+export function useRecentBurials(limit: number) {
+  return useQuery({
+    queryKey: queryKeys.burials.recent(limit),
+    queryFn: async () =>
+      fromRows<RecentBurial>(
+        await sb(
+          supabase.from('burials')
+            .select('id, deceased_first_name, deceased_last_name, plot_location, burial_date')
+            .order('created_at', { ascending: false })
+            .limit(limit)
+        )
+      ),
   });
 }
 

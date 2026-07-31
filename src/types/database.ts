@@ -14,7 +14,9 @@
  * boundary between the two. Both are needed — this file keeps the schema honest,
  * `index.ts` keeps the components readable.
  *
- * Last generated: 2026-07-31 (17 tables, post Phase 6 RBAC: profiles).
+ * Last generated: 2026-07-31 (17 tables, post Phase 6 RBAC: profiles;
+ * post Phase 2 aggregation: the v_ar_aging / v_ap_aging views and the
+ * dashboard_summary / monthly_burial_trend / monthly_revenue_trend functions).
  * NOT NULL timestamptz created_at/updated_at).
  */
 
@@ -890,10 +892,123 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_ap_aging: {
+        Row: {
+          amount: number | null
+          amount_paid: number | null
+          bucket: string | null
+          days_past_due: number | null
+          due_date: string | null
+          id: string | null
+          invoice_number: string | null
+          open_balance: number | null
+          status: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          amount_paid?: number | null
+          bucket?: never
+          days_past_due?: never
+          due_date?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          open_balance?: never
+          status?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          amount_paid?: number | null
+          bucket?: never
+          days_past_due?: never
+          due_date?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          open_balance?: never
+          status?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_payable_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_ar_aging: {
+        Row: {
+          amount: number | null
+          amount_paid: number | null
+          bucket: string | null
+          customer_id: string | null
+          days_past_due: number | null
+          due_date: string | null
+          id: string | null
+          invoice_number: string | null
+          open_balance: number | null
+          status: string | null
+        }
+        Insert: {
+          amount?: number | null
+          amount_paid?: number | null
+          bucket?: never
+          customer_id?: string | null
+          days_past_due?: never
+          due_date?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          open_balance?: never
+          status?: string | null
+        }
+        Update: {
+          amount?: number | null
+          amount_paid?: number | null
+          bucket?: never
+          customer_id?: string | null
+          days_past_due?: never
+          due_date?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          open_balance?: never
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_receivable_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      can_write: { Args: never; Returns: boolean }
+      current_app_role: { Args: never; Returns: string }
+      dashboard_summary: { Args: never; Returns: Json }
+      is_active_user: { Args: never; Returns: boolean }
+      is_admin: { Args: never; Returns: boolean }
+      monthly_burial_trend: {
+        Args: { p_months?: number }
+        Returns: {
+          burials: number
+          label: string
+          month_start: string
+        }[]
+      }
+      monthly_revenue_trend: {
+        Args: { p_months?: number }
+        Returns: {
+          label: string
+          month_start: string
+          revenue: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
