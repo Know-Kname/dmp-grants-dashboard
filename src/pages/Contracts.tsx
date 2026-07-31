@@ -17,6 +17,7 @@ import {
   Badge, EmptyState, LoadingSpinner, PageError, StatCard, AnimatedNumber,
   ConfirmDialog, SkeletonTable, Tabs, TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, FileText, Edit, Trash2, RefreshCw, DollarSign, TrendingUp, X, CalendarDays } from 'lucide-react';
+import { useAuth } from '../lib/auth';
 
 /** Live form state — the input side of `contractFormSchema`, so the two cannot drift. */
 type ContractFormData = z.input<typeof contractFormSchema>;
@@ -123,6 +124,15 @@ export default function Contracts() {
   const [showModal, setShowModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Contract | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -256,9 +266,11 @@ export default function Contracts() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingContract(null); setLineItems([]); setShowModal(true); }}>
-            New Contract
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingContract(null); setLineItems([]); setShowModal(true); }}>
+              New Contract
+            </Button>
+          )}
         </div>
       </div>
 
@@ -322,7 +334,7 @@ export default function Contracts() {
               icon={<FileText size={48} />}
               title="No contracts found"
               description={searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Create your first contract'}
-              action={!searchTerm && typeFilter === 'all' && statusFilter === 'all'
+              action={canCreate && !searchTerm && typeFilter === 'all' && statusFilter === 'all'
                 ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>New Contract</Button>
                 : undefined}
             />
@@ -361,8 +373,12 @@ export default function Contracts() {
                       <td className="px-6 py-4">{statusBadge(c.status)}</td>
                       <td className="px-6 py-4 text-foreground-muted">{c.signedDate ? formatDate(c.signedDate) : '—'}</td>
                       <td className="px-6 py-4 text-right space-x-2">
-                        <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                        <button onClick={() => setDeleteTarget(c)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                        {canEdit && (
+                          <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setDeleteTarget(c)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -397,9 +413,11 @@ export default function Contracts() {
         footer={
           <>
             <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
-              {editingContract ? 'Save Changes' : 'Create Contract'}
-            </Button>
+            {(editingContract ? canEdit : canCreate) && (
+              <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
+                {editingContract ? 'Save Changes' : 'Create Contract'}
+              </Button>
+            )}
           </>
         }
       >

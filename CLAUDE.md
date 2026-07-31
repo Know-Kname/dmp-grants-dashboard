@@ -45,6 +45,15 @@ src/
                  the PASSWORD_RECOVERY latch. Imported by supabase.ts BEFORE
                  createClient — that ordering is load-bearing, do not reorder.
     supabase.ts  Supabase client init (PKCE flow)
+    permissions.ts  AppRole + can(role, action). A MIRROR of the RLS policies so
+                 the UI can hide impossible actions — NOT the security boundary.
+                 Change it in the same commit as any policy change.
+    profiles.ts  Row/domain types for public.profiles + the one widened client
+                 accessor. Delete once database.ts is regenerated with profiles.
+    writeResult.ts  affectedRows()/WriteBlockedError. A refused UPDATE/DELETE
+                 returns 200 + zero rows, NOT an error — every mutation in
+                 useData.ts must `.select()` and go through this, or a blocked
+                 write looks exactly like a successful one.
     env.ts       Validates VITE_SUPABASE_* at runtime; main.tsx renders a
                  ConfigError screen instead of the app when they're missing.
                  Deliberately no zod — this module is in the entry chunk.

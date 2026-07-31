@@ -28,6 +28,14 @@ export default defineConfig({
           recharts: ['recharts'],
           // Supabase client
           supabase: ['@supabase/supabase-js'],
+          // Validation. Rollup used to keep zod out of the entry chunk on its
+          // own, because only lazily-routed pages imported `lib/schemas`. The
+          // dashboard now validates its RPC payloads and is eagerly imported by
+          // App.tsx, which was enough to hoist all of zod into the entry — ~59
+          // kB raw / ~13 kB gzip of parser that the first paint does not need.
+          // Naming it keeps it a separate, cacheable chunk shared by every page
+          // that validates, fetched in parallel rather than ahead of render.
+          zod: ['zod'],
           // React core + router
           react: ['react', 'react-dom', 'react-router-dom'],
         },

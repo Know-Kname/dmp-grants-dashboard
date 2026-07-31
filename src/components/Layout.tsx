@@ -9,7 +9,8 @@ import {
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from './ui';
 import { COMPANY } from '../config/company';
-import { NAV_ITEMS } from '../config/nav';
+import { ROLE_LABELS } from '../lib/permissions';
+import { navItemsFor } from '../config/nav';
 import { CommandPalette } from './CommandPalette';
 import { useHotkeys } from '../hooks/useHotkeys';
 import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
@@ -31,7 +32,7 @@ function MenuPop({ children, className = '' }: { children: React.ReactNode; clas
 }
 
 export default function Layout() {
-  const { currentUser: user, logout } = useAuth();
+  const { currentUser: user, logout, role } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,7 +69,7 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const navItems = NAV_ITEMS;
+  const navItems = navItemsFor(role);
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -76,6 +77,9 @@ export default function Layout() {
     }
     return location.pathname.startsWith(path);
   };
+
+  // `role` is null while the profile loads; show nothing rather than guess.
+  const roleLabel = role ? ROLE_LABELS[role] : '';
 
   const ThemeIcon = theme === 'system' ? Monitor : resolvedTheme === 'dark' ? Moon : Sun;
 
@@ -164,7 +168,7 @@ export default function Layout() {
                   />
                   <div className="hidden md:block text-left">
                     <div className="text-sm font-medium text-foreground">{user?.name}</div>
-                    <div className="text-xs text-foreground-muted capitalize">{user?.role}</div>
+                    <div className="text-xs text-foreground-muted">{roleLabel}</div>
                   </div>
                   <ChevronDown size={16} className="text-foreground-muted hidden md:block" />
                 </button>
@@ -174,7 +178,7 @@ export default function Layout() {
                   <MenuPop className="w-48">
                     <div className="px-3 py-2 border-b border-border md:hidden">
                       <div className="text-sm font-medium text-foreground">{user?.name}</div>
-                      <div className="text-xs text-foreground-muted capitalize">{user?.role}</div>
+                      <div className="text-xs text-foreground-muted">{roleLabel}</div>
                     </div>
                     <button
                       onClick={handleLogout}

@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { APP_ROLES, type AppRole } from './permissions';
 
 // ============================================
 // COMMON SCHEMAS
@@ -315,6 +316,37 @@ export const payableFormSchema = z.object({
 export type PayableFormData = z.infer<typeof payableFormSchema>;
 
 // ============================================
+// USER ACCOUNT SCHEMAS
+// ============================================
+
+/**
+ * The three values `profiles.role` may hold.
+ *
+ * Duplicating the union from `./permissions` would let the two drift, so this
+ * is built from `APP_ROLES` and pinned to `AppRole` by `satisfies` below — a
+ * fourth role added there is a compile error here until it is handled.
+ */
+export const appRoleSchema = z.enum(APP_ROLES, {
+  errorMap: () => ({ message: 'Select a role' }),
+}) satisfies z.ZodType<AppRole>;
+
+/**
+ * The admin form on `/users`.
+ *
+ * `isActive` is `'true' | 'false'` on the way in because it is bound to a
+ * `<Select>`, which can only hold a string, and a boolean on the way out
+ * because that is what the `is_active` column takes. Same reason `amount` is a
+ * string-in/number-out union on the money forms — see `useForm`'s two type
+ * parameters.
+ */
+export const userAccountFormSchema = z.object({
+  role: appRoleSchema,
+  isActive: z.enum(['true', 'false']).transform((v) => v === 'true'),
+});
+
+export type UserAccountFormData = z.infer<typeof userAccountFormSchema>;
+
+// ============================================
 // AUTH SCHEMAS
 // ============================================
 
@@ -350,6 +382,122 @@ export const resetPasswordFormSchema = z.object({
 });
 
 export type ResetPasswordFormData = z.infer<typeof resetPasswordFormSchema>;
+
+// ============================================
+// DASHBOARD RPC SCHEMAS
+// ============================================
+
+/**
+ * A number as it may arrive from PostgREST.
+ *
+ * Postgres `numeric` has more range and precision than a JS double, so the
+ * wire format for it is not guaranteed: inside a `jsonb` payload it is a JSON
+ * number, but a `numeric` *column* is sometimes serialised as a string so no
+ * precision is lost in transit. Both are accepted here and coerced once, at the
+ * edge, rather than each call site guessing.
+ *
+ * `Number('')` is 0 and `Number(null)` is 0 — both would sail through an
+ * unguarded coercion and put a fabricated zero on a financial KPI. Empty and
+ * whitespace-only strings are therefore rejected outright, and anything else
+ * that coerces to NaN or Infinity is rejected by the `finite` refinement.
+ */
+export const dbNumberSchema = z.union([z.number(), z.string()])
+  .transform((v) => (typeof v === 'number' ? v : v.trim() === '' ? NaN : Number(v)))
+  .refine((n) => Number.isFinite(n), 'Expected a finite number');
+
+/** A count: a whole, non-negative `dbNumber`. */
+export const dbCountSchema = dbNumberSchema.refine(
+  (n) => Number.isInteger(n) && n >= 0,
+  'Expected a non-negative whole number',
+);
+
+/**
+ * One entry of `dashboard_summary()`'s `upcomingGrants` array.
+ *
+ * `amount` is nullable because `grants.amount` is; `daysLeft` is computed
+ * server-side as `deadline - current_date` so the client never re-derives it
+ * from a date string in the wrong timezone.
+ */
+export const upcomingGrantSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  source: z.string(),
+  amount: dbNumberSchema.nullable(),
+  deadline: z.string(),
+  status: z.string(),
+  daysLeft: dbNumberSchema,
+});
+
+export type UpcomingGrant = z.infer<typeof upcomingGrantSchema>;
+
+/**
+ * The single `jsonb` object returned by the `dashboard_summary()` RPC.
+ *
+ * A jsonb blob off the network is `unknown`; parsing it once here is what lets
+ * the rest of the dashboard work with real types instead of casts. Unknown keys
+ * are stripped rather than rejected, so the database may grow a new KPI before
+ * the client learns to render it.
+ *
+ * `workOrdersByStatus` and `inventoryByCategory` omit keys with no rows — an
+ * absent key means zero, not missing data.
+ */
+export const dashboardSummarySchema = z.object({
+  generatedAt: z.string(),
+
+  burialsThisMonth: dbCountSchema,
+  burialsLastMonth: dbCountSchema,
+  burialsYTD: dbCountSchema,
+
+  activeContracts: dbCountSchema,
+  contractsValue: dbNumberSchema,
+
+  arOutstanding: dbNumberSchema,
+  unpaidAR: dbCountSchema,
+  overdueAR: dbCountSchema,
+
+  apOutstanding: dbNumberSchema,
+
+  activeWO: dbCountSchema,
+  totalWO: dbCountSchema,
+
+  lowStock: dbCountSchema,
+  totalInventory: dbCountSchema,
+
+  revenue30d: dbNumberSchema,
+  revenuePrior30d: dbNumberSchema,
+
+  workOrdersByStatus: z.record(z.string(), dbCountSchema),
+  inventoryByCategory: z.record(z.string(), dbCountSchema),
+
+  upcomingGrants: z.array(upcomingGrantSchema),
+});
+
+export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+
+/**
+ * Rows from `monthly_burial_trend()` / `monthly_revenue_trend()`.
+ *
+ * These are set-returning functions, not jsonb, so their columns arrive in
+ * snake_case — unlike the summary, which builds camelCase keys in SQL. They are
+ * zero-filled and ordered ascending server-side.
+ */
+export const burialTrendRowSchema = z.object({
+  month_start: z.string(),
+  label: z.string(),
+  burials: dbCountSchema,
+});
+
+export const revenueTrendRowSchema = z.object({
+  month_start: z.string(),
+  label: z.string(),
+  revenue: dbNumberSchema,
+});
+
+export const burialTrendSchema = z.array(burialTrendRowSchema);
+export const revenueTrendSchema = z.array(revenueTrendRowSchema);
+
+export type BurialTrendRow = z.infer<typeof burialTrendRowSchema>;
+export type RevenueTrendRow = z.infer<typeof revenueTrendRowSchema>;
 
 // ============================================
 // VALIDATION HELPERS

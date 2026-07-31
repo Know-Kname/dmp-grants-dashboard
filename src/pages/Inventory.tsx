@@ -16,6 +16,7 @@ import {
   TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, Package, Edit, Trash2, RefreshCw, AlertTriangle, DollarSign } from 'lucide-react';
 import { useToast } from '../lib/toast';
+import { useAuth } from '../lib/auth';
 
 /** Live form state — the input side of `inventoryFormSchema`, so the two cannot drift. */
 type InventoryFormData = z.input<typeof inventoryFormSchema>;
@@ -55,6 +56,15 @@ export default function Inventory() {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   // Seeded from ?q= so other screens can deep-link a specific item
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -131,9 +141,11 @@ export default function Inventory() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingItem(null); setShowModal(true); }}>
-            Add Item
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingItem(null); setShowModal(true); }}>
+              Add Item
+            </Button>
+          )}
         </div>
       </div>
 
@@ -209,7 +221,7 @@ export default function Inventory() {
               icon={<Package size={48} />}
               title="No items found"
               description={searchTerm || categoryFilter !== 'all' || lowStockOnly ? 'Try adjusting your filters' : 'Add your first inventory item'}
-              action={!searchTerm && categoryFilter === 'all' && !lowStockOnly
+              action={canCreate && !searchTerm && categoryFilter === 'all' && !lowStockOnly
                 ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Item</Button>
                 : undefined}
             />
@@ -249,8 +261,12 @@ export default function Inventory() {
                       <td className="px-6 py-4 text-foreground">{formatCurrency(item.unitPrice)}</td>
                       <td className="px-6 py-4 text-foreground-muted">{item.location || '—'}</td>
                       <td className="px-6 py-4 text-right space-x-2">
-                        <button onClick={() => handleEdit(item)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                        <button onClick={() => setDeleteTarget(item)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                        {canEdit && (
+                          <button onClick={() => handleEdit(item)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setDeleteTarget(item)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -285,9 +301,11 @@ export default function Inventory() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
-              {editingItem ? 'Save Changes' : 'Add Item'}
-            </Button>
+            {(editingItem ? canEdit : canCreate) && (
+              <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
+                {editingItem ? 'Save Changes' : 'Add Item'}
+              </Button>
+            )}
           </>
         }
       >

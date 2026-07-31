@@ -18,6 +18,7 @@ import {
 } from '../components/ui';
 import { DataTable, type Column } from '../components/DataTable';
 import { Plus, Search, Building2, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
+import { useAuth } from '../lib/auth';
 
 /** Live form state — the input side of `vendorFormSchema`, so the two cannot drift. */
 type VendorFormData = z.input<typeof vendorFormSchema>;
@@ -45,6 +46,15 @@ export default function Vendors() {
   const [showModal, setShowModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   // Form state + validation. onSubmit only runs once vendorFormSchema parses.
@@ -132,9 +142,11 @@ export default function Vendors() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingVendor(null); setShowModal(true); }}>
-            New Vendor
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingVendor(null); setShowModal(true); }}>
+              New Vendor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -194,7 +206,7 @@ export default function Vendors() {
                 icon={<Building2 size={48} />}
                 title="No vendors found"
                 description={searchTerm ? 'Try a different search term' : 'Add your first vendor to get started'}
-                action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Vendor</Button> : undefined}
+                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Vendor</Button> : undefined}
               />
             </CardBody>
           }
@@ -225,8 +237,12 @@ export default function Vendors() {
             ) },
             { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: v => (
               <span className="space-x-2">
-                <button onClick={() => handleEdit(v)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                <button onClick={() => setDeleteTarget(v)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                {canEdit && (
+                  <button onClick={() => handleEdit(v)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                )}
+                {canDelete && (
+                  <button onClick={() => setDeleteTarget(v)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                )}
               </span>
             ) },
           ] satisfies Column<Vendor>[]}
@@ -252,9 +268,11 @@ export default function Vendors() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
-              {editingVendor ? 'Save Changes' : 'Add Vendor'}
-            </Button>
+            {(editingVendor ? canEdit : canCreate) && (
+              <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
+                {editingVendor ? 'Save Changes' : 'Add Vendor'}
+              </Button>
+            )}
           </>
         }
       >
