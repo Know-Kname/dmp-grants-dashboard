@@ -16,7 +16,7 @@ import { queryKeys } from '../lib/query';
 import { affectedRow, affectedRows, WriteBlockedError } from '../lib/writeResult';
 import { profilesTable, type Profile, type ProfileRow } from '../lib/profiles';
 import { toAppRole, type AppRole } from '../lib/permissions';
-import type { Database, TablesInsert } from '../types/database';
+import type { Database, TablesInsert, TablesUpdate } from '../types/database';
 import type {
   WorkOrder,
   Grant,
@@ -1106,7 +1106,11 @@ export function useUpdateProfile(callbacks?: MutationCallbacks<Profile>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, role, isActive }: { id: string; role?: AppRole; isActive?: boolean }) => {
-      const patch: Record<string, unknown> = {};
+      // Typed against the generated Update shape rather than
+      // Record<string, unknown>: now that `profiles` is in database.ts, an
+      // untyped payload is rejected, which is the generated types earning
+      // their keep. A typo like `is_actve` is a compile error here.
+      const patch: TablesUpdate<'profiles'> = {};
       if (role !== undefined) patch.role = role;
       if (isActive !== undefined) patch.is_active = isActive;
 
