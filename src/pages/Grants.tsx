@@ -15,6 +15,7 @@ import { m, AnimatePresence, staggerContainer, fadeInUp, EASE_LUX } from '../lib
 import { Plus, Search, DollarSign, Calendar, ExternalLink, Gift, Edit, Trash2, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react';
 import { format, differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from '../lib/toast';
+import { useAuth } from '../lib/auth';
 
 type GrantStatus = Grant['status'];
 
@@ -67,6 +68,12 @@ export default function Grants() {
   // React Query hooks
   const { data: grants = [], isLoading, error, refetch } = useGrants();
   const toast = useToast();
+  // Server-side RLS is what enforces these; hiding the controls just avoids
+  // offering an action that would be refused. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
 
   const createMutation = useCreateGrant({
     onSuccess: () => { toast.success('Grant added successfully'); setShowModal(false); resetForm(); },
@@ -241,17 +248,19 @@ export default function Grants() {
           >
             Refresh
           </Button>
-          <Button
-            variant="primary"
-            icon={<Plus size={20} />}
-            onClick={() => {
-              resetForm();
-              setEditingGrant(null);
-              setShowModal(true);
-            }}
-          >
-            Add Grant
-          </Button>
+          {canCreate && (
+            <Button
+              variant="primary"
+              icon={<Plus size={20} />}
+              onClick={() => {
+                resetForm();
+                setEditingGrant(null);
+                setShowModal(true);
+              }}
+            >
+              Add Grant
+            </Button>
+          )}
         </div>
       </div>
 
@@ -358,11 +367,11 @@ export default function Grants() {
               description={searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
                 ? "Try adjusting your filters"
                 : "Add your first grant or funding opportunity"}
-              action={
+              action={canCreate ? (
                 <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>
                   Add Grant
                 </Button>
-              }
+              ) : undefined}
             />
           </CardBody>
         </Card>
@@ -409,7 +418,7 @@ export default function Grants() {
                               )}
                             </div>
                           </button>
-                          {next && (
+                          {next && canEdit && (
                             <button
                               onClick={() => advance(grant, next.to)}
                               disabled={updateMutation.isPending}
@@ -491,7 +500,7 @@ export default function Grants() {
                   <div className="flex items-start gap-3 ml-4 shrink-0">
                     {getStatusBadge(grant.status)}
                     <div className="flex gap-1">
-                      {NEXT_STATUS[grant.status] && (
+                      {NEXT_STATUS[grant.status] && canEdit && (
                         <button
                           onClick={() => advance(grant, NEXT_STATUS[grant.status]!.to)}
                           disabled={updateMutation.isPending}
@@ -501,21 +510,25 @@ export default function Grants() {
                           <ArrowRight size={16} />
                         </button>
                       )}
-                      <button
-                        onClick={() => handleEdit(grant)}
-                        className="p-1.5 text-foreground-muted hover:text-primary hover:bg-primary-50 dark:hover:bg-primary-950 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(grant)}
-                        disabled={deleteMutation.isPending}
-                        className="p-1.5 text-foreground-muted hover:text-danger hover:bg-danger-50 dark:hover:bg-danger-950 rounded-lg transition-colors disabled:opacity-50"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleEdit(grant)}
+                          className="p-1.5 text-foreground-muted hover:text-primary hover:bg-primary-50 dark:hover:bg-primary-950 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => setDeleteTarget(grant)}
+                          disabled={deleteMutation.isPending}
+                          className="p-1.5 text-foreground-muted hover:text-danger hover:bg-danger-50 dark:hover:bg-danger-950 rounded-lg transition-colors disabled:opacity-50"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -553,13 +566,15 @@ export default function Grants() {
             <Button variant="ghost" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => form.handleSubmit()}
-              loading={isMutating}
-            >
-              {editingGrant ? 'Update' : 'Add'}
-            </Button>
+            {(editingGrant ? canEdit : canCreate) && (
+              <Button
+                variant="primary"
+                onClick={() => form.handleSubmit()}
+                loading={isMutating}
+              >
+                {editingGrant ? 'Update' : 'Add'}
+              </Button>
+            )}
           </>
         }
       >

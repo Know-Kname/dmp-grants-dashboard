@@ -18,6 +18,7 @@ import { DataTable, type Column } from '../components/DataTable';
 import { Plus, Search, BookOpen, Edit, Trash2, RefreshCw, Calendar, QrCode, Globe } from 'lucide-react';
 import { isThisMonth } from 'date-fns';
 import QRCode from 'react-qr-code';
+import { useAuth } from '../lib/auth';
 
 /** Live form state — the input side of `burialFormSchema`, so the two cannot drift. */
 type BurialFormData = z.input<typeof burialFormSchema>;
@@ -58,6 +59,15 @@ export default function Burials() {
   const [editingBurial, setEditingBurial] = useState<Burial | null>(null);
   const [qrBurial, setQrBurial] = useState<Burial | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Burial | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   // Seeded from ?q= so other screens can deep-link a specific record
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   // Form state + validation. onSubmit only runs once the schema parses.
@@ -152,9 +162,11 @@ export default function Burials() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingBurial(null); setShowModal(true); }}>
-            Record Burial
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingBurial(null); setShowModal(true); }}>
+              Record Burial
+            </Button>
+          )}
         </div>
       </div>
 
@@ -205,7 +217,7 @@ export default function Burials() {
                 icon={<BookOpen size={48} />}
                 title="No burial records found"
                 description={searchTerm ? 'Try a different search term' : 'Record your first burial to get started'}
-                action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Record Burial</Button> : undefined}
+                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Record Burial</Button> : undefined}
               />
             </CardBody>
           }
@@ -251,8 +263,12 @@ export default function Burials() {
                     <QrCode size={17} />
                   </button>
                 )}
-                <button onClick={() => handleEdit(b)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                <button onClick={() => setDeleteTarget(b)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                {canEdit && (
+                  <button onClick={() => handleEdit(b)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                )}
+                {canDelete && (
+                  <button onClick={() => setDeleteTarget(b)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                )}
               </span>
             ) },
           ] satisfies Column<Burial>[]}
@@ -321,9 +337,11 @@ export default function Burials() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
-              {editingBurial ? 'Save Changes' : 'Record Burial'}
-            </Button>
+            {(editingBurial ? canEdit : canCreate) && (
+              <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
+                {editingBurial ? 'Save Changes' : 'Record Burial'}
+              </Button>
+            )}
           </>
         }
       >

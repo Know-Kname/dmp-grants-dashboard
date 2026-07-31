@@ -173,6 +173,21 @@ export const queryKeys = {
     byContract: (contractId: string) => [...queryKeys.paymentSchedule.all, 'contract', contractId] as const,
   },
 
+  /**
+   * User accounts (`public.profiles`) — the `/users` admin page.
+   *
+   * RLS narrows a SELECT here to the caller's own row unless they are an admin,
+   * so the same key holds "everyone" for an admin and "just me" for anybody
+   * else. That is fine because the cache is cleared on sign-out (see
+   * `signOutEverywhere` in `lib/auth`), which is what stops one user's list
+   * being served to the next.
+   */
+  profiles: {
+    all: ['profiles'] as const,
+    list: () => [...queryKeys.profiles.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.profiles.all, 'detail', id] as const,
+  },
+
   // Cemetery Hierarchy
   cemeteries: {
     all: ['cemeteries'] as const,

@@ -17,6 +17,7 @@ import {
 import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
 import { Plus, Search, Edit, Trash2, ClipboardList, Calendar, RefreshCw, AlertCircle, ArrowRight, User } from 'lucide-react';
 import { format, isThisMonth, startOfDay } from 'date-fns';
+import { useAuth } from '../lib/auth';
 
 /** Left color rail per priority on kanban cards. */
 const PRIORITY_RAIL: Record<WorkOrder['priority'], string> = {
@@ -119,6 +120,15 @@ export default function WorkOrders() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [view, setView] = useState<'table' | 'board'>('table');
   const [deleteTarget, setDeleteTarget] = useState<WorkOrder | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   // Form state + validation. onSubmit only runs once the schema parses.
   const form = useForm({
     schema: workOrderFormSchema,
@@ -199,9 +209,11 @@ export default function WorkOrders() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingOrder(null); setShowModal(true); }}>
-            New Work Order
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingOrder(null); setShowModal(true); }}>
+              New Work Order
+            </Button>
+          )}
         </div>
       </div>
 
@@ -254,7 +266,7 @@ export default function WorkOrders() {
               description={searchTerm || statusFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Create your first work order to get started'}
-              action={
+              action={canCreate && 
                 <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>
                   New Work Order
                 </Button>
@@ -309,7 +321,7 @@ export default function WorkOrders() {
                               )}
                             </div>
                           </button>
-                          {next && (
+                          {next && canEdit && (
                             <button
                               onClick={() => moveTo(wo, next.to)}
                               disabled={updateMutation.isPending}
@@ -380,12 +392,16 @@ export default function WorkOrders() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => handleEdit(wo)} className="text-primary hover:text-primary-hover transition-colors" aria-label="Edit">
-                          <Edit size={16} />
-                        </button>
-                        <button onClick={() => setDeleteTarget(wo)} className="text-danger hover:text-danger-hover transition-colors" aria-label="Delete">
-                          <Trash2 size={16} />
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => handleEdit(wo)} className="text-primary hover:text-primary-hover transition-colors" aria-label="Edit">
+                            <Edit size={16} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setDeleteTarget(wo)} className="text-danger hover:text-danger-hover transition-colors" aria-label="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -414,9 +430,11 @@ export default function WorkOrders() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" onClick={() => form.handleSubmit()} loading={isMutating}>
-              {editingOrder ? 'Save Changes' : 'Create'}
-            </Button>
+            {(editingOrder ? canEdit : canCreate) && (
+              <Button variant="primary" onClick={() => form.handleSubmit()} loading={isMutating}>
+                {editingOrder ? 'Save Changes' : 'Create'}
+              </Button>
+            )}
           </>
         }
       >
