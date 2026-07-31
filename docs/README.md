@@ -33,6 +33,8 @@ Read in this order:
 | 11 | [Design System](11-design-system.md) | Colors, components, dark mode, Tailwind tokens |
 | 12 | [Roadmap](12-roadmap.md) | Upcoming features, known limitations |
 | 13 | [CI & Database Operations](13-ci-and-database-operations.md) | Required Actions secrets, drift check, repo↔production DB divergence |
+| 14 | [Auth Platform Evaluation](14-auth-platform-evaluation.md) | Clerk vs Supabase vs Azure vs others — decision record and recommendation |
+| 15 | [Data Import](15-data-import.md) | What real DMP data is loaded, from which export, and how to undo it |
 
 ---
 

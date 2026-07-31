@@ -15,5 +15,11 @@ coverage
 supabase/.temp
 supabase/.branches
 
+# Local staging for the DMP CSV exports. These hold real deceased and
+# next-of-kin names and this repo is public — never commit them.
+# See docs/15-data-import.md.
+scripts/import/data/
+scripts/import/sql/
+
 # Agent worktrees (transient)
 .claude/worktrees/
