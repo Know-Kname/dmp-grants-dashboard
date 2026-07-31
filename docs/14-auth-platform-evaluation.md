@@ -5,6 +5,15 @@
 **Evaluated 2026-07-30.** Pricing and feature tiers change without notice; re-check every
 dollar figure against the linked source before anyone budgets against it.
 
+> **Status update, 2026-07-31.** The RBAC workstream recommended below (see
+> [RBAC and audit](#rbac-and-audit-a-separate-workstream)) has since shipped in #91:
+> `profiles.role`, the `current_app_role()` / `can_write()` / `is_admin()` helpers, and
+> per-operation policies on all 16 business tables. The "authorization is flat" findings
+> below describe the codebase **as evaluated on 2026-07-30** and are deliberately left as
+> written, because they are what drove the recommendation — but they no longer describe
+> `main`. The auth *platform* recommendation (keep Supabase as issuer, add Entra ID as an
+> OAuth provider) is unaffected and still open.
+
 ---
 
 ## Table of Contents

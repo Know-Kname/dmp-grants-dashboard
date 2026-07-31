@@ -123,11 +123,25 @@ pair well-formed. The provenance columns exist for exactly this purpose.
 ## Access note
 
 The database now holds real deceased names, next-of-kin names and burial
-locations. Every RLS policy on these tables is
-`FOR ALL TO authenticated USING (true) WITH CHECK (true)`, `auth.uid()` appears
-in no migration, and there is no audit log. Any authenticated account can read
-and write all of it.
+locations.
 
-The exposure is bounded only by there being a single account. Keep account
-creation closed until the RBAC work lands — see
-`docs/14-auth-platform-evaluation.md`.
+Role-based access control landed in #91 while this import was being written, so
+the flat `FOR ALL TO authenticated USING (true)` policies are gone. Each table
+now carries per-operation policies backed by `public.current_app_role()`, with
+`profiles.role` in `('admin', 'staff', 'readonly')` as the authoritative source
+— never `user_metadata`, which the user can write. `can_write()` gates INSERT,
+UPDATE and DELETE to `admin` and `staff`. This import ran under an `admin`
+account, which is why it was permitted; `load.py` authenticates as a normal
+user and gets no special treatment.
+
+Two things are still worth knowing before more accounts exist:
+
+- **`readonly` still reads everything.** The role split governs writes much more
+  than reads, so any active account can see every deceased and next-of-kin
+  record. New accounts default to `readonly`, which bounds what they can change
+  but not what they can see.
+- **There is still no audit log.** Nothing records who read or altered a row.
+
+See `supabase/migrations/20260731003232_rbac_profiles_role_helpers_and_per_operation_rls.sql`
+for the policy definitions and `docs/14-auth-platform-evaluation.md` for how the
+model was chosen.
