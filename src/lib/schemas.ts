@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { APP_ROLES, type AppRole } from './permissions';
 
 // ============================================
 // COMMON SCHEMAS
@@ -313,6 +314,37 @@ export const payableFormSchema = z.object({
 });
 
 export type PayableFormData = z.infer<typeof payableFormSchema>;
+
+// ============================================
+// USER ACCOUNT SCHEMAS
+// ============================================
+
+/**
+ * The three values `profiles.role` may hold.
+ *
+ * Duplicating the union from `./permissions` would let the two drift, so this
+ * is built from `APP_ROLES` and pinned to `AppRole` by `satisfies` below — a
+ * fourth role added there is a compile error here until it is handled.
+ */
+export const appRoleSchema = z.enum(APP_ROLES, {
+  errorMap: () => ({ message: 'Select a role' }),
+}) satisfies z.ZodType<AppRole>;
+
+/**
+ * The admin form on `/users`.
+ *
+ * `isActive` is `'true' | 'false'` on the way in because it is bound to a
+ * `<Select>`, which can only hold a string, and a boolean on the way out
+ * because that is what the `is_active` column takes. Same reason `amount` is a
+ * string-in/number-out union on the money forms — see `useForm`'s two type
+ * parameters.
+ */
+export const userAccountFormSchema = z.object({
+  role: appRoleSchema,
+  isActive: z.enum(['true', 'false']).transform((v) => v === 'true'),
+});
+
+export type UserAccountFormData = z.infer<typeof userAccountFormSchema>;
 
 // ============================================
 // AUTH SCHEMAS

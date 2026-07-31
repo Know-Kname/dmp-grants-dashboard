@@ -1,0 +1,22 @@
+-- Take the auth trigger function out of the exposed API surface.
+--
+-- Supabase's advisor flagged `public.handle_new_user()` as callable by both
+-- `anon` and `authenticated` via `/rest/v1/rpc/handle_new_user`. It is a
+-- trigger function -- invoking it directly errors -- but a SECURITY DEFINER
+-- function reachable by anonymous callers has no reason to be reachable, and
+-- "it happens to fail" is not access control.
+--
+-- The trigger itself is unaffected: triggers execute the function as the table
+-- owner, not as the caller, so revoking EXECUTE from the API roles does not
+-- stop `on_auth_user_created` from firing.
+--
+-- Deliberately NOT revoked: current_app_role(), is_active_user(), can_write()
+-- and is_admin(). The advisor flags those too, but the grants are REQUIRED --
+-- verified empirically on a local replay, where revoking EXECUTE from
+-- `authenticated` made every policy-protected query fail with
+-- "permission denied for function is_active_user". RLS policy expressions are
+-- evaluated with the calling user's privileges, so the role that queries the
+-- table must be able to execute the helpers its policies call. They disclose
+-- only the caller's own role, which the UI already shows them.
+
+revoke all on function public.handle_new_user() from public, anon, authenticated;

@@ -1,6 +1,6 @@
 # 06 — Supabase Guide
 
-> **TL;DR:** Supabase is a cloud PostgreSQL database with a built-in REST API, real-time subscriptions, and auth. The app talks to it directly from the browser using the `@supabase/supabase-js` library. Row-Level Security (RLS) is what controls who can read or write what — the frontend enforces nothing itself.
+> **TL;DR:** Supabase is a cloud PostgreSQL database with a built-in REST API, real-time subscriptions, and auth. The app talks to it directly from the browser using the `@supabase/supabase-js` library. Row-Level Security (RLS) is what controls who can read or write what — the frontend enforces nothing itself. Roles (`admin` / `staff` / `readonly`) live in `public.profiles`, **never** in `user_metadata`.
 
 ---
 
@@ -9,6 +9,7 @@
 - [Accessing the dashboard](#accessing-the-dashboard)
 - [The database tables](#the-database-tables)
 - [Authentication](#authentication)
+- [Provisioning a new user (the current process)](#provisioning-a-new-user-the-current-process)
 - [Supabase dashboard configuration checklist](#supabase-dashboard-configuration-checklist)
 - [Row-Level Security (RLS)](#row-level-security-rls)
 - [How the app talks to Supabase](#how-the-app-talks-to-supabase)
@@ -80,9 +81,18 @@ The app has 16 tables. Each one maps to a module in the UI.
 | `graves` | Cemeteries | Individual graves within a lot — GPS-taggable, status-tracked |
 | `payment_schedule` | Contracts | Installment schedule for pre-need contracts |
 
-There is no `users` table — staff accounts live in Supabase's built-in `auth.users`.
-An earlier `public.users` table (a redundant, zero-row mirror with no application
-reads) was dropped via migration; don't recreate it.
+Plus one table that is not a business module:
+
+| Table | Module | What it stores |
+|---|---|---|
+| `profiles` | Users & Access | One row per auth user: `role`, `is_active`, name, email |
+
+There is no `users` table — staff accounts live in Supabase's built-in `auth.users`,
+and `public.profiles` is the thin, RLS-protected companion that holds their role. An
+earlier `public.users` table (a redundant, zero-row mirror with no application reads)
+was dropped via migration; don't recreate it. `profiles` is not that table: it is
+written only by a trigger and by admins, and every RLS policy in the database reads
+from it.
 
 **Column naming:** All columns use `snake_case` (e.g. `first_name`, `burial_date`, `created_at`). The JavaScript code uses `camelCase` (`firstName`, `burialDate`, `createdAt`). The `api.ts` layer converts between them automatically.
 
@@ -121,30 +131,63 @@ Supabase Auth handles user logins. There are two accounts of interest:
 
 ### Real user login
 
-Staff accounts are Supabase Auth users, with `role` stored in `user_metadata` (e.g.
-`admin`). Ask a Supabase project admin to create you an account (Authentication →
-Users → "Add user") rather than relying on any credential written down in a doc —
-none are recorded in this file, and if you find one committed anywhere in this repo's
-history, treat it as compromised and rotate it immediately.
+Staff accounts are Supabase Auth users. Ask a Supabase project admin to create you an
+account rather than relying on any credential written down in a doc — none are
+recorded in this file, and if you find one committed anywhere in this repo's history,
+treat it as compromised and rotate it immediately.
 
-To add another user:
-1. Supabase dashboard → Authentication → Users → "Add user"
-2. Enter email and password
-3. The user can then sign in to the app
-4. To set their `name` and `role`, use SQL:
-   ```sql
-   UPDATE auth.users
-   SET raw_user_meta_data = '{"name": "Jane Smith", "role": "staff"}'::jsonb
-   WHERE email = 'jsmith@detroitmemorialpark.com';
-   ```
+> ⚠️ **`user_metadata.role` is dead and must never come back.** Roles used to live in
+> `auth.users.raw_user_meta_data`. That field is writable **by the user themselves**
+> — any signed-in staff member could call `supabase.auth.updateUser({ data: { role:
+> 'admin' } })` from the browser console and promote themselves. The role now lives
+> in `public.profiles.role`, which only an admin can write (RLS). Nothing anywhere
+> may read a role from `user_metadata` again.
 
-> **Note — forgotten passwords no longer need an admin.** Staff can reset their own
+### Provisioning a new user (the current process)
+
+There is **no invite button in the app**, and this is deliberate: creating an auth
+user requires the `service_role` key, which must never reach the browser bundle. Until
+that lives in an edge function, provisioning is a dashboard task.
+
+1. **Supabase dashboard → Authentication → Users → "Invite user"**
+   (or **"Add user"** → *Create new user* if you want to set a password directly
+   rather than email them a link).
+2. Enter their work email address. Supabase emails them an invitation link; they set
+   their own password by following it.
+3. **A trigger on `auth.users` automatically creates their `public.profiles` row**,
+   with `role = 'readonly'` and `is_active = true`. There is nothing to run by hand —
+   and nothing you *can* run by hand, since `INSERT` on `profiles` is closed to the
+   API entirely.
+4. **Promote them.** Sign in as an admin, open **Users & Access** (`/users`, visible in
+   the sidebar to admins only), and set their role:
+
+   | Role | May do |
+   |---|---|
+   | `admin` | Everything, including deleting records and managing user accounts |
+   | `staff` | View, add and edit records — but **not** delete them |
+   | `readonly` | View records only |
+
+5. That is it. The new role takes effect on their next page load.
+
+**Removing access.** Use **Deactivate** on `/users` — it sets `is_active = false`,
+which RLS reads as "may select nothing", and the app then shows them an *Account
+deactivated* notice instead of an app full of empty tables. Their sign-in still works,
+so reactivating is one click. Delete the auth user in the dashboard only when you want
+the account gone for good; that cascades and removes the profile row with it.
+
+**Editing a role by SQL** (if `/users` is unreachable — e.g. nobody is an admin yet):
+```sql
+UPDATE public.profiles
+SET role = 'admin', full_name = 'Jane Smith'
+WHERE email = 'jsmith@detroitmemorialpark.com';
+```
+Run it from the SQL editor, which uses the `service_role` connection and so bypasses
+RLS. This is the bootstrap path for the very first administrator.
+
+> **Note — forgotten passwords do not need an admin.** Staff can reset their own
 > password from the app: **Forgot password?** on the login page → `/forgot-password`
 > → emailed link → `/reset-password` (12-character minimum). Only *creating* an
-> account still requires the steps above.
->
-> A proper admin invite UI is planned; until then the dashboard + SQL flow above is
-> the current process, and there is deliberately no self-service sign-up in the app.
+> account needs the steps above, and there is deliberately no self-service sign-up.
 
 ### How the JWT session works
 
@@ -264,24 +307,48 @@ both wrong and unactionable.
 
 RLS policies are SQL rules attached to a table. When any request comes in, PostgreSQL evaluates the policy for that user. If the policy doesn't return `true`, the operation is denied.
 
-### The actual policy this app uses
+### The actual policies this app uses
 
-Every table uses the same **one** flat policy — not separate per-operation policies:
+Every business table has **per-operation** policies, keyed on the caller's role in
+`public.profiles` through four SQL helpers — `current_app_role()`, `is_active_user()`,
+`can_write()` and `is_admin()`:
 
-```sql
-CREATE POLICY "auth_all" ON public.TABLE_NAME
-  FOR ALL TO authenticated
-  USING (true) WITH CHECK (true);
+| Operation | Who |
+|---|---|
+| `SELECT` | any **active** profile (`is_active = true`) |
+| `INSERT` | `admin` or `staff` |
+| `UPDATE` | `admin` or `staff` |
+| `DELETE` | `admin` only |
+
+`profiles` itself is stricter: you may `SELECT` your own row, admins may `SELECT` all
+rows and `UPDATE` any row, and `INSERT`/`DELETE` are **closed to the API entirely** —
+rows arrive via the `auth.users` trigger and leave when the auth user is deleted.
+
+Measured behaviour, per role:
+
+```
+admin       select=yes insert=yes  update=yes delete=yes
+staff       select=yes insert=yes  update=yes delete=NO (0 rows)
+readonly    select=yes insert=DENY update=0   delete=0
+deactivated select=NO  insert=DENY update=0   delete=0
 ```
 
-This is a deliberate, documented design choice (see the header of migration
-`20260506002815_enable_rls_all_business_tables.sql` and `RUNBOOK.md`'s "RLS Policy
-Reference" section) — not an oversight. DMP CMS has no public user accounts; every
-authenticated session is a staff member who was issued credentials, so **any
-authenticated user currently has full read/write access to every table.** There is no
-role-based restriction anywhere in the database today, despite `User.role` existing as
-a client-side TypeScript field — RBAC is a tracked future improvement, not something
-partially built (see [docs/12-roadmap.md](12-roadmap.md)).
+> ⚠️ **Read that table carefully: refusal looks different per verb.** An `INSERT`
+> blocked by a `WITH CHECK` clause raises an error the client sees. A blocked `UPDATE`
+> or `DELETE` is filtered by a `USING` clause *before* it runs, so it matches nothing
+> and returns **`200 OK` with zero rows — no error at all**. Without care, a `staff`
+> user clicking Delete watches the row vanish optimistically and reappear on the next
+> refetch, and nothing anywhere reports a problem.
+>
+> That is why every UPDATE and DELETE in `src/hooks/useData.ts` ends in `.select()`
+> and passes the result through `affectedRows()` from `src/lib/writeResult.ts`, which
+> turns an empty result into a `WriteBlockedError` with a message naming the likely
+> cause. **Any new mutation must do the same.**
+
+The client mirrors this table in `src/lib/permissions.ts` so the UI can hide actions a
+user cannot perform. That file is a *mirror*, not a boundary — the database is what
+enforces access. When these policies change, change `permissions.ts` and its test in
+the same commit.
 
 **One exception:** `burials` also carries an anonymous-read policy, which is what
 powers the public `/memorial/:id` pages:
@@ -313,12 +380,21 @@ If a table has **no policies**, it depends on whether RLS is enabled:
 - RLS **disabled** → all operations allowed for all users (risky!)
 - RLS **enabled** with no policies → all operations **blocked** (safe but non-functional)
 
-**The policy to add for any new table** (matching every existing table):
+**The policies to add for any new business table** (matching every existing one):
 ```sql
 ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "auth_all" ON public.new_table
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "read_active"   ON public.new_table
+  FOR SELECT TO authenticated USING (is_active_user());
+CREATE POLICY "insert_writer" ON public.new_table
+  FOR INSERT TO authenticated WITH CHECK (can_write());
+CREATE POLICY "update_writer" ON public.new_table
+  FOR UPDATE TO authenticated USING (can_write()) WITH CHECK (can_write());
+CREATE POLICY "delete_admin"  ON public.new_table
+  FOR DELETE TO authenticated USING (is_admin());
 ```
+A single `FOR ALL … USING (true)` policy is **not** acceptable any more: it would
+silently re-grant delete to every role on that one table.
 
 ---
 

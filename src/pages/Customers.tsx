@@ -18,6 +18,7 @@ import {
 import { DataTable, type Column } from '../components/DataTable';
 import { Plus, Search, Users, Edit, Trash2, RefreshCw, Mail, Phone } from 'lucide-react';
 import { useToast } from '../lib/toast';
+import { useAuth } from '../lib/auth';
 
 /** Live form state — the input side of `customerFormSchema`, so the two cannot drift. */
 type CustomerFormData = z.input<typeof customerFormSchema>;
@@ -46,6 +47,15 @@ export default function Customers() {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '');
   // Form state + validation. onSubmit only runs once customerFormSchema parses.
@@ -141,9 +151,11 @@ export default function Customers() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingCustomer(null); setShowModal(true); }}>
-            New Customer
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingCustomer(null); setShowModal(true); }}>
+              New Customer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -203,7 +215,7 @@ export default function Customers() {
                 icon={<Users size={48} />}
                 title="No customers found"
                 description={searchTerm ? 'Try a different search term' : 'Add your first customer to get started'}
-                action={!searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Customer</Button> : undefined}
+                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Customer</Button> : undefined}
               />
             </CardBody>
           }
@@ -232,8 +244,12 @@ export default function Customers() {
             ) },
             { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: c => (
               <span className="space-x-2">
-                <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
-                <button onClick={() => setDeleteTarget(c)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                {canEdit && (
+                  <button onClick={() => handleEdit(c)} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={17} /></button>
+                )}
+                {canDelete && (
+                  <button onClick={() => setDeleteTarget(c)} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={17} /></button>
+                )}
               </span>
             ) },
           ] satisfies Column<Customer>[]}
@@ -259,9 +275,11 @@ export default function Customers() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
-              {editingCustomer ? 'Save Changes' : 'Add Customer'}
-            </Button>
+            {(editingCustomer ? canEdit : canCreate) && (
+              <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
+                {editingCustomer ? 'Save Changes' : 'Add Customer'}
+              </Button>
+            )}
           </>
         }
       >

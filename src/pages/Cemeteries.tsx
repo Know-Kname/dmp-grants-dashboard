@@ -1,3 +1,4 @@
+import { useAuth } from '../lib/auth';
 import { useState, useMemo, lazy, Suspense } from 'react';
 import {
   useCemeteries, useCreateCemetery, useUpdateCemetery, useDeleteCemetery,
@@ -155,6 +156,15 @@ export default function Cemeteries() {
 
   // Delete confirmation (shared across all four levels)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  const canEdit = can('update');
+  const canDelete = can('delete');
+
   const deletePending =
     deleteCemetery.isPending || deleteSection.isPending || deleteLot.isPending || deleteGrave.isPending;
 
@@ -199,22 +209,22 @@ export default function Cemeteries() {
           >
             Refresh
           </Button>
-          {level === 'cemeteries' && (
+          {level === 'cemeteries' && canCreate && (
             <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setCemeteryForm(emptyCemeteryForm); setEditingCemetery(null); setShowCemeteryModal(true); }}>
               New Cemetery
             </Button>
           )}
-          {level === 'sections' && (
+          {level === 'sections' && canCreate && (
             <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setSectionForm(emptySectionForm); setEditingSection(null); setShowSectionModal(true); }}>
               New Section
             </Button>
           )}
-          {level === 'lots' && (
+          {level === 'lots' && canCreate && (
             <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setLotForm(emptyLotForm); setEditingLot(null); setShowLotModal(true); }}>
               New Lot
             </Button>
           )}
-          {level === 'graves' && (
+          {level === 'graves' && canCreate && (
             <Button variant="primary" icon={<Plus size={20} />} onClick={() => { setGraveForm(emptyGraveForm); setEditingGrave(null); setShowGraveModal(true); }}>
               New Grave
             </Button>
@@ -281,7 +291,7 @@ export default function Cemeteries() {
                   icon={<Map size={48} />}
                   title="No cemeteries yet"
                   description="Add your cemetery locations to start managing plots and graves"
-                  action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowCemeteryModal(true)}>Add Cemetery</Button>}
+                  action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowCemeteryModal(true)}>Add Cemetery</Button>}
                 />
               </CardBody>
             </Card>
@@ -304,8 +314,12 @@ export default function Cemeteries() {
                       </div>
                     </button>
                     <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border">
-                      <button onClick={(e) => { e.stopPropagation(); setEditingCemetery(c); setCemeteryForm({ name: c.name, address: c.address ?? '', city: c.city ?? '', state: c.state ?? '', zip: c.zip ?? '', phone: c.phone ?? '', notes: c.notes ?? '' }); setShowCemeteryModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'cemetery', id: c.id, name: c.name }); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                      {canEdit && (
+                        <button onClick={(e) => { e.stopPropagation(); setEditingCemetery(c); setCemeteryForm({ name: c.name, address: c.address ?? '', city: c.city ?? '', state: c.state ?? '', zip: c.zip ?? '', phone: c.phone ?? '', notes: c.notes ?? '' }); setShowCemeteryModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
+                      )}
+                      {canDelete && (
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'cemetery', id: c.id, name: c.name }); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                      )}
                     </div>
                   </CardBody>
                 </Card>
@@ -330,7 +344,7 @@ export default function Cemeteries() {
                   icon={<Map size={48} />}
                   title="No sections yet"
                   description="Add sections to organize this cemetery's plots"
-                  action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowSectionModal(true)}>Add Section</Button>}
+                  action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowSectionModal(true)}>Add Section</Button>}
                 />
               </CardBody>
             </Card>
@@ -355,8 +369,12 @@ export default function Cemeteries() {
                       </div>
                     </button>
                     <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border">
-                      <button onClick={(e) => { e.stopPropagation(); setEditingSection(s); setSectionForm({ name: s.name, description: s.description ?? '', capacity: s.capacity != null ? String(s.capacity) : '' }); setShowSectionModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'section', id: s.id, name: s.name }); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                      {canEdit && (
+                        <button onClick={(e) => { e.stopPropagation(); setEditingSection(s); setSectionForm({ name: s.name, description: s.description ?? '', capacity: s.capacity != null ? String(s.capacity) : '' }); setShowSectionModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
+                      )}
+                      {canDelete && (
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ kind: 'section', id: s.id, name: s.name }); }} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                      )}
                     </div>
                   </CardBody>
                 </Card>
@@ -381,7 +399,7 @@ export default function Cemeteries() {
                   icon={<Map size={48} />}
                   title="No lots yet"
                   description="Add lots to this section to start adding individual graves"
-                  action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowLotModal(true)}>Add Lot</Button>}
+                  action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowLotModal(true)}>Add Lot</Button>}
                 />
               </CardBody>
             </Card>
@@ -402,8 +420,12 @@ export default function Cemeteries() {
                         <td className="px-6 py-4 font-mono font-medium text-foreground">{lot.lotNumber}</td>
                         <td className="px-6 py-4 text-foreground-muted">{lot.description || '—'}</td>
                         <td className="px-6 py-4 text-right space-x-2" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => { setEditingLot(lot); setLotForm({ lotNumber: lot.lotNumber, description: lot.description ?? '' }); setShowLotModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                          <button onClick={() => setDeleteTarget({ kind: 'lot', id: lot.id, name: `Lot ${lot.lotNumber}` })} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                          {canEdit && (
+                            <button onClick={() => { setEditingLot(lot); setLotForm({ lotNumber: lot.lotNumber, description: lot.description ?? '' }); setShowLotModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => setDeleteTarget({ kind: 'lot', id: lot.id, name: `Lot ${lot.lotNumber}` })} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -465,7 +487,7 @@ export default function Cemeteries() {
                   icon={<Map size={48} />}
                   title="No graves yet"
                   description="Add individual grave spaces to this lot"
-                  action={<Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowGraveModal(true)}>Add Grave</Button>}
+                  action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowGraveModal(true)}>Add Grave</Button>}
                 />
               </CardBody>
             </Card>
@@ -496,8 +518,12 @@ export default function Cemeteries() {
                         </td>
                         <td className="px-6 py-4 text-foreground-muted">{g.notes || '—'}</td>
                         <td className="px-6 py-4 text-right space-x-2">
-                          <button onClick={() => { setEditingGrave(g); setGraveForm({ graveNumber: g.graveNumber, status: g.status, lat: g.lat != null ? String(g.lat) : '', lng: g.lng != null ? String(g.lng) : '', notes: g.notes ?? '' }); setShowGraveModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
-                          <button onClick={() => setDeleteTarget({ kind: 'grave', id: g.id, name: `Grave ${g.graveNumber}` })} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                          {canEdit && (
+                            <button onClick={() => { setEditingGrave(g); setGraveForm({ graveNumber: g.graveNumber, status: g.status, lat: g.lat != null ? String(g.lat) : '', lng: g.lng != null ? String(g.lng) : '', notes: g.notes ?? '' }); setShowGraveModal(true); }} className="text-primary hover:text-primary-hover" aria-label="Edit"><Edit size={16} /></button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => setDeleteTarget({ kind: 'grave', id: g.id, name: `Grave ${g.graveNumber}` })} className="text-danger hover:text-danger-hover" aria-label="Delete"><Trash2 size={16} /></button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -536,17 +562,19 @@ export default function Cemeteries() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowCemeteryModal(false)}>Cancel</Button>
-            <Button
-              variant="primary"
-              loading={createCemetery.isPending || updateCemetery.isPending}
-              onClick={() => {
-                const data = { name: cemeteryForm.name, address: cemeteryForm.address || undefined, city: cemeteryForm.city || undefined, state: cemeteryForm.state || undefined, zip: cemeteryForm.zip || undefined, phone: cemeteryForm.phone || undefined, notes: cemeteryForm.notes || undefined };
-                if (editingCemetery) updateCemetery.mutate({ id: editingCemetery.id, ...data });
-                else createCemetery.mutate(data as Omit<Cemetery, 'id' | 'createdAt' | 'updatedAt'>);
-              }}
-            >
-              {editingCemetery ? 'Save' : 'Add Cemetery'}
-            </Button>
+            {(editingCemetery ? canEdit : canCreate) && (
+              <Button
+                variant="primary"
+                loading={createCemetery.isPending || updateCemetery.isPending}
+                onClick={() => {
+                  const data = { name: cemeteryForm.name, address: cemeteryForm.address || undefined, city: cemeteryForm.city || undefined, state: cemeteryForm.state || undefined, zip: cemeteryForm.zip || undefined, phone: cemeteryForm.phone || undefined, notes: cemeteryForm.notes || undefined };
+                  if (editingCemetery) updateCemetery.mutate({ id: editingCemetery.id, ...data });
+                  else createCemetery.mutate(data as Omit<Cemetery, 'id' | 'createdAt' | 'updatedAt'>);
+                }}
+              >
+                {editingCemetery ? 'Save' : 'Add Cemetery'}
+              </Button>
+            )}
           </>
         }
       >
@@ -572,18 +600,20 @@ export default function Cemeteries() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowSectionModal(false)}>Cancel</Button>
-            <Button
-              variant="primary"
-              loading={createSection.isPending || updateSection.isPending}
-              onClick={() => {
-                if (!selectedCemetery) return;
-                const data = { cemeteryId: selectedCemetery.id, name: sectionForm.name, description: sectionForm.description || undefined, capacity: sectionForm.capacity ? parseInt(sectionForm.capacity) : undefined };
-                if (editingSection) updateSection.mutate({ id: editingSection.id, ...data });
-                else createSection.mutate(data as Omit<Section, 'id' | 'createdAt' | 'updatedAt'>);
-              }}
-            >
-              {editingSection ? 'Save' : 'Add Section'}
-            </Button>
+            {(editingSection ? canEdit : canCreate) && (
+              <Button
+                variant="primary"
+                loading={createSection.isPending || updateSection.isPending}
+                onClick={() => {
+                  if (!selectedCemetery) return;
+                  const data = { cemeteryId: selectedCemetery.id, name: sectionForm.name, description: sectionForm.description || undefined, capacity: sectionForm.capacity ? parseInt(sectionForm.capacity) : undefined };
+                  if (editingSection) updateSection.mutate({ id: editingSection.id, ...data });
+                  else createSection.mutate(data as Omit<Section, 'id' | 'createdAt' | 'updatedAt'>);
+                }}
+              >
+                {editingSection ? 'Save' : 'Add Section'}
+              </Button>
+            )}
           </>
         }
       >
@@ -603,18 +633,20 @@ export default function Cemeteries() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowLotModal(false)}>Cancel</Button>
-            <Button
-              variant="primary"
-              loading={createLot.isPending || updateLot.isPending}
-              onClick={() => {
-                if (!selectedSection) return;
-                const data = { sectionId: selectedSection.id, lotNumber: lotForm.lotNumber, description: lotForm.description || undefined };
-                if (editingLot) updateLot.mutate({ id: editingLot.id, ...data });
-                else createLot.mutate(data as Omit<Lot, 'id' | 'createdAt' | 'updatedAt'>);
-              }}
-            >
-              {editingLot ? 'Save' : 'Add Lot'}
-            </Button>
+            {(editingLot ? canEdit : canCreate) && (
+              <Button
+                variant="primary"
+                loading={createLot.isPending || updateLot.isPending}
+                onClick={() => {
+                  if (!selectedSection) return;
+                  const data = { sectionId: selectedSection.id, lotNumber: lotForm.lotNumber, description: lotForm.description || undefined };
+                  if (editingLot) updateLot.mutate({ id: editingLot.id, ...data });
+                  else createLot.mutate(data as Omit<Lot, 'id' | 'createdAt' | 'updatedAt'>);
+                }}
+              >
+                {editingLot ? 'Save' : 'Add Lot'}
+              </Button>
+            )}
           </>
         }
       >
@@ -633,18 +665,20 @@ export default function Cemeteries() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowGraveModal(false)}>Cancel</Button>
-            <Button
-              variant="primary"
-              loading={createGrave.isPending || updateGrave.isPending}
-              onClick={() => {
-                if (!selectedLot) return;
-                const data = { lotId: selectedLot.id, graveNumber: graveForm.graveNumber, status: graveForm.status, lat: graveForm.lat ? parseFloat(graveForm.lat) : undefined, lng: graveForm.lng ? parseFloat(graveForm.lng) : undefined, notes: graveForm.notes || undefined };
-                if (editingGrave) updateGrave.mutate({ id: editingGrave.id, ...data });
-                else createGrave.mutate(data as Omit<Grave, 'id' | 'createdAt' | 'updatedAt'>);
-              }}
-            >
-              {editingGrave ? 'Save' : 'Add Grave'}
-            </Button>
+            {(editingGrave ? canEdit : canCreate) && (
+              <Button
+                variant="primary"
+                loading={createGrave.isPending || updateGrave.isPending}
+                onClick={() => {
+                  if (!selectedLot) return;
+                  const data = { lotId: selectedLot.id, graveNumber: graveForm.graveNumber, status: graveForm.status, lat: graveForm.lat ? parseFloat(graveForm.lat) : undefined, lng: graveForm.lng ? parseFloat(graveForm.lng) : undefined, notes: graveForm.notes || undefined };
+                  if (editingGrave) updateGrave.mutate({ id: editingGrave.id, ...data });
+                  else createGrave.mutate(data as Omit<Grave, 'id' | 'createdAt' | 'updatedAt'>);
+                }}
+              >
+                {editingGrave ? 'Save' : 'Add Grave'}
+              </Button>
+            )}
           </>
         }
       >

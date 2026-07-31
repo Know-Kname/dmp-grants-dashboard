@@ -14,7 +14,7 @@
  * boundary between the two. Both are needed — this file keeps the schema honest,
  * `index.ts` keeps the components readable.
  *
- * Last generated: 2026-07-30 (16 tables, post Phase 1: provenance columns,
+ * Last generated: 2026-07-31 (17 tables, post Phase 6 RBAC: profiles).
  * NOT NULL timestamptz created_at/updated_at).
  */
 
@@ -720,6 +720,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_active: boolean
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       sections: {
         Row: {

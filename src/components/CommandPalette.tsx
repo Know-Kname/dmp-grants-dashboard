@@ -9,10 +9,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Search, CornerDownLeft, Moon, Sun } from 'lucide-react';
-import { NAV_ITEMS } from '../config/nav';
+import { navItemsFor } from '../config/nav';
 import { fuzzyScore } from '../lib/fuzzy';
 import { queryKeys } from '../lib/query';
 import { useTheme } from '../lib/theme';
+import { useAuth } from '../lib/auth';
 import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
 import type { Burial, Customer, Grant, Vendor, WorkOrder } from '../types';
 
@@ -31,6 +32,9 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { resolvedTheme, setTheme } = useTheme();
+  // The palette is a second way into every page, so it has to respect the same
+  // role filter the sidebar does — otherwise ⌘K is a bypass for the nav.
+  const { role } = useAuth();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +56,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       navigate(path);
     };
 
-    const pages: PaletteItem[] = NAV_ITEMS.map((n) => ({
+    const pages: PaletteItem[] = navItemsFor(role).map((n) => ({
       id: `page:${n.path}`,
       group: 'Pages',
       label: n.label,

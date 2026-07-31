@@ -11,11 +11,13 @@
  * There is no `signUp`. Accounts are provisioned by an admin (see docs/06-supabase.md);
  * self-service registration on a staff tool for a private cemetery is not wanted.
  */
-import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react"
 import { User, Session } from "@supabase/supabase-js"
 import { supabase } from "./supabase"
 import { clearAuthStorage } from "./authStorage"
 import { getQueryClient } from "./query"
+import { profilesTable, type Profile, type ProfileRow } from "./profiles"
+import { can, toAppRole, type AppRole, type PermissionAction } from "./permissions"
 import {
   beginRecoverySession,
   endRecoverySession,
@@ -27,8 +29,43 @@ interface LocalUser {
   id: string
   email: string
   name: string
-  role: string
+  /**
+   * The signed-in user's role, from `public.profiles` — `null` until the
+   * profile has loaded, and whenever it could not be loaded or the account is
+   * deactivated.
+   *
+   * It used to be read from `user.user_metadata.role`, which is writable by the
+   * user themselves via `updateUser({ data: { role: 'admin' } })`. That made it
+   * a display string at best and a self-service promotion at worst; nothing may
+   * key off it. `profiles.role` is only writable by admins (RLS), which is what
+   * makes this value worth reading.
+   */
+  role: AppRole | null
 }
+
+/**
+ * How far the `profiles` lookup for the signed-in user has got.
+ *
+ * - `idle`         — nobody is signed in, so there is nothing to look up.
+ * - `loading`      — request in flight; the app must not decide anything yet.
+ * - `active`       — profile found, `is_active = true`. Normal operation.
+ * - `deactivated`  — profile found, `is_active = false`. RLS lets this user
+ *                    read *nothing*, so without special handling they would see
+ *                    a fully-loaded app in which every screen is empty. That
+ *                    looks like data loss. It gets its own screen instead.
+ * - `missing`      — authenticated, but no profile row. The `auth.users` trigger
+ *                    should make this impossible; it is reachable for accounts
+ *                    created before the trigger existed.
+ * - `error`        — the lookup itself failed (offline, transient 5xx). Distinct
+ *                    from `missing`: retrying is the right response.
+ */
+export type ProfileStatus =
+  | "idle"
+  | "loading"
+  | "active"
+  | "deactivated"
+  | "missing"
+  | "error"
 
 export interface AuthContextType {
   user: User | null
@@ -36,6 +73,20 @@ export interface AuthContextType {
   session: Session | null
   isLoading: boolean
   isAuthenticated: boolean
+  /** Role from `profiles`; `null` unless the profile loaded and is active. */
+  role: AppRole | null
+  /** The full profile row, or `null` when it has not loaded (or is inactive). */
+  profile: Profile | null
+  profileStatus: ProfileStatus
+  /** Whatever the `profiles` lookup threw, for `<PageError>`. */
+  profileError: unknown
+  /** Re-run the `profiles` lookup — the retry button on the error screen. */
+  refreshProfile: () => void
+  /**
+   * `can(role, action)` bound to the signed-in user. A convenience only: the
+   * database is what actually enforces this. See `./permissions`.
+   */
+  can: (action: PermissionAction) => boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -43,6 +94,23 @@ export interface AuthContextType {
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updatePassword: (password: string) => Promise<void>
+}
+
+/** Columns of `profiles` this app reads. Spelled out so a schema addition
+ *  cannot quietly widen what the client pulls down. */
+const PROFILE_COLUMNS = "id, email, full_name, role, is_active, created_at, updated_at"
+
+/** snake_case row → the camelCase shape components speak. */
+function toProfile(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    role: toAppRole(row.role),
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -55,6 +123,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profileStatus, setProfileStatus] = useState<ProfileStatus>('idle')
+  const [profileError, setProfileError] = useState<unknown>(null)
+  /** Bumped by `refreshProfile()` to re-run the lookup effect. */
+  const [profileNonce, setProfileNonce] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -86,17 +159,88 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = user !== null
 
+  /**
+   * Load `public.profiles` for the signed-in user.
+   *
+   * Keyed on the user id (not the whole `user` object, which is a fresh
+   * reference on every token refresh) plus a nonce that `refreshProfile` bumps.
+   *
+   * `maybeSingle()` rather than `single()`: "no row" is a state this app has to
+   * distinguish and explain, not a request error. Note RLS already narrows the
+   * table to this user's own row, so the `.eq('id', …)` is belt-and-braces.
+   */
+  useEffect(() => {
+    const userId = user?.id
+    if (!userId) {
+      setProfile(null)
+      setProfileError(null)
+      setProfileStatus('idle')
+      return
+    }
+
+    let cancelled = false
+    setProfileStatus('loading')
+    setProfileError(null)
+
+    profilesTable()
+      .select(PROFILE_COLUMNS)
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          setProfile(null)
+          setProfileError(new Error(error.message))
+          setProfileStatus('error')
+          return
+        }
+        if (!data) {
+          setProfile(null)
+          setProfileError(null)
+          setProfileStatus('missing')
+          return
+        }
+        const loaded = toProfile(data as ProfileRow)
+        setProfile(loaded)
+        setProfileError(null)
+        setProfileStatus(loaded.isActive ? 'active' : 'deactivated')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, profileNonce])
+
+  const refreshProfile = useCallback(() => setProfileNonce((n) => n + 1), [])
+
+  /**
+   * The effective role.
+   *
+   * Deliberately `null` for anything other than a loaded, active profile:
+   * `can()` then answers `false` for every action, so a half-loaded or broken
+   * profile shows the least-privileged UI rather than briefly flashing buttons
+   * the server would refuse.
+   */
+  const role: AppRole | null =
+    profileStatus === 'active' && profile ? profile.role : null
+
   const currentUser: LocalUser | null = user
     ? {
         id: user.id,
-        email: user.email || '',
-        name: (user.user_metadata?.name as string) || user.email || 'User',
-        // NOTE: read from user_metadata, which is user-writable, so this is a
-        // display value only — never an authorization decision. Role moves to a
-        // `profiles` table when RBAC lands.
-        role: (user.user_metadata?.role as string) || 'staff',
+        email: profile?.email || user.email || '',
+        name:
+          profile?.fullName ||
+          (user.user_metadata?.name as string) ||
+          user.email ||
+          'User',
+        role,
       }
     : null
+
+  const canDo = useCallback(
+    (action: PermissionAction) => can(role, action),
+    [role]
+  )
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -148,6 +292,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
    *     is served the previous user's burial and financial rows out of cache
    *     until each query refetches.
    */
+  /**
+   * Drop the cached profile synchronously on sign-out.
+   *
+   * The lookup effect would do this anyway when `user` becomes `null`, but only
+   * after the next render — long enough for one paint of the previous user's
+   * name and role. On a shared office workstation that is the wrong frame to
+   * render.
+   */
+  const clearProfileState = () => {
+    setProfile(null)
+    setProfileError(null)
+    setProfileStatus('idle')
+  }
+
   const signOutEverywhere = async () => {
     endRecoverySession()
 
@@ -176,6 +334,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const failure = await signOutEverywhere()
     setSession(null)
     setUser(null)
+    clearProfileState()
     if (failure) throw failure
   }
 
@@ -189,6 +348,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await signOutEverywhere()
     setSession(null)
     setUser(null)
+    clearProfileState()
   }
 
   /**
@@ -242,6 +402,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     session,
     isLoading,
     isAuthenticated,
+    role,
+    profile,
+    profileStatus,
+    profileError,
+    refreshProfile,
+    can: canDo,
     login,
     logout,
     signIn,

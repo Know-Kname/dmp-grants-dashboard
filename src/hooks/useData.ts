@@ -13,7 +13,10 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { supabase } from '../lib/supabase';
 import { isUUID, toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
-import type { Database, TablesInsert } from '../types/database';
+import { affectedRow, affectedRows, WriteBlockedError } from '../lib/writeResult';
+import { profilesTable, type Profile, type ProfileRow } from '../lib/profiles';
+import { toAppRole, type AppRole } from '../lib/permissions';
+import type { Database, TablesInsert, TablesUpdate } from '../types/database';
 import type {
   WorkOrder,
   Grant,
@@ -216,12 +219,14 @@ export function useUpdateWorkOrder(callbacks?: MutationCallbacks<WorkOrder>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<WorkOrder>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('work_orders')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<WorkOrder>(row);
+      return fromRow<WorkOrder>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.workOrders.all, callbacks),
   });
@@ -231,8 +236,10 @@ export function useDeleteWorkOrder(callbacks?: MutationCallbacks<{ success: bool
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('work_orders').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('work_orders').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.workOrders.all, callbacks),
@@ -269,12 +276,14 @@ export function useUpdateGrant(callbacks?: MutationCallbacks<Grant>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Grant>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('grants')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Grant>(row);
+      return fromRow<Grant>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.grants.all, callbacks),
   });
@@ -284,8 +293,10 @@ export function useDeleteGrant(callbacks?: MutationCallbacks<{ success: boolean 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('grants').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('grants').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.grants.all, callbacks),
@@ -322,12 +333,14 @@ export function useUpdateInventoryItem(callbacks?: MutationCallbacks<InventoryIt
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<InventoryItem>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('inventory')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<InventoryItem>(row);
+      return fromRow<InventoryItem>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.inventory.all, callbacks),
   });
@@ -337,8 +350,10 @@ export function useDeleteInventoryItem(callbacks?: MutationCallbacks<{ success: 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('inventory').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('inventory').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.inventory.all, callbacks),
@@ -375,12 +390,14 @@ export function useUpdateCustomer(callbacks?: MutationCallbacks<Customer>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Customer>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('customers')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Customer>(row);
+      return fromRow<Customer>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.customers.all, callbacks),
   });
@@ -390,8 +407,10 @@ export function useDeleteCustomer(callbacks?: MutationCallbacks<{ success: boole
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('customers').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('customers').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.customers.all, callbacks),
@@ -428,12 +447,14 @@ export function useUpdateBurial(callbacks?: MutationCallbacks<Burial>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Burial>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('burials')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Burial>(row);
+      return fromRow<Burial>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.burials.all, callbacks),
   });
@@ -443,8 +464,10 @@ export function useDeleteBurial(callbacks?: MutationCallbacks<{ success: boolean
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('burials').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('burials').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.burials.all, callbacks),
@@ -519,18 +542,40 @@ export function useUpdateContract(callbacks?: MutationCallbacks<Contract>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, items, ...data }: UpdateInput<Contract>) => {
-      await sb(
-        supabase.from('contracts')
-          .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+      affectedRows(
+        await sb(
+          supabase.from('contracts')
+            .update(toSnakeCaseKeys(data))
+            .eq('id', id).select()
+        ),
+        'update'
       );
 
       // When items are supplied, replace the contract's line items wholesale.
       // Nothing references contract_items.id, so a delete-then-insert is safe
       // and keeps the persisted set in sync with what the form submitted.
       if (items !== undefined) {
-        const { error: delError } = await supabase.from('contract_items').delete().eq('contract_id', id);
-        if (delError) throw new Error(delError.message);
+        // This clear-then-insert needs DELETE on contract_items, which only an
+        // admin has. A `staff` user can UPDATE the contract itself, so without
+        // this check the delete would quietly remove nothing, the insert would
+        // succeed, and the contract would end up with every line item twice.
+        //
+        // `affectedRows` cannot be used directly here: a contract legitimately
+        // may have no items, and then zero deleted rows is the correct outcome.
+        // So the count is compared against what is actually there.
+        const existing = await sb(
+          supabase.from('contract_items').select('id').eq('contract_id', id)
+        ) as unknown[];
+        if (existing.length > 0) {
+          const removed = await sb(
+            supabase.from('contract_items').delete().eq('contract_id', id).select('id')
+          ) as unknown[];
+          if (removed.length !== existing.length) {
+            throw new WriteBlockedError(
+              'The contract was saved, but its line items could not be replaced — only administrators can remove line items. Ask an administrator to make this change.'
+            );
+          }
+        }
         const rows = itemRows(items, id);
         if (rows.length > 0) {
           await sb(supabase.from('contract_items').insert(rows).select());
@@ -550,8 +595,10 @@ export function useDeleteContract(callbacks?: MutationCallbacks<{ success: boole
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('contracts').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('contracts').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.contracts.all, callbacks),
@@ -628,12 +675,14 @@ export function useUpdateReceivable(callbacks?: MutationCallbacks<AccountsReceiv
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('accounts_receivable')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<AccountsReceivable>(row);
+      return fromRow<AccountsReceivable>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.financial.receivables.all, callbacks),
   });
@@ -671,12 +720,14 @@ export function useUpdatePayable(callbacks?: MutationCallbacks<AccountsPayable>)
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: { id: string; amountPaid?: number; status?: string }) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('accounts_payable')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<AccountsPayable>(row);
+      return fromRow<AccountsPayable>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.financial.payables.all, callbacks),
   });
@@ -712,12 +763,14 @@ export function useUpdateVendor(callbacks?: MutationCallbacks<Vendor>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Vendor>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('vendors')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Vendor>(row);
+      return fromRow<Vendor>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.vendors.all, callbacks),
   });
@@ -727,8 +780,10 @@ export function useDeleteVendor(callbacks?: MutationCallbacks<{ success: boolean
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('vendors').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('vendors').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.vendors.all, callbacks),
@@ -784,12 +839,14 @@ export function useUpdateCemetery(callbacks?: MutationCallbacks<Cemetery>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Cemetery>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('cemeteries')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Cemetery>(row);
+      return fromRow<Cemetery>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.cemeteries.all, callbacks),
   });
@@ -799,8 +856,10 @@ export function useDeleteCemetery(callbacks?: MutationCallbacks<{ success: boole
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('cemeteries').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('cemeteries').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.cemeteries.all, callbacks),
@@ -841,12 +900,14 @@ export function useUpdateSection(callbacks?: MutationCallbacks<Section>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Section>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('sections')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Section>(row);
+      return fromRow<Section>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.sections.all, callbacks),
   });
@@ -856,8 +917,10 @@ export function useDeleteSection(callbacks?: MutationCallbacks<{ success: boolea
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('sections').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('sections').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.sections.all, callbacks),
@@ -898,12 +961,14 @@ export function useUpdateLot(callbacks?: MutationCallbacks<Lot>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Lot>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('lots')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Lot>(row);
+      return fromRow<Lot>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.lots.all, callbacks),
   });
@@ -913,8 +978,10 @@ export function useDeleteLot(callbacks?: MutationCallbacks<{ success: boolean }>
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('lots').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('lots').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.lots.all, callbacks),
@@ -955,12 +1022,14 @@ export function useUpdateGrave(callbacks?: MutationCallbacks<Grave>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInput<Grave>) => {
-      const row = await sb(
+      // Deliberately no `.single()`: it reports zero rows as a cryptic
+      // PGRST116 about JSON coercion. `affectedRow` names the real cause.
+      const rows = await sb(
         supabase.from('graves')
           .update(toSnakeCaseKeys(data))
-          .eq('id', id).select().single()
+          .eq('id', id).select()
       );
-      return fromRow<Grave>(row);
+      return fromRow<Grave>(affectedRow(rows, 'update'));
     },
     ...mutationSideEffects(queryClient, queryKeys.graves.all, callbacks),
   });
@@ -970,11 +1039,87 @@ export function useDeleteGrave(callbacks?: MutationCallbacks<{ success: boolean 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('graves').delete().eq('id', id);
-      if (error) throw new Error(error.message);
+      // `.select()` so rows come back: an RLS-refused delete is a 200 with
+      // zero rows, not an error. See `lib/writeResult`.
+      const rows = await sb(supabase.from('graves').delete().eq('id', id).select('id'));
+      affectedRows(rows, 'delete');
       return { success: true };
     },
     ...mutationSideEffects(queryClient, queryKeys.graves.all, callbacks),
+  });
+}
+
+// ============================================
+// USER ACCOUNTS (PROFILES) — ADMIN ONLY
+// ============================================
+
+/**
+ * `profiles` goes through `profilesTable()` rather than `supabase.from()`
+ * because the generated `Database` type does not know the table yet — see the
+ * header of `lib/profiles` for how that gets removed.
+ */
+function toProfile(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    role: toAppRole(row.role),
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+const PROFILE_COLUMNS = 'id, email, full_name, role, is_active, created_at, updated_at';
+
+/**
+ * Every user account.
+ *
+ * Returns only the caller's own row for a non-admin — RLS decides, not this
+ * hook. `/users` is admin-gated anyway; the narrow result is the backstop.
+ */
+export function useProfiles() {
+  return useQuery({
+    queryKey: queryKeys.profiles.list(),
+    queryFn: async () => {
+      const rows = await sb(
+        profilesTable().select(PROFILE_COLUMNS).order('created_at', { ascending: false })
+      );
+      return (rows as ProfileRow[]).map(toProfile);
+    },
+  });
+}
+
+/**
+ * Change a user's role and/or active flag.
+ *
+ * Only admins may UPDATE `profiles`; for everyone else the policy filters the
+ * row out and the write lands on nothing, so the result goes through
+ * `affectedRow` like every other update in this file.
+ *
+ * There is deliberately no create or delete hook: INSERT and DELETE on
+ * `profiles` are closed to the API entirely. Rows appear via the `auth.users`
+ * trigger when an admin invites someone from the Supabase dashboard (see
+ * docs/06-supabase.md) and disappear when the auth user is deleted.
+ */
+export function useUpdateProfile(callbacks?: MutationCallbacks<Profile>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, role, isActive }: { id: string; role?: AppRole; isActive?: boolean }) => {
+      // Typed against the generated Update shape rather than
+      // Record<string, unknown>: now that `profiles` is in database.ts, an
+      // untyped payload is rejected, which is the generated types earning
+      // their keep. A typo like `is_actve` is a compile error here.
+      const patch: TablesUpdate<'profiles'> = {};
+      if (role !== undefined) patch.role = role;
+      if (isActive !== undefined) patch.is_active = isActive;
+
+      const rows = await sb(
+        profilesTable().update(patch).eq('id', id).select(PROFILE_COLUMNS)
+      );
+      return toProfile(affectedRow(rows, 'update') as unknown as ProfileRow);
+    },
+    ...mutationSideEffects(queryClient, queryKeys.profiles.all, callbacks),
   });
 }
 

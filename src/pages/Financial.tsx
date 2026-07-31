@@ -1,3 +1,4 @@
+import { useAuth } from '../lib/auth';
 import { useState, useMemo } from 'react';
 import type { z } from 'zod';
 import {
@@ -105,6 +106,17 @@ export default function Financial() {
   const [showModal, setShowModal] = useState(false);
   const [editingReceivable, setEditingReceivable] = useState<AccountsReceivable | null>(null);
   const [editingPayable, setEditingPayable] = useState<AccountsPayable | null>(null);
+
+  // Write permissions. Postgres RLS is what enforces them (every policy keys off
+  // `profiles.role`); hiding the controls only stops the UI offering an action
+  // the server would refuse. See `lib/permissions`.
+  const { can } = useAuth();
+  const canCreate = can('create');
+  // Recording a payment is an UPDATE. Nothing on this page deletes, so there is
+  // deliberately no `canDelete` here — money records are never removed, only
+  // superseded.
+  const canEdit = can('update');
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -315,9 +327,11 @@ export default function Financial() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={handleRefetch}>
             Refresh
           </Button>
-          <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-            {addLabel}
-          </Button>
+          {canCreate && (
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+              {addLabel}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -441,7 +455,7 @@ export default function Financial() {
               }}
               emptyState={
                 <CardBody>
-                  <EmptyState icon={<DollarSign size={48} />} title="No deposits recorded" description={searchTerm ? 'Try adjusting your search' : 'Record your first deposit'} action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Record Deposit</Button>} />
+                  <EmptyState icon={<DollarSign size={48} />} title="No deposits recorded" description={searchTerm ? 'Try adjusting your search' : 'Record your first deposit'} action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Record Deposit</Button>} />
                 </CardBody>
               }
               columns={[
@@ -472,7 +486,7 @@ export default function Financial() {
               }}
               emptyState={
                 <CardBody>
-                  <EmptyState icon={<TrendingUp size={48} />} title="No receivables" description={searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Create your first invoice'} action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Invoice</Button>} />
+                  <EmptyState icon={<TrendingUp size={48} />} title="No receivables" description={searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Create your first invoice'} action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Invoice</Button>} />
                 </CardBody>
               }
               columns={[
@@ -487,9 +501,9 @@ export default function Financial() {
                 ) },
                 { key: 'dueDate', header: 'Due Date', sortValue: r => r.dueDate, cell: r => <span className="text-foreground-muted">{r.dueDate ? formatDate(r.dueDate) : '—'}</span> },
                 { key: 'status', header: 'Status', sortValue: r => r.status, cell: r => <Badge variant={arStatusVariant(r.status)}>{formatStatus(r.status)}</Badge> },
-                { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: r => (
+                { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: r => canEdit ? (
                   <button onClick={() => handleEditReceivable(r)} className="text-primary hover:text-primary-hover" aria-label="Record payment"><Edit size={17} /></button>
-                ) },
+                ) : null },
               ] satisfies Column<AccountsReceivable>[]}
             />
           )}
@@ -507,7 +521,7 @@ export default function Financial() {
               }}
               emptyState={
                 <CardBody>
-                  <EmptyState icon={<TrendingDown size={48} />} title="No payables" description={searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Record your first bill'} action={<Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Bill</Button>} />
+                  <EmptyState icon={<TrendingDown size={48} />} title="No payables" description={searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Record your first bill'} action={canCreate && <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Bill</Button>} />
                 </CardBody>
               }
               columns={[
@@ -522,9 +536,9 @@ export default function Financial() {
                 ) },
                 { key: 'dueDate', header: 'Due Date', sortValue: p => p.dueDate, cell: p => <span className="text-foreground-muted">{p.dueDate ? formatDate(p.dueDate) : '—'}</span> },
                 { key: 'status', header: 'Status', sortValue: p => p.status, cell: p => <Badge variant={arStatusVariant(p.status)}>{formatStatus(p.status)}</Badge> },
-                { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: p => (
+                { key: 'actions', header: <span className="sr-only">Actions</span>, align: 'right', cell: p => canEdit ? (
                   <button onClick={() => handleEditPayable(p)} className="text-primary hover:text-primary-hover" aria-label="Record payment"><Edit size={17} /></button>
-                ) },
+                ) : null },
               ] satisfies Column<AccountsPayable>[]}
             />
           )}
@@ -540,9 +554,11 @@ export default function Financial() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
-              Save
-            </Button>
+            {((editingReceivable || editingPayable) ? canEdit : canCreate) && (
+              <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
+                Save
+              </Button>
+            )}
           </>
         }
       >
