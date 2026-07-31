@@ -5,15 +5,20 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { format, subMonths, startOfMonth, parseISO, differenceInCalendarDays } from 'date-fns';
+import { format } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
   TrendingUp, TrendingDown, BookOpen, FileText, Activity, Zap, Gift,
 } from 'lucide-react';
 import {
-  useWorkOrders, useBurials, useInventory, useReceivables,
-  useDeposits, useContracts, useGrants,
+  useDashboardSummary, useBurialTrend, useRevenueTrend,
+  useRecentWorkOrders, useRecentBurials,
 } from '../hooks/useData';
+import {
+  burialTrendSeries, revenueTrendSeries, workOrderChartData,
+  inventoryCategoryData as buildInventoryCategoryData,
+} from '../lib/dashboard';
+import type { DashboardSummary } from '../lib/schemas';
 import {
   Card, CardHeader, CardBody, Badge, PageError, AnimatedNumber,
   Skeleton, SkeletonStatRow, SkeletonChart, Tabs,
@@ -60,144 +65,102 @@ function ChartTooltip({ active, payload, label, formatter }: TooltipProps) {
   );
 }
 
+/**
+ * What the KPI cards read while the summary is loading or has failed.
+ *
+ * The page renders its own error and keeps its layout rather than blanking, so
+ * the components below always need a summary-shaped object. Zeros are honest
+ * here: the alert bar and the trend arrows are all driven by `> 0` checks.
+ */
+const EMPTY_SUMMARY: DashboardSummary = {
+  generatedAt: '',
+  burialsThisMonth: 0, burialsLastMonth: 0, burialsYTD: 0,
+  activeContracts: 0, contractsValue: 0,
+  arOutstanding: 0, unpaidAR: 0, overdueAR: 0,
+  apOutstanding: 0,
+  activeWO: 0, totalWO: 0,
+  lowStock: 0, totalInventory: 0,
+  revenue30d: 0, revenuePrior30d: 0,
+  workOrdersByStatus: {}, inventoryByCategory: {},
+  upcomingGrants: [],
+};
+
+/** How many rows of each kind the activity feed asks the database for. */
+const RECENT_WORK_ORDERS = 5;
+const RECENT_BURIALS = 3;
+const ACTIVITY_ROWS = 6;
+
 export default function Dashboard() {
-  const workOrdersQ = useWorkOrders();
-  const burialsQ = useBurials();
-  const inventoryQ = useInventory();
-  const receivablesQ = useReceivables();
-  const depositsQ = useDeposits();
-  const contractsQ = useContracts();
-  const grantsQ = useGrants();
+  const [monthsBack, setMonthsBack] = useState(12);
+
+  // Every KPI on this page comes from one server-side aggregate. The trends are
+  // separate queries because the 6M/12M/24M control changes only their range —
+  // bundling them into the summary would refetch every KPI on each toggle.
+  const summaryQ = useDashboardSummary();
+  const burialTrendQ = useBurialTrend(monthsBack);
+  const revenueTrendQ = useRevenueTrend(monthsBack);
+  // The activity feed is the one thing the RPC does not cover. It reads the
+  // newest few rows with a database-side LIMIT rather than downloading a table.
+  const recentWorkOrdersQ = useRecentWorkOrders(RECENT_WORK_ORDERS);
+  const recentBurialsQ = useRecentBurials(RECENT_BURIALS);
+
   const { resolvedTheme } = useTheme();
   const chart = CHART_THEME[resolvedTheme === 'dark' ? 'dark' : 'light'];
 
-  const workOrders = workOrdersQ.data ?? [];
-  const burials = burialsQ.data ?? [];
-  const inventory = inventoryQ.data ?? [];
-  const receivables = receivablesQ.data ?? [];
-  const deposits = depositsQ.data ?? [];
-  const contracts = contractsQ.data ?? [];
-  const grants = grantsQ.data ?? [];
-
-  const isLoading =
-    workOrdersQ.isLoading || burialsQ.isLoading || inventoryQ.isLoading ||
-    receivablesQ.isLoading || depositsQ.isLoading || contractsQ.isLoading;
+  const isLoading = summaryQ.isLoading || burialTrendQ.isLoading || revenueTrendQ.isLoading;
+  // Any one query failing shows its message above a page that still renders:
+  // the others' data is still good, and a blank dashboard tells staff nothing.
   const combinedError =
-    workOrdersQ.error || burialsQ.error || inventoryQ.error ||
-    receivablesQ.error || depositsQ.error || contractsQ.error || grantsQ.error;
+    summaryQ.error || burialTrendQ.error || revenueTrendQ.error ||
+    recentWorkOrdersQ.error || recentBurialsQ.error;
 
-  const [monthsBack, setMonthsBack] = useState(12);
-
-  // Freeze "now" for the component's lifetime so month buckets stay stable.
+  // Freeze "now" for the component's lifetime so the hero's date stays stable.
   const now = useMemo(() => new Date(), []);
 
-  const months = useMemo(() =>
-    Array.from({ length: monthsBack }, (_, i) => {
-      const d = subMonths(now, monthsBack - 1 - i);
-      return { key: format(d, 'yyyy-MM'), label: format(d, 'MMM') };
-    }),
-  [now, monthsBack]);
-
   // ── KPI stats ──────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const thisMonthKey = format(startOfMonth(now), 'yyyy-MM');
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const thisYear = now.getFullYear();
+  const stats = summaryQ.data ?? EMPTY_SUMMARY;
 
-    const burialsThisMonth = burials.filter(b => b.burialDate.startsWith(thisMonthKey)).length;
-    const burialsYTD = burials.filter(b => parseISO(b.burialDate).getFullYear() === thisYear).length;
-
-    const activeContracts = contracts.filter(c => c.status === 'active');
-    const contractsValue = activeContracts.reduce((s, c) => s + c.totalAmount, 0);
-
-    const unpaidAR = receivables.filter(r => r.status !== 'paid');
-    const arOutstanding = unpaidAR.reduce((s, r) => s + (r.amount - r.amountPaid), 0);
-    const overdueAR = receivables.filter(r => r.status === 'overdue').length;
-
-    const lowStock = inventory.filter(i => i.quantity <= i.reorderPoint).length;
-
-    const revenue30d = deposits
-      .filter(d => parseISO(d.date) >= thirtyDaysAgo)
-      .reduce((s, d) => s + d.amount, 0);
-
-    // Prior periods for trend deltas
-    const lastMonthKey = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM');
-    const burialsLastMonth = burials.filter(b => b.burialDate.startsWith(lastMonthKey)).length;
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    const revenuePrior30d = deposits
-      .filter(d => {
-        const dt = parseISO(d.date);
-        return dt >= sixtyDaysAgo && dt < thirtyDaysAgo;
-      })
-      .reduce((s, d) => s + d.amount, 0);
-
-    return {
-      burialsThisMonth, burialsYTD, burialsLastMonth,
-      activeContracts: activeContracts.length, contractsValue,
-      arOutstanding, overdueAR,
-      unpaidAR: unpaidAR.length,
-      activeWO: workOrders.filter(w => w.status === 'in_progress').length,
-      totalWO: workOrders.length,
-      lowStock, totalInventory: inventory.length,
-      revenue30d, revenuePrior30d,
-    };
-  }, [workOrders, burials, inventory, receivables, deposits, contracts, now]);
-
-  // Grant deadlines coming up within 30 days (still actionable statuses only)
-  const upcomingGrants = useMemo(() =>
-    grants
-      .filter(g => (g.status === 'available' || g.status === 'applied') && g.deadline)
-      .map(g => ({ ...g, daysLeft: differenceInCalendarDays(parseISO(g.deadline!), now) }))
-      .filter(g => g.daysLeft >= 0 && g.daysLeft <= 30)
-      .sort((a, b) => a.daysLeft - b.daysLeft)
-      .slice(0, 3),
-  [grants, now]);
+  // Grant deadlines coming up within 30 days, already filtered, ranked and
+  // capped at 3 by the RPC.
+  const upcomingGrants = stats.upcomingGrants;
 
   // ── Chart data ─────────────────────────────────────────────
-  const burialTrend = useMemo(() =>
-    months.map(m => ({
-      month: m.label,
-      Burials: burials.filter(b => b.burialDate.startsWith(m.key)).length,
-    })),
-  [burials, months]);
+  const burialTrend = useMemo(
+    () => burialTrendSeries(burialTrendQ.data ?? []),
+    [burialTrendQ.data],
+  );
 
-  const revenueTrend = useMemo(() =>
-    months.map(m => ({
-      month: m.label,
-      Revenue: deposits
-        .filter(d => d.date.startsWith(m.key))
-        .reduce((s, d) => s + d.amount, 0),
-    })),
-  [deposits, months]);
+  const revenueTrend = useMemo(
+    () => revenueTrendSeries(revenueTrendQ.data ?? []),
+    [revenueTrendQ.data],
+  );
 
-  const woChartData = useMemo(() => {
-    const raw = [
-      { name: 'Pending',     value: workOrders.filter(w => w.status === 'pending').length,     color: C.warning },
-      { name: 'In Progress', value: workOrders.filter(w => w.status === 'in_progress').length, color: C.info },
-      { name: 'Completed',   value: workOrders.filter(w => w.status === 'completed').length,   color: C.success },
-      { name: 'Cancelled',   value: workOrders.filter(w => w.status === 'cancelled').length,   color: C.muted },
-    ].filter(d => d.value > 0);
-    return raw.length > 0 ? raw : [{ name: 'No Data', value: 1, color: C.muted }];
-  }, [workOrders]);
+  const woChartData = useMemo(
+    () => workOrderChartData(stats.workOrdersByStatus, {
+      pending: C.warning,
+      in_progress: C.info,
+      completed: C.success,
+      cancelled: C.muted,
+      empty: C.muted,
+    }),
+    [stats.workOrdersByStatus],
+  );
 
-  const inventoryCategoryData = useMemo(() => {
-    const cats = ['casket', 'urn', 'vault', 'marker', 'supplies', 'other'] as const;
-    return cats.map(cat => ({
-      category: cat.charAt(0).toUpperCase() + cat.slice(1),
-      Items: inventory.filter(i => i.category === cat).length,
-    })).filter(d => d.Items > 0);
-  }, [inventory]);
+  const inventoryCategoryData = useMemo(
+    () => buildInventoryCategoryData(stats.inventoryByCategory),
+    [stats.inventoryByCategory],
+  );
 
   // ── Recent activity ────────────────────────────────────────
   const recentActivity = useMemo(() => {
-    const wos = workOrders.slice(0, 5).map(w => ({
+    const wos = (recentWorkOrdersQ.data ?? []).map(w => ({
       type: 'work_order' as const,
       title: w.title,
       sub: w.status.replace('_', ' '),
       date: w.createdAt,
       status: w.status,
     }));
-    const bs = burials.slice(0, 3).map(b => ({
+    const bs = (recentBurialsQ.data ?? []).map(b => ({
       type: 'burial' as const,
       title: `${b.deceasedLastName}, ${b.deceasedFirstName}`,
       sub: b.plotLocation,
@@ -206,8 +169,8 @@ export default function Dashboard() {
     }));
     return [...wos, ...bs]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 6);
-  }, [workOrders, burials]);
+      .slice(0, ACTIVITY_ROWS);
+  }, [recentWorkOrdersQ.data, recentBurialsQ.data]);
 
   const hasAlerts = stats.lowStock > 0 || stats.overdueAR > 0;
 

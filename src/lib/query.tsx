@@ -92,10 +92,27 @@ export function QueryProvider({ children }: QueryProviderProps) {
  * Centralized query keys for consistent caching
  */
 export const queryKeys = {
+  /**
+   * Server-side dashboard aggregates.
+   *
+   * `summary` and the two trends are separate keys on purpose: the dashboard's
+   * 6M/12M/24M control changes only the trend range, and a single bundled key
+   * would refetch every KPI on each toggle. The range is part of the trend keys
+   * so each range is cached independently instead of thrashing one entry.
+   */
+  dashboard: {
+    all: ['dashboard'] as const,
+    summary: () => [...queryKeys.dashboard.all, 'summary'] as const,
+    burialTrend: (months: number) => [...queryKeys.dashboard.all, 'burial-trend', months] as const,
+    revenueTrend: (months: number) => [...queryKeys.dashboard.all, 'revenue-trend', months] as const,
+  },
+
   // Work Orders
   workOrders: {
     all: ['work-orders'] as const,
     list: () => [...queryKeys.workOrders.all, 'list'] as const,
+    /** Newest N only — the dashboard activity feed, which must stay bounded. */
+    recent: (limit: number) => [...queryKeys.workOrders.all, 'recent', limit] as const,
     detail: (id: string) => [...queryKeys.workOrders.all, 'detail', id] as const,
   },
 
@@ -124,6 +141,8 @@ export const queryKeys = {
   burials: {
     all: ['burials'] as const,
     list: () => [...queryKeys.burials.all, 'list'] as const,
+    /** Newest N only — the dashboard activity feed, which must stay bounded. */
+    recent: (limit: number) => [...queryKeys.burials.all, 'recent', limit] as const,
     detail: (id: string) => [...queryKeys.burials.all, 'detail', id] as const,
     /**
      * Public memorial page (`/memorial/:id`), which reads a narrowed column set
