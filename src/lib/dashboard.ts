@@ -16,7 +16,6 @@
 
 import type {
   BurialTrendRow,
-  NamedCount,
   Referral,
   RevenueTrendRow,
 } from './schemas';
@@ -56,6 +55,50 @@ export function formatMonthYear(iso: string | null): string | null {
 export function periodLabel(dataAsOf: string | null, months: number): string {
   const anchor = formatMonthYear(dataAsOf);
   return anchor ? `${months} months to ${anchor}` : 'no data loaded';
+}
+
+/** The unfiltered row counts that decide whether a module has data at all. */
+export interface ModulePopulation {
+  totalContracts: number;
+  totalAR: number;
+  totalDeposits: number;
+  totalWO: number;
+  totalInventory: number;
+}
+
+/** Which dashboard modules should render a live card rather than a placeholder. */
+export interface ModulesLoaded {
+  contracts: boolean;
+  receivables: boolean;
+  deposits: boolean;
+  workOrders: boolean;
+  inventory: boolean;
+}
+
+/**
+ * Decide which modules have data — from table population only, never from a
+ * filtered figure.
+ *
+ * This distinction is the whole reason the function exists. Three of these
+ * cards previously asked a filtered question, and each one has a legitimate
+ * state where the answer is zero while the table is full:
+ *
+ * - `activeContracts` is 0 once every contract is paid.
+ * - `unpaidAR` is 0 once every invoice is settled — the state a business is
+ *   *trying* to reach.
+ * - `revenue30d` is 0 unless a deposit landed in the last 30 days, so a ledger
+ *   imported from 2020 reads as empty however many rows it has.
+ *
+ * Reporting any of those as "not loaded" tells the user their import failed.
+ */
+export function modulesLoaded(counts: ModulePopulation): ModulesLoaded {
+  return {
+    contracts: counts.totalContracts > 0,
+    receivables: counts.totalAR > 0,
+    deposits: counts.totalDeposits > 0,
+    workOrders: counts.totalWO > 0,
+    inventory: counts.totalInventory > 0,
+  };
 }
 
 /** A slice of the work-order donut. */
@@ -237,16 +280,3 @@ export function vendorSpendSeries(
     .sort((a, b) => b.Spend - a.Spend);
 }
 
-/** A bar of a generic `{name, n}` ranking (sections, counselors). */
-export interface NamedCountBar {
-  name: string;
-  Interments: number;
-}
-
-/**
- * Reshape a server-ranked `{name, n}` list for a bar chart. Order is the
- * server's; re-sorting here would let the two disagree.
- */
-export function namedCountSeries(rows: NamedCount[]): NamedCountBar[] {
-  return rows.map((r) => ({ name: r.name, Interments: r.n }));
-}

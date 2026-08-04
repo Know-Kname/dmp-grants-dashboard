@@ -18,10 +18,10 @@ import {
 import {
   burialTrendSeries, revenueTrendSeries, workOrderChartData,
   inventoryCategoryData as buildInventoryCategoryData,
-  referralSeries, ageBandSeries, vendorSpendSeries,
+  referralSeries, ageBandSeries, vendorSpendSeries, modulesLoaded,
   formatMonthYear, periodLabel,
 } from '../lib/dashboard';
-import type { DashboardSummary } from '../lib/schemas';
+import type { DashboardSummary, NamedCount } from '../lib/schemas';
 import {
   Card, CardHeader, CardBody, Badge, PageError, AnimatedNumber,
   Skeleton, SkeletonStatRow, SkeletonChart, Tabs,
@@ -92,6 +92,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
   vendorCount: 0, vendorSpendKnown: 0, vendorSpendByCategory: {},
   topVendorsBySpend: [],
   burialsThisMonth: 0, burialsLastMonth: 0, burialsYTD: 0,
+  totalContracts: 0, totalAR: 0, totalDeposits: 0,
   activeContracts: 0, contractsValue: 0,
   arOutstanding: 0, unpaidAR: 0, overdueAR: 0,
   apOutstanding: 0,
@@ -137,6 +138,38 @@ function PendingCard({
         </Card>
       </m.div>
     </Link>
+  );
+}
+
+/**
+ * A compact ranked list with a proportional bar.
+ *
+ * Used where a chart would be overkill: six rows of `{name, n}` read faster as
+ * a list than as another axis, and the bar carries the proportion without
+ * spending a card's whole height on it. Bars are scaled to the largest row, so
+ * the comparison stays within the list and never implies a share of some total
+ * the list does not show.
+ */
+function RankedList({ rows, empty }: { rows: NamedCount[]; empty: string }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-foreground-muted text-center py-6">{empty}</p>;
+  }
+  const max = rows[0]?.n || 1;
+  return (
+    <div className="space-y-2.5">
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-center gap-3 text-sm">
+          <span className="flex-1 truncate text-foreground-muted" title={r.name}>{r.name}</span>
+          <div className="w-20 h-1.5 rounded-full bg-background-subtle overflow-hidden shrink-0">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${(r.n / max) * 100}%`, backgroundColor: BRAND.green }}
+            />
+          </div>
+          <span className="w-9 text-right font-medium text-foreground tabular-nums shrink-0">{r.n}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -223,6 +256,15 @@ export default function Dashboard() {
   // without it.
   const asOf = formatMonthYear(stats.dataAsOf);
   const hasInterments = stats.totalInterments > 0;
+  // Population, not filtered figures — see modulesLoaded for why.
+  const loaded = modulesLoaded(stats);
+
+  /** The register's span, e.g. `2020` or `2018–2020`. */
+  const yearSpan = useMemo(() => {
+    const years = Object.keys(stats.intermentsByYear).sort();
+    if (years.length === 0) return null;
+    return years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`;
+  }, [stats.intermentsByYear]);
 
   // ── Recent activity ────────────────────────────────────────
   const recentActivity = useMemo(() => {
@@ -318,7 +360,7 @@ export default function Dashboard() {
                 <p className="text-white/40 text-xs uppercase tracking-widest">Interments</p>
                 <p className="text-white font-bold text-2xl mt-0.5">{stats.totalInterments}</p>
                 <p className="text-white/50 text-xs">
-                  {asOf ? `through ${asOf}` : 'none recorded'}
+                  {yearSpan ? `across ${yearSpan}` : 'none recorded'}
                 </p>
               </div>
               <div className="w-px h-10 bg-white/20" />
@@ -389,8 +431,25 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalInterments} /></p>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  {asOf ? `on record through ${asOf}` : 'none on record'}
+                {/*
+                  Month over month against the anchor, not against the calendar.
+                  The arrow is deliberately not coloured as good/bad: fewer
+                  interments in a month is not a business failure, and flagging
+                  it as one would be exactly the kind of unjustified direction
+                  the cemetery scorecard rules warn about.
+                */}
+                <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1 flex-wrap">
+                  {asOf ? `through ${asOf}` : 'none on record'}
+                  {asOf && stats.burialsLatestMonth !== stats.burialsPriorMonth && (
+                    stats.burialsLatestMonth > stats.burialsPriorMonth
+                      ? <TrendingUp size={11} className="text-foreground-subtle" />
+                      : <TrendingDown size={11} className="text-foreground-subtle" />
+                  )}
+                  {asOf && (
+                    <span className="text-foreground-subtle">
+                      {stats.burialsLatestMonth} vs {stats.burialsPriorMonth} prior mo
+                    </span>
+                  )}
                 </p>
               </div>
             </CardBody>
@@ -516,7 +575,12 @@ export default function Dashboard() {
         initial="hidden"
         animate="show"
       >
-        {stats.activeContracts > 0 || stats.contractsValue > 0 ? (
+        {/*
+          Gated on table population, not on a filtered figure. `activeContracts`
+          goes to zero once every contract is paid, which is a healthy state,
+          not an empty table.
+        */}
+        {loaded.contracts ? (
           <Link to="/contracts" className="contents">
             <m.div variants={fadeInUp} className="h-full">
             <Card hoverable className="h-full">
@@ -540,7 +604,8 @@ export default function Dashboard() {
             note="blocked: no purchaser link in source" />
         )}
 
-        {stats.unpaidAR > 0 ? (
+        {/* `unpaidAR` is zero for a business that has collected everything. */}
+        {loaded.receivables ? (
           <Link to="/financial" className="contents">
             <m.div variants={fadeInUp} className="h-full">
             <Card hoverable className={`h-full ${stats.overdueAR > 0 ? 'border-warning' : ''}`}>
@@ -564,7 +629,7 @@ export default function Dashboard() {
             note="awaiting AR import" />
         )}
 
-        {stats.totalWO > 0 ? (
+        {loaded.workOrders ? (
           <Link to="/work-orders" className="contents">
             <m.div variants={fadeInUp} className="h-full">
             <Card hoverable className="h-full">
@@ -588,7 +653,7 @@ export default function Dashboard() {
             note="none recorded yet" />
         )}
 
-        {stats.totalInventory > 0 ? (
+        {loaded.inventory ? (
           <Link to="/inventory" className="contents">
             <m.div variants={fadeInUp} className="h-full">
             <Card hoverable className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
@@ -620,7 +685,12 @@ export default function Dashboard() {
           otherwise would put a number on the dashboard that no accountant would
           sign.
         */}
-        {stats.revenue30d > 0 ? (
+        {/*
+          `revenue30d` only looks back 30 days. Every DMP dataset so far is
+          2020, so gating on it would load thousands of deposits and still show
+          "Not loaded" — indistinguishable from a failed import.
+        */}
+        {loaded.deposits ? (
           <Link to="/financial" className="contents">
             <m.div variants={fadeInUp} className="h-full">
             <Card hoverable className="h-full">
@@ -827,6 +897,63 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* ── Who handled the work, and where it went ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Counselor attribution</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              arrangements credited, {periodLabel(stats.dataAsOf, monthsBack).replace(/^\d+ months to /, 'to ')}
+            </p>
+          </CardHeader>
+          <CardBody>
+            <RankedList rows={stats.topCounselors} empty="No counselor data yet" />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Busiest sections</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {stats.sectionsInUse} sections hold interments
+            </p>
+          </CardHeader>
+          <CardBody>
+            <RankedList rows={stats.topSections} empty="No section data yet" />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Largest vendors</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              by known spend, 2020–2024
+            </p>
+          </CardHeader>
+          <CardBody>
+            {stats.topVendorsBySpend.length > 0 ? (
+              <div className="space-y-2.5">
+                {stats.topVendorsBySpend.map((v) => (
+                  <div key={v.name} className="flex items-center gap-3 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-foreground-muted" title={v.name}>{v.name}</p>
+                      {v.category && (
+                        <p className="text-[11px] text-foreground-subtle truncate">{v.category}</p>
+                      )}
+                    </div>
+                    <span className="font-medium text-foreground tabular-nums shrink-0">
+                      {formatCurrency(v.spend)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground-muted text-center py-6">No vendor spend recorded yet</p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
       {/* ── Charts Row 3: modules still awaiting their data ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
@@ -875,7 +1002,7 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardBody>
-            {stats.revenue30d > 0 || revenueTrend.some((r) => r.Revenue > 0) ? (
+            {loaded.deposits ? (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={revenueTrend} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
                   <defs>

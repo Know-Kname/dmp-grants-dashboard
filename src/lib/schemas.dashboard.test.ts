@@ -63,6 +63,10 @@ const SUMMARY = {
   burialsThisMonth: 2,
   burialsLastMonth: 1,
   burialsYTD: 9,
+
+  totalContracts: 3,
+  totalAR: 4,
+  totalDeposits: 12,
   activeContracts: 3,
   contractsValue: 45000,
   arOutstanding: 1200.5,

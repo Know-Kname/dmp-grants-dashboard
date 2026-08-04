@@ -543,6 +543,20 @@ export const dashboardSummarySchema = z.object({
   burialsLastMonth: dbCountSchema,
   burialsYTD: dbCountSchema,
 
+  /**
+   * Unfiltered row counts for the modules whose data has not landed yet.
+   *
+   * These exist so the page can tell "this table is empty" from "this table is
+   * full and every filtered figure in it is legitimately zero" — a business
+   * that has collected every invoice has `unpaidAR === 0` with plenty of
+   * receivables, and a deposit ledger imported from 2020 has `revenue30d === 0`
+   * with thousands of rows. Gating a card on the filtered figure would call
+   * both of those "not loaded".
+   */
+  totalContracts: dbCountSchema,
+  totalAR: dbCountSchema,
+  totalDeposits: dbCountSchema,
+
   activeContracts: dbCountSchema,
   contractsValue: dbNumberSchema,
 

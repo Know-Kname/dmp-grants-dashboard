@@ -12,10 +12,10 @@ import {
   AGE_BANDS,
   INVENTORY_CATEGORIES,
   ageBandSeries,
+  modulesLoaded,
   burialTrendSeries,
   formatMonthYear,
   inventoryCategoryData,
-  namedCountSeries,
   periodLabel,
   referralSeries,
   revenueTrendSeries,
@@ -228,13 +228,40 @@ describe('vendorSpendSeries', () => {
   });
 });
 
-describe('namedCountSeries', () => {
-  it('keeps the server order rather than re-sorting', () => {
-    const series = namedCountSeries([
-      { name: 'CHERYL BERRIEN', n: 366 },
-      { name: 'ANTHONY MCKINNEY', n: 203 },
-    ]);
-    expect(series.map((s) => s.name)).toEqual(['CHERYL BERRIEN', 'ANTHONY MCKINNEY']);
-    expect(series[0].Interments).toBe(366);
+
+describe('modulesLoaded', () => {
+  const EMPTY = {
+    totalContracts: 0, totalAR: 0, totalDeposits: 0, totalWO: 0, totalInventory: 0,
+  };
+
+  it('reports every module as unloaded when no table has rows', () => {
+    expect(modulesLoaded(EMPTY)).toEqual({
+      contracts: false, receivables: false, deposits: false,
+      workOrders: false, inventory: false,
+    });
+  });
+
+  it('counts receivables as loaded when every invoice is settled', () => {
+    // The regression this function exists for. Gating on `unpaidAR` reported a
+    // full AR table as "not loaded" the moment the business collected
+    // everything — i.e. exactly when it was doing well.
+    expect(modulesLoaded({ ...EMPTY, totalAR: 120 }).receivables).toBe(true);
+  });
+
+  it('counts deposits as loaded when the ledger predates the 30-day window', () => {
+    // Every DMP dataset so far is 2020, so `revenue30d` would be 0 for a
+    // ledger of thousands of rows and the card would read as a failed import.
+    expect(modulesLoaded({ ...EMPTY, totalDeposits: 4200 }).deposits).toBe(true);
+  });
+
+  it('counts contracts as loaded when none are still active', () => {
+    expect(modulesLoaded({ ...EMPTY, totalContracts: 11720 }).contracts).toBe(true);
+  });
+
+  it('keeps the modules independent', () => {
+    const one = modulesLoaded({ ...EMPTY, totalInventory: 6 });
+    expect(one.inventory).toBe(true);
+    expect(one.contracts).toBe(false);
+    expect(one.receivables).toBe(false);
   });
 });
