@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import {
   ClipboardList, Package, DollarSign, Users, AlertCircle,
   TrendingUp, TrendingDown, BookOpen, FileText, Activity, Zap, Gift,
+  Share2, Layers, Truck,
 } from 'lucide-react';
 import {
   useDashboardSummary, useBurialTrend, useRevenueTrend,
@@ -17,8 +18,10 @@ import {
 import {
   burialTrendSeries, revenueTrendSeries, workOrderChartData,
   inventoryCategoryData as buildInventoryCategoryData,
+  referralSeries, ageBandSeries, vendorSpendSeries, modulesLoaded,
+  formatMonthYear, periodLabel,
 } from '../lib/dashboard';
-import type { DashboardSummary } from '../lib/schemas';
+import type { DashboardSummary, NamedCount } from '../lib/schemas';
 import {
   Card, CardHeader, CardBody, Badge, PageError, AnimatedNumber,
   Skeleton, SkeletonStatRow, SkeletonChart, Tabs,
@@ -74,7 +77,22 @@ function ChartTooltip({ active, payload, label, formatter }: TooltipProps) {
  */
 const EMPTY_SUMMARY: DashboardSummary = {
   generatedAt: '',
+  dataAsOf: null,
+  burialsLatestMonth: 0, burialsPriorMonth: 0, burialsTrailing12: 0,
+  totalInterments: 0, intermentsByYear: {},
+  topFuneralHomes: [], referralTop5Pct: null, distinctFuneralHomes: 0,
+  topCounselors: [],
+  ageBands: {}, medianAgeAtDeath: null,
+  sectionsInUse: 0, topSections: [],
+  capacity: {
+    gravesTotal: 0, gravesOccupied: 0, lotsTotal: 0,
+    runwayYears: null, runwayReason: null,
+  },
+  customerCount: 0,
+  vendorCount: 0, vendorSpendKnown: 0, vendorSpendByCategory: {},
+  topVendorsBySpend: [],
   burialsThisMonth: 0, burialsLastMonth: 0, burialsYTD: 0,
+  totalContracts: 0, totalAR: 0, totalDeposits: 0,
   activeContracts: 0, contractsValue: 0,
   arOutstanding: 0, unpaidAR: 0, overdueAR: 0,
   apOutstanding: 0,
@@ -84,6 +102,76 @@ const EMPTY_SUMMARY: DashboardSummary = {
   workOrdersByStatus: {}, inventoryByCategory: {},
   upcomingGrants: [],
 };
+
+/**
+ * A KPI card for a module whose source table has no rows yet.
+ *
+ * A bare `0` is indistinguishable from a broken query, and five of them at once
+ * reads as a broken page. Naming the reason keeps the layout honest — and the
+ * card returns to its normal self the moment the table has rows, with no code
+ * change.
+ */
+function PendingCard({
+  to, label, icon: Icon, note,
+}: {
+  to: string;
+  label: string;
+  icon: typeof BookOpen;
+  note: string;
+}) {
+  return (
+    <Link to={to} className="contents">
+      <m.div variants={fadeInUp} className="h-full">
+        <Card hoverable className="h-full border-dashed">
+          <CardBody className="flex flex-col gap-3 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-foreground-subtle font-medium uppercase tracking-wide">{label}</p>
+              <div className="p-1.5 bg-background-subtle rounded-lg">
+                <Icon size={14} className="text-foreground-subtle" />
+              </div>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-foreground-subtle">Not loaded</p>
+              <p className="text-xs text-foreground-subtle mt-0.5">{note}</p>
+            </div>
+          </CardBody>
+        </Card>
+      </m.div>
+    </Link>
+  );
+}
+
+/**
+ * A compact ranked list with a proportional bar.
+ *
+ * Used where a chart would be overkill: six rows of `{name, n}` read faster as
+ * a list than as another axis, and the bar carries the proportion without
+ * spending a card's whole height on it. Bars are scaled to the largest row, so
+ * the comparison stays within the list and never implies a share of some total
+ * the list does not show.
+ */
+function RankedList({ rows, empty }: { rows: NamedCount[]; empty: string }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-foreground-muted text-center py-6">{empty}</p>;
+  }
+  const max = rows[0]?.n || 1;
+  return (
+    <div className="space-y-2.5">
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-center gap-3 text-sm">
+          <span className="flex-1 truncate text-foreground-muted" title={r.name}>{r.name}</span>
+          <div className="w-20 h-1.5 rounded-full bg-background-subtle overflow-hidden shrink-0">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${(r.n / max) * 100}%`, backgroundColor: BRAND.green }}
+            />
+          </div>
+          <span className="w-9 text-right font-medium text-foreground tabular-nums shrink-0">{r.n}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** How many rows of each kind the activity feed asks the database for. */
 const RECENT_WORK_ORDERS = 5;
@@ -150,6 +238,33 @@ export default function Dashboard() {
     () => buildInventoryCategoryData(stats.inventoryByCategory),
     [stats.inventoryByCategory],
   );
+
+  const referralData = useMemo(
+    () => referralSeries(stats.topFuneralHomes),
+    [stats.topFuneralHomes],
+  );
+
+  const ageBandData = useMemo(() => ageBandSeries(stats.ageBands), [stats.ageBands]);
+
+  const vendorSpendData = useMemo(
+    () => vendorSpendSeries(stats.vendorSpendByCategory),
+    [stats.vendorSpendByCategory],
+  );
+
+  // The period every anchored window is measured against. Stated on the cards
+  // because a "trailing 12 months" figure that ends in 2020 is misleading
+  // without it.
+  const asOf = formatMonthYear(stats.dataAsOf);
+  const hasInterments = stats.totalInterments > 0;
+  // Population, not filtered figures — see modulesLoaded for why.
+  const loaded = modulesLoaded(stats);
+
+  /** The register's span, e.g. `2020` or `2018–2020`. */
+  const yearSpan = useMemo(() => {
+    const years = Object.keys(stats.intermentsByYear).sort();
+    if (years.length === 0) return null;
+    return years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`;
+  }, [stats.intermentsByYear]);
 
   // ── Recent activity ────────────────────────────────────────
   const recentActivity = useMemo(() => {
@@ -242,15 +357,17 @@ export default function Dashboard() {
               </div>
               <div className="w-px h-10 bg-white/20" />
               <div>
-                <p className="text-white/40 text-xs uppercase tracking-widest">Burials YTD</p>
-                <p className="text-white font-bold text-2xl mt-0.5">{stats.burialsYTD}</p>
-                <p className="text-white/50 text-xs">{stats.burialsThisMonth} this month</p>
+                <p className="text-white/40 text-xs uppercase tracking-widest">Interments</p>
+                <p className="text-white font-bold text-2xl mt-0.5">{stats.totalInterments}</p>
+                <p className="text-white/50 text-xs">
+                  {yearSpan ? `across ${yearSpan}` : 'none recorded'}
+                </p>
               </div>
               <div className="w-px h-10 bg-white/20" />
               <div>
-                <p className="text-white/40 text-xs uppercase tracking-widest">Active WO</p>
-                <p className="text-white font-bold text-2xl mt-0.5">{stats.activeWO}</p>
-                <p className="text-white/50 text-xs">{stats.totalWO} total</p>
+                <p className="text-white/40 text-xs uppercase tracking-widest">Sections</p>
+                <p className="text-white font-bold text-2xl mt-0.5">{stats.sectionsInUse}</p>
+                <p className="text-white/50 text-xs">{stats.capacity.gravesTotal} graves mapped</p>
               </div>
             </div>
           </div>
@@ -295,7 +412,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── KPI Cards ── */}
+      {/* ── KPI Cards: what the register actually holds ── */}
       <m.div
         className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4"
         variants={staggerContainer}
@@ -307,21 +424,32 @@ export default function Dashboard() {
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Burials</p>
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Interments</p>
                 <div className="p-1.5 bg-primary-100 dark:bg-primary-950 rounded-lg">
                   <BookOpen size={14} className="text-primary" />
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.burialsThisMonth} /></p>
-                <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1">
-                  this month
-                  {stats.burialsThisMonth !== stats.burialsLastMonth && (
-                    stats.burialsThisMonth > stats.burialsLastMonth
-                      ? <TrendingUp size={11} className="text-success" />
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalInterments} /></p>
+                {/*
+                  Month over month against the anchor, not against the calendar.
+                  The arrow is deliberately not coloured as good/bad: fewer
+                  interments in a month is not a business failure, and flagging
+                  it as one would be exactly the kind of unjustified direction
+                  the cemetery scorecard rules warn about.
+                */}
+                <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1 flex-wrap">
+                  {asOf ? `through ${asOf}` : 'none on record'}
+                  {asOf && stats.burialsLatestMonth !== stats.burialsPriorMonth && (
+                    stats.burialsLatestMonth > stats.burialsPriorMonth
+                      ? <TrendingUp size={11} className="text-foreground-subtle" />
                       : <TrendingDown size={11} className="text-foreground-subtle" />
                   )}
-                  <span className="text-foreground-subtle">vs {stats.burialsLastMonth} last mo</span>
+                  {asOf && (
+                    <span className="text-foreground-subtle">
+                      {stats.burialsLatestMonth} vs {stats.burialsPriorMonth} prior mo
+                    </span>
+                  )}
                 </p>
               </div>
             </CardBody>
@@ -329,77 +457,23 @@ export default function Dashboard() {
         </m.div>
         </Link>
 
-        <Link to="/contracts" className="contents">
+        {/* Concentration, not the leader's name: one home leaving is the risk. */}
+        <Link to="/burials" className="contents">
           <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Contracts</p>
-                <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
-                  <FileText size={14} className="text-info" />
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Top 5 Referrers</p>
+                <div className="p-1.5 bg-warning-100 dark:bg-warning-950 rounded-lg">
+                  <Share2 size={14} className="text-warning" />
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.activeContracts} /></p>
-                <p className="text-xs text-foreground-muted mt-0.5">{formatCurrency(stats.contractsValue)}</p>
-              </div>
-            </CardBody>
-          </Card>
-        </m.div>
-        </Link>
-
-        <Link to="/financial" className="contents">
-          <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className={`h-full ${stats.overdueAR > 0 ? 'border-warning' : ''}`}>
-            <CardBody className="flex flex-col gap-3 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Receivables</p>
-                <div className={`p-1.5 rounded-lg ${stats.overdueAR > 0 ? 'bg-warning-100 dark:bg-warning-950' : 'bg-success-100 dark:bg-success-950'}`}>
-                  <DollarSign size={14} className={stats.overdueAR > 0 ? 'text-warning' : 'text-success'} />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.arOutstanding} format={formatCurrency} /></p>
-                <p className="text-xs text-foreground-muted mt-0.5">{stats.unpaidAR} open</p>
-              </div>
-            </CardBody>
-          </Card>
-        </m.div>
-        </Link>
-
-        <Link to="/work-orders" className="contents">
-          <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
-            <CardBody className="flex flex-col gap-3 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Work Orders</p>
-                <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
-                  <ClipboardList size={14} className="text-info" />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalWO} /></p>
-                <p className="text-xs text-foreground-muted mt-0.5">{stats.activeWO} in progress</p>
-              </div>
-            </CardBody>
-          </Card>
-        </m.div>
-        </Link>
-
-        <Link to="/inventory" className="contents">
-          <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
-            <CardBody className="flex flex-col gap-3 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Inventory</p>
-                <div className={`p-1.5 rounded-lg ${stats.lowStock > 0 ? 'bg-warning-100 dark:bg-warning-950' : 'bg-success-100 dark:bg-success-950'}`}>
-                  <Package size={14} className={stats.lowStock > 0 ? 'text-warning' : 'text-success'} />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalInventory} /></p>
+                <p className="text-3xl font-bold text-foreground">
+                  {stats.referralTop5Pct !== null ? `${stats.referralTop5Pct}%` : '—'}
+                </p>
                 <p className="text-xs text-foreground-muted mt-0.5">
-                  {stats.lowStock > 0 ? `${stats.lowStock} low stock` : 'All stocked'}
+                  of {stats.distinctFuneralHomes} funeral homes
                 </p>
               </div>
             </CardBody>
@@ -407,29 +481,82 @@ export default function Dashboard() {
         </m.div>
         </Link>
 
-        <Link to="/financial" className="contents">
+        <Link to="/cemeteries" className="contents">
           <m.div variants={fadeInUp} className="h-full">
           <Card hoverable className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Revenue (30d)</p>
-                <div className="p-1.5 bg-success-100 dark:bg-success-950 rounded-lg">
-                  <TrendingUp size={14} className="text-success" />
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Graves Mapped</p>
+                <div className="p-1.5 bg-primary-100 dark:bg-primary-950 rounded-lg">
+                  <Layers size={14} className="text-primary" />
                 </div>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.revenue30d} format={formatCurrency} /></p>
-                <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1">
-                  deposits
-                  {stats.revenuePrior30d > 0 && stats.revenue30d !== stats.revenuePrior30d && (
-                    stats.revenue30d > stats.revenuePrior30d
-                      ? <TrendingUp size={11} className="text-success" />
-                      : <TrendingDown size={11} className="text-warning" />
-                  )}
-                  {stats.revenuePrior30d > 0 && (
-                    <span className="text-foreground-subtle">vs {formatCurrency(stats.revenuePrior30d)}</span>
-                  )}
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.capacity.gravesTotal} /></p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  {stats.capacity.lotsTotal} lots · {stats.sectionsInUse} sections
                 </p>
+              </div>
+            </CardBody>
+          </Card>
+        </m.div>
+        </Link>
+
+        <Link to="/customers" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Customers</p>
+                <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
+                  <Users size={14} className="text-info" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.customerCount} /></p>
+                <p className="text-xs text-foreground-muted mt-0.5">next of kin on record</p>
+              </div>
+            </CardBody>
+          </Card>
+        </m.div>
+        </Link>
+
+        <Link to="/vendors" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Vendors</p>
+                <div className="p-1.5 bg-success-100 dark:bg-success-950 rounded-lg">
+                  <Truck size={14} className="text-success" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.vendorCount} /></p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  {formatCurrency(stats.vendorSpendKnown)} known spend
+                </p>
+              </div>
+            </CardBody>
+          </Card>
+        </m.div>
+        </Link>
+
+        <Link to="/burials" className="contents">
+          <m.div variants={fadeInUp} className="h-full">
+          <Card hoverable className="h-full">
+            <CardBody className="flex flex-col gap-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Median Age</p>
+                <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
+                  <Activity size={14} className="text-info" />
+                </div>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">
+                  {stats.medianAgeAtDeath !== null ? stats.medianAgeAtDeath : '—'}
+                </p>
+                <p className="text-xs text-foreground-muted mt-0.5">at death</p>
               </div>
             </CardBody>
           </Card>
@@ -437,13 +564,181 @@ export default function Dashboard() {
         </Link>
       </m.div>
 
-      {/* ── Charts Row 1: Burial Trend + Work Orders Donut ── */}
+      {/*
+        Modules whose source tables are still empty. They keep their place and
+        their link rather than showing a zero that reads as a broken query, and
+        each becomes a live card the moment its table has rows.
+      */}
+      <m.div
+        className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+      >
+        {/*
+          Gated on table population, not on a filtered figure. `activeContracts`
+          goes to zero once every contract is paid, which is a healthy state,
+          not an empty table.
+        */}
+        {loaded.contracts ? (
+          <Link to="/contracts" className="contents">
+            <m.div variants={fadeInUp} className="h-full">
+            <Card hoverable className="h-full">
+              <CardBody className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Contracts</p>
+                  <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
+                    <FileText size={14} className="text-info" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.activeContracts} /></p>
+                  <p className="text-xs text-foreground-muted mt-0.5">{formatCurrency(stats.contractsValue)}</p>
+                </div>
+              </CardBody>
+            </Card>
+          </m.div>
+          </Link>
+        ) : (
+          <PendingCard to="/contracts" label="Contracts" icon={FileText}
+            note="blocked: no purchaser link in source" />
+        )}
+
+        {/* `unpaidAR` is zero for a business that has collected everything. */}
+        {loaded.receivables ? (
+          <Link to="/financial" className="contents">
+            <m.div variants={fadeInUp} className="h-full">
+            <Card hoverable className={`h-full ${stats.overdueAR > 0 ? 'border-warning' : ''}`}>
+              <CardBody className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Receivables</p>
+                  <div className={`p-1.5 rounded-lg ${stats.overdueAR > 0 ? 'bg-warning-100 dark:bg-warning-950' : 'bg-success-100 dark:bg-success-950'}`}>
+                    <DollarSign size={14} className={stats.overdueAR > 0 ? 'text-warning' : 'text-success'} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.arOutstanding} format={formatCurrency} /></p>
+                  <p className="text-xs text-foreground-muted mt-0.5">{stats.unpaidAR} open</p>
+                </div>
+              </CardBody>
+            </Card>
+          </m.div>
+          </Link>
+        ) : (
+          <PendingCard to="/financial" label="Receivables" icon={DollarSign}
+            note="awaiting AR import" />
+        )}
+
+        {loaded.workOrders ? (
+          <Link to="/work-orders" className="contents">
+            <m.div variants={fadeInUp} className="h-full">
+            <Card hoverable className="h-full">
+              <CardBody className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Work Orders</p>
+                  <div className="p-1.5 bg-info-100 dark:bg-info-950 rounded-lg">
+                    <ClipboardList size={14} className="text-info" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalWO} /></p>
+                  <p className="text-xs text-foreground-muted mt-0.5">{stats.activeWO} in progress</p>
+                </div>
+              </CardBody>
+            </Card>
+          </m.div>
+          </Link>
+        ) : (
+          <PendingCard to="/work-orders" label="Work Orders" icon={ClipboardList}
+            note="none recorded yet" />
+        )}
+
+        {loaded.inventory ? (
+          <Link to="/inventory" className="contents">
+            <m.div variants={fadeInUp} className="h-full">
+            <Card hoverable className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
+              <CardBody className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Inventory</p>
+                  <div className={`p-1.5 rounded-lg ${stats.lowStock > 0 ? 'bg-warning-100 dark:bg-warning-950' : 'bg-success-100 dark:bg-success-950'}`}>
+                    <Package size={14} className={stats.lowStock > 0 ? 'text-warning' : 'text-success'} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.totalInventory} /></p>
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    {stats.lowStock > 0 ? `${stats.lowStock} low stock` : 'All stocked'}
+                  </p>
+                </div>
+              </CardBody>
+            </Card>
+          </m.div>
+          </Link>
+        ) : (
+          <PendingCard to="/inventory" label="Inventory" icon={Package}
+            note="awaiting stock import" />
+        )}
+
+        {/*
+          "Deposits", never "Revenue". This sums cash received against invoices;
+          it is a booking/cash measure, not recognised revenue, and labelling it
+          otherwise would put a number on the dashboard that no accountant would
+          sign.
+        */}
+        {/*
+          `revenue30d` only looks back 30 days. Every DMP dataset so far is
+          2020, so gating on it would load thousands of deposits and still show
+          "Not loaded" — indistinguishable from a failed import.
+        */}
+        {loaded.deposits ? (
+          <Link to="/financial" className="contents">
+            <m.div variants={fadeInUp} className="h-full">
+            <Card hoverable className="h-full">
+              <CardBody className="flex flex-col gap-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Deposits (30d)</p>
+                  <div className="p-1.5 bg-success-100 dark:bg-success-950 rounded-lg">
+                    <TrendingUp size={14} className="text-success" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-foreground"><AnimatedNumber to={stats.revenue30d} format={formatCurrency} /></p>
+                  <p className="text-xs text-foreground-muted mt-0.5 inline-flex items-center gap-1">
+                    cash received
+                    {stats.revenuePrior30d > 0 && stats.revenue30d !== stats.revenuePrior30d && (
+                      stats.revenue30d > stats.revenuePrior30d
+                        ? <TrendingUp size={11} className="text-success" />
+                        : <TrendingDown size={11} className="text-warning" />
+                    )}
+                    {stats.revenuePrior30d > 0 && (
+                      <span className="text-foreground-subtle">vs {formatCurrency(stats.revenuePrior30d)}</span>
+                    )}
+                  </p>
+                </div>
+              </CardBody>
+            </Card>
+          </m.div>
+          </Link>
+        ) : (
+          <PendingCard to="/financial" label="Deposits (30d)" icon={DollarSign}
+            note="awaiting deposit import" />
+        )}
+      </m.div>
+
+      {/* ── Charts Row 1: Interment Trend + Age at Death ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground">Burial Trend</h3>
-              <p className="text-xs text-foreground-muted mt-0.5">Interments per month — last {monthsBack} months</p>
+              <h3 className="font-semibold text-foreground">Interments per Month</h3>
+              {/*
+                The window anchors on the newest interment, not on today. Saying
+                so is the whole point: a "last 12 months" chart that silently
+                ends in 2020 would be read as this year's volume.
+              */}
+              <p className="text-xs text-foreground-muted mt-0.5">
+                {periodLabel(stats.dataAsOf, monthsBack)}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Tabs
@@ -451,36 +746,216 @@ export default function Dashboard() {
                 active={String(monthsBack)}
                 onChange={(v) => setMonthsBack(Number(v))}
               />
-              <Badge variant="secondary" size="sm">{stats.burialsYTD} YTD</Badge>
+              <Badge variant="secondary" size="sm">{stats.burialsTrailing12} in 12 mo</Badge>
             </div>
           </CardHeader>
           <CardBody>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={burialTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="burialGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={C.green} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={C.green} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="Burials"
-                  stroke={C.green}
-                  strokeWidth={2.5}
-                  fill="url(#burialGrad)"
-                  dot={false}
-                  activeDot={{ r: 4, fill: C.green, strokeWidth: 0 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {hasInterments ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={burialTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="burialGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={C.green} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={C.green} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="Burials"
+                    stroke={C.green}
+                    strokeWidth={2.5}
+                    fill="url(#burialGrad)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: C.green, strokeWidth: 0 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-foreground-muted text-sm">
+                No interments recorded yet
+              </div>
+            )}
           </CardBody>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Age at Death</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {stats.medianAgeAtDeath !== null
+                ? `median ${stats.medianAgeAtDeath} years`
+                : 'no ages recorded'}
+            </p>
+          </CardHeader>
+          <CardBody>
+            {hasInterments ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={ageBandData} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} vertical={false} />
+                  <XAxis dataKey="band" tick={{ fontSize: 10, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="Interments" fill={C.info} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-foreground-muted text-sm">
+                No age data yet
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* ── Charts Row 2: Referral Channel + Vendor Spend ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              {/*
+                Title states the finding, not the topic. Referral concentration
+                is the risk: losing one relationship removes a quarter of
+                volume.
+              */}
+              <h3 className="font-semibold text-foreground">Where interments come from</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                {stats.referralTop5Pct !== null
+                  ? `top 5 of ${stats.distinctFuneralHomes} homes account for ${stats.referralTop5Pct}%`
+                  : 'no referral data yet'}
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {referralData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={230}>
+                <BarChart data={referralData} layout="vertical" margin={{ top: 0, right: 12, left: 16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 10, fill: chart.tick }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={120}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="Interments" fill={C.gold} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[230px] flex items-center justify-center text-foreground-muted text-sm">
+                No referral data yet
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-foreground">Vendor Spend by Category</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                {formatCurrency(stats.vendorSpendKnown)} known across {stats.vendorCount} vendors · 2020–2024
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {vendorSpendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={230}>
+                <BarChart data={vendorSpendData} layout="vertical" margin={{ top: 0, right: 12, left: 16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: chart.tick }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="category"
+                    tick={{ fontSize: 10, fill: chart.tick }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={140}
+                  />
+                  <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Bar dataKey="Spend" fill={C.green} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[230px] flex items-center justify-center text-foreground-muted text-sm">
+                No vendor spend recorded yet
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* ── Who handled the work, and where it went ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Counselor attribution</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              arrangements credited, {periodLabel(stats.dataAsOf, monthsBack).replace(/^\d+ months to /, 'to ')}
+            </p>
+          </CardHeader>
+          <CardBody>
+            <RankedList rows={stats.topCounselors} empty="No counselor data yet" />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Busiest sections</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {stats.sectionsInUse} sections hold interments
+            </p>
+          </CardHeader>
+          <CardBody>
+            <RankedList rows={stats.topSections} empty="No section data yet" />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-foreground">Largest vendors</h3>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              by known spend, 2020–2024
+            </p>
+          </CardHeader>
+          <CardBody>
+            {stats.topVendorsBySpend.length > 0 ? (
+              <div className="space-y-2.5">
+                {stats.topVendorsBySpend.map((v) => (
+                  <div key={v.name} className="flex items-center gap-3 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-foreground-muted" title={v.name}>{v.name}</p>
+                      {v.category && (
+                        <p className="text-[11px] text-foreground-subtle truncate">{v.category}</p>
+                      )}
+                    </div>
+                    <span className="font-medium text-foreground tabular-nums shrink-0">
+                      {formatCurrency(v.spend)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground-muted text-center py-6">No vendor spend recorded yet</p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* ── Charts Row 3: modules still awaiting their data ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <h3 className="font-semibold text-foreground">Work Order Status</h3>
@@ -515,39 +990,44 @@ export default function Dashboard() {
             </div>
           </CardBody>
         </Card>
-      </div>
 
-      {/* ── Charts Row 2: Revenue + Inventory by Category ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground">Monthly Revenue</h3>
-              <p className="text-xs text-foreground-muted mt-0.5">Deposit totals — last {monthsBack} months</p>
+              {/* Deposits, not Revenue — see the KPI card comment. */}
+              <h3 className="font-semibold text-foreground">Monthly Deposits</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                cash received, not recognised revenue
+              </p>
             </div>
-            <Badge variant="success" size="sm">{formatCurrency(stats.revenue30d)} (30d)</Badge>
           </CardHeader>
           <CardBody>
-            <ResponsiveContainer width="100%" height={210}>
-              <BarChart data={revenueTrend} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor={C.gold} stopOpacity={1} />
-                    <stop offset="100%" stopColor={C.gold} stopOpacity={0.55} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 11, fill: chart.tick }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
-                />
-                <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                <Bar dataKey="Revenue" fill="url(#revenueGrad)" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {loaded.deposits ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={revenueTrend} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor={C.gold} stopOpacity={1} />
+                      <stop offset="100%" stopColor={C.gold} stopOpacity={0.55} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: chart.tick }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
+                  />
+                  <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Bar dataKey="Revenue" fill="url(#revenueGrad)" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[180px] flex items-center justify-center text-foreground-muted text-sm text-center px-4">
+                No deposits recorded yet
+              </div>
+            )}
           </CardBody>
         </Card>
 
@@ -560,7 +1040,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardBody>
             {inventoryCategoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={210}>
+              <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={inventoryCategoryData} layout="vertical" margin={{ top: 0, right: 8, left: 16, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} strokeOpacity={0.6} horizontal={false} />
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: chart.tick }} axisLine={false} tickLine={false} />
@@ -570,13 +1050,43 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[210px] flex items-center justify-center text-foreground-muted text-sm">
+              <div className="h-[180px] flex items-center justify-center text-foreground-muted text-sm">
                 No inventory data yet
               </div>
             )}
           </CardBody>
         </Card>
       </div>
+
+      {/*
+        Capacity is reported, never scored. Occupancy carries no direction: every
+        grave here is occupied, and high occupancy means less left to sell, not
+        better performance. Runway — available spaces ÷ annual absorption — is
+        the metric that would matter, and it is genuinely not computable from
+        what was imported, so the card says why instead of showing a figure.
+      */}
+      {stats.capacity.runwayReason && (
+        <Card>
+          <CardBody className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-background-subtle rounded-lg">
+                <Layers size={16} className="text-foreground-muted" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Capacity runway unavailable
+                </p>
+                <p className="text-xs text-foreground-muted mt-0.5 max-w-2xl">
+                  {stats.capacity.runwayReason}
+                </p>
+              </div>
+            </div>
+            <div className="text-sm text-foreground-muted shrink-0">
+              {stats.capacity.gravesOccupied} of {stats.capacity.gravesTotal} mapped graves occupied
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* ── Locations Map ── */}
       <Card>

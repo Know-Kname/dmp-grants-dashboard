@@ -14,7 +14,92 @@
  * brand colours are defined.
  */
 
-import type { BurialTrendRow, RevenueTrendRow } from './schemas';
+import type {
+  BurialTrendRow,
+  Referral,
+  RevenueTrendRow,
+} from './schemas';
+
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const;
+
+/**
+ * Render a `YYYY-MM-DD` date as `Mon YYYY`.
+ *
+ * Parsed by splitting the string rather than with `new Date(iso)`: that
+ * constructor reads a bare date as UTC midnight, so west of Greenwich
+ * `'2020-12-31'` formats as December 30 — and the dashboard's whole point here
+ * is to state the data's period correctly.
+ *
+ * @param iso A `YYYY-MM-DD` date, or null when there is no data.
+ */
+export function formatMonthYear(iso: string | null): string | null {
+  if (!iso) return null;
+  const [year, month] = iso.split('-');
+  const index = Number(month) - 1;
+  if (!year || !MONTHS[index]) return null;
+  return `${MONTHS[index]} ${year}`;
+}
+
+/**
+ * The period label a windowed card sits under, e.g. `12 months to Dec 2020`.
+ *
+ * Windows anchor on the newest row rather than on today, so without this the
+ * reader has no way to know a "trailing 12 months" figure ends six years ago.
+ *
+ * @param dataAsOf `dashboard_summary().dataAsOf`; null when nothing is loaded.
+ * @param months   Width of the window in months.
+ */
+export function periodLabel(dataAsOf: string | null, months: number): string {
+  const anchor = formatMonthYear(dataAsOf);
+  return anchor ? `${months} months to ${anchor}` : 'no data loaded';
+}
+
+/** The unfiltered row counts that decide whether a module has data at all. */
+export interface ModulePopulation {
+  totalContracts: number;
+  totalAR: number;
+  totalDeposits: number;
+  totalWO: number;
+  totalInventory: number;
+}
+
+/** Which dashboard modules should render a live card rather than a placeholder. */
+export interface ModulesLoaded {
+  contracts: boolean;
+  receivables: boolean;
+  deposits: boolean;
+  workOrders: boolean;
+  inventory: boolean;
+}
+
+/**
+ * Decide which modules have data — from table population only, never from a
+ * filtered figure.
+ *
+ * This distinction is the whole reason the function exists. Three of these
+ * cards previously asked a filtered question, and each one has a legitimate
+ * state where the answer is zero while the table is full:
+ *
+ * - `activeContracts` is 0 once every contract is paid.
+ * - `unpaidAR` is 0 once every invoice is settled — the state a business is
+ *   *trying* to reach.
+ * - `revenue30d` is 0 unless a deposit landed in the last 30 days, so a ledger
+ *   imported from 2020 reads as empty however many rows it has.
+ *
+ * Reporting any of those as "not loaded" tells the user their import failed.
+ */
+export function modulesLoaded(counts: ModulePopulation): ModulesLoaded {
+  return {
+    contracts: counts.totalContracts > 0,
+    receivables: counts.totalAR > 0,
+    deposits: counts.totalDeposits > 0,
+    workOrders: counts.totalWO > 0,
+    inventory: counts.totalInventory > 0,
+  };
+}
 
 /** A slice of the work-order donut. */
 export interface WorkOrderSlice {
@@ -124,3 +209,74 @@ export function burialTrendSeries(rows: BurialTrendRow[]): BurialTrendPoint[] {
 export function revenueTrendSeries(rows: RevenueTrendRow[]): RevenueTrendPoint[] {
   return rows.map((r) => ({ month: r.label, Revenue: r.revenue }));
 }
+
+/** A bar of the referring-funeral-home chart. */
+export interface ReferralBar {
+  name: string;
+  Interments: number;
+  pct: number;
+}
+
+/**
+ * Build the referral ranking series.
+ *
+ * A ranking, so a horizontal bar rather than a pie — and with 47 distinct
+ * funeral homes a pie is doubly wrong. The server already ordered and capped
+ * the rows; this only reshapes them, so the chart cannot disagree with the
+ * concentration figure shown beside it.
+ */
+export function referralSeries(homes: Referral[]): ReferralBar[] {
+  return homes.map((h) => ({ name: h.name, Interments: h.n, pct: h.pct }));
+}
+
+/**
+ * Age bands in the order the histogram presents them.
+ *
+ * Declared here rather than read off the object's keys: `ageBands` is an
+ * unordered record, and sorting it by key would put `0-17` between `18-44` and
+ * `45-64` as strings. A distribution read out of order is worse than no chart.
+ */
+export const AGE_BANDS = ['0-17', '18-44', '45-64', '65-79', '80+'] as const;
+
+/** A bar of the age-at-death distribution. */
+export interface AgeBandBar {
+  band: string;
+  Interments: number;
+}
+
+/**
+ * Build the age-at-death distribution.
+ *
+ * Empty bands are kept, unlike the other charts here: a gap in the middle of a
+ * distribution is information, and dropping it would silently reshape the
+ * curve.
+ *
+ * @param byBand `ageBands` from the summary RPC; absent keys are zero.
+ */
+export function ageBandSeries(byBand: Record<string, number>): AgeBandBar[] {
+  return AGE_BANDS.map((band) => ({ band, Interments: byBand[band] ?? 0 }));
+}
+
+/** A bar of the vendor-spend-by-category chart. */
+export interface VendorSpendBar {
+  category: string;
+  Spend: number;
+}
+
+/**
+ * Build the vendor spend ranking, largest first.
+ *
+ * Sorted here because the RPC returns an unordered object; a ranking chart that
+ * reorders itself between refetches is unreadable. Categories with no known
+ * spend are dropped — only 9 of 47 vendors carry a spend figure, so keeping the
+ * rest would render a chart that is mostly empty axis.
+ */
+export function vendorSpendSeries(
+  byCategory: Record<string, number>,
+): VendorSpendBar[] {
+  return Object.entries(byCategory)
+    .filter(([, spend]) => spend > 0)
+    .map(([category, Spend]) => ({ category, Spend }))
+    .sort((a, b) => b.Spend - a.Spend);
+}
+

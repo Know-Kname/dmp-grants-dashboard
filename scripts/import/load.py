@@ -21,21 +21,29 @@ order, which makes the whole import repeatable.
 Environment:
     SUPABASE_URL, SUPABASE_ANON_KEY, DMP_EMAIL, DMP_PASSWORD
 
+`--backfill` is a third mode: it patches, in place, the columns added after the
+original load (burials.funeral_home / counselor / age_at_death, vendors.category
+/ known_spend from migration 20260804001947). It inserts nothing and deletes
+nothing, so it is the safe way to widen an existing load.
+
 Usage:
-    load.py vendors --csv dim_vendor.csv
-    load.py party   --csv dim_party.csv [--replace]
+    load.py vendors --csv dim_vendor.csv [--replace | --backfill]
+    load.py party   --csv dim_party.csv  [--replace | --backfill]
 """
 
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import csv
 import datetime as dt
 import json
 import os
 import pathlib
 import sys
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 SS_VENDOR = "dim_vendor"
@@ -55,21 +63,46 @@ class Api:
         self.anon_key = anon_key
         self.token: str | None = None
 
+    # Retried on transient failures. A backfill is ~800 requests through a
+    # proxy, and a single dropped TLS handshake used to abort the whole run at
+    # 600 rows -- recoverable in principle, but only by re-running everything.
+    # 5xx and 429 are retried for the same reason; 4xx is not, because a bad
+    # payload will fail identically however many times it is sent.
+    RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+    MAX_ATTEMPTS = 5
+
     def _request(self, method: str, path: str, body=None, headers=None):
         payload = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(f"{self.url}{path}", data=payload, method=method)
-        req.add_header("apikey", self.anon_key)
-        req.add_header("Authorization", f"Bearer {self.token or self.anon_key}")
-        req.add_header("Content-Type", "application/json")
-        for key, value in (headers or {}).items():
-            req.add_header(key, value)
-        try:
-            with urllib.request.urlopen(req) as response:
-                text = response.read().decode()
-                return json.loads(text) if text.strip() else None
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode()
-            raise SystemExit(f"{method} {path} -> HTTP {exc.code}\n{detail}") from exc
+        last_error: str | None = None
+
+        for attempt in range(self.MAX_ATTEMPTS):
+            # Rebuilt per attempt: a Request that already failed mid-send
+            # cannot be safely resubmitted.
+            req = urllib.request.Request(f"{self.url}{path}", data=payload, method=method)
+            req.add_header("apikey", self.anon_key)
+            req.add_header("Authorization", f"Bearer {self.token or self.anon_key}")
+            req.add_header("Content-Type", "application/json")
+            for key, value in (headers or {}).items():
+                req.add_header(key, value)
+
+            try:
+                with urllib.request.urlopen(req, timeout=60) as response:
+                    text = response.read().decode()
+                    return json.loads(text) if text.strip() else None
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode()
+                if exc.code not in self.RETRY_STATUS:
+                    raise SystemExit(f"{method} {path} -> HTTP {exc.code}\n{detail}") from exc
+                last_error = f"HTTP {exc.code}: {detail}"
+            except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+
+            if attempt < self.MAX_ATTEMPTS - 1:
+                time.sleep(2**attempt)  # 1s, 2s, 4s, 8s
+
+        raise SystemExit(
+            f"{method} {path} failed after {self.MAX_ATTEMPTS} attempts\n{last_error}"
+        )
 
     def sign_in(self, email: str, password: str) -> None:
         data = self._request(
@@ -104,6 +137,45 @@ class Api:
             headers={"Prefer": "return=minimal"},
         )
         print(f"  cleared {table} ({source_system})", file=sys.stderr)
+
+    def patch_one(self, table: str, source_system: str, source_ref: str, body: dict) -> None:
+        """Update a single row located by its (source_system, source_ref) pair."""
+        self._request(
+            "PATCH",
+            f"/rest/v1/{table}"
+            f"?source_system=eq.{urllib.parse.quote(source_system, safe='')}"
+            f"&source_ref=eq.{urllib.parse.quote(source_ref, safe='')}",
+            body,
+            {"Prefer": "return=minimal"},
+        )
+
+    def patch_many(
+        self, table: str, source_system: str, updates: list[tuple[str, dict]]
+    ) -> int:
+        """Patch many rows concurrently, each located by its own source_ref.
+
+        One request per row rather than a bulk upsert: an upsert would have to
+        resend every NOT NULL column to satisfy the insert half of
+        `on conflict`, which turns a column backfill into a full rewrite of rows
+        that are already correct. PostgREST also cannot target the partial
+        `uq_<table>_source` index for `on_conflict`, since that index carries a
+        WHERE clause.
+
+        Concurrency is modest on purpose -- this runs against a production
+        project, and the job is short enough that saturating it buys nothing.
+        """
+        done = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {
+                pool.submit(self.patch_one, table, source_system, ref, body): ref
+                for ref, body in updates
+            }
+            for future in concurrent.futures.as_completed(futures):
+                future.result()  # re-raises, so a failed patch stops the run
+                done += 1
+                if done % 200 == 0 or done == len(updates):
+                    print(f"  {table}: {done}/{len(updates)}", file=sys.stderr)
+        return done
 
     def ref_map(self, table: str, source_system: str) -> dict[str, str]:
         """source_ref -> id, paged so it survives PostgREST's default limit."""
@@ -372,6 +444,96 @@ def load_party(api: Api, rows: list[dict], replace: bool) -> None:
             print(f"  {line}", file=sys.stderr)
 
 
+# --------------------------------------------------------------------------
+# Backfill: populate columns added after the original load
+# --------------------------------------------------------------------------
+#
+# The first import had nowhere to put the funeral home, counselor, or age, so
+# it concatenated them into `notes`. Migration 20260804001947 added real
+# columns; these functions fill them in place.
+#
+# In place, and not via --replace, deliberately: --replace deletes and reloads
+# ~3,150 rows across six tables in foreign-key order, which empties a database
+# someone may be looking at and leaves it empty if it fails part way. A patch
+# touches only the new columns and cannot lose a row.
+
+
+def backfill_party(api: Api, rows: list[dict]) -> None:
+    updates: list[tuple[str, dict]] = []
+    skipped_age: list[str] = []
+
+    for row in rows:
+        party_id = cell(row, "party_id")
+        if not party_id:
+            continue
+
+        patch: dict = {}
+
+        # Source column is `mortician`, but every value is a firm, not a person
+        # -- hence the column name funeral_home.
+        if cell(row, "mortician"):
+            patch["funeral_home"] = cell(row, "mortician")
+
+        counselor = " ".join(
+            p for p in (cell(row, "salesman_first"), cell(row, "salesman_last")) if p
+        )
+        if counselor:
+            patch["counselor"] = counselor
+
+        raw_age = cell(row, "deceased_age")
+        if raw_age:
+            try:
+                age = int(raw_age)
+            except ValueError:
+                skipped_age.append(f"{party_id}: non-numeric age {raw_age!r}")
+            else:
+                # Mirror burials_age_at_death_sane rather than letting the
+                # database reject the row: one bad age should not abort a run.
+                if 0 <= age <= 130:
+                    patch["age_at_death"] = age
+                else:
+                    skipped_age.append(f"{party_id}: age {age} out of range")
+
+        if patch:
+            updates.append((party_id, patch))
+
+    print(f"burials: patching {len(updates)} rows", file=sys.stderr)
+    api.patch_many("burials", SS_PARTY, updates)
+    if skipped_age:
+        print(f"  {len(skipped_age)} age values skipped:", file=sys.stderr)
+        for line in skipped_age[:20]:
+            print(f"    {line}", file=sys.stderr)
+
+
+def backfill_vendors(api: Api, rows: list[dict]) -> None:
+    updates: list[tuple[str, dict]] = []
+
+    for row in rows:
+        vendor_id = cell(row, "vendor_id")
+        # Only operating vendors were loaded, so only they have a row to patch.
+        if not vendor_id or cell(row, "operating_vendor") != "Yes":
+            continue
+
+        patch: dict = {}
+        if cell(row, "category"):
+            patch["category"] = cell(row, "category")
+
+        raw_spend = cell(row, "spend_known_usd")
+        if raw_spend:
+            try:
+                spend = float(raw_spend)
+            except ValueError:
+                spend = None
+            if spend is not None and spend >= 0:
+                patch["known_spend"] = spend
+
+        if patch:
+            updates.append((vendor_id, patch))
+
+    print(f"vendors: patching {len(updates)} rows", file=sys.stderr)
+    api.patch_many("vendors", SS_VENDOR, updates)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", choices=["vendors", "party"])
@@ -381,7 +543,15 @@ def main() -> int:
         action="store_true",
         help="delete this source_system's rows first, making the load repeatable",
     )
+    parser.add_argument(
+        "--backfill",
+        action="store_true",
+        help="patch columns added after the original load, in place; inserts nothing",
+    )
     args = parser.parse_args()
+
+    if args.replace and args.backfill:
+        raise SystemExit("--replace and --backfill are mutually exclusive")
 
     missing = [
         name
@@ -397,7 +567,12 @@ def main() -> int:
     rows = read_csv(args.csv)
     print(f"{args.source}: read {len(rows)} rows from {args.csv}", file=sys.stderr)
 
-    if args.source == "vendors":
+    if args.backfill:
+        if args.source == "vendors":
+            backfill_vendors(api, rows)
+        else:
+            backfill_party(api, rows)
+    elif args.source == "vendors":
         load_vendors(api, rows, args.replace)
     else:
         load_party(api, rows, args.replace)

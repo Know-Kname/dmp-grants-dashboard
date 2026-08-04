@@ -14,9 +14,12 @@
  * boundary between the two. Both are needed — this file keeps the schema honest,
  * `index.ts` keeps the components readable.
  *
- * Last generated: 2026-07-31 (17 tables, post Phase 6 RBAC: profiles;
+ * Last generated: 2026-08-04 (17 tables, post Phase 6 RBAC: profiles;
  * post Phase 2 aggregation: the v_ar_aging / v_ap_aging views and the
- * dashboard_summary / monthly_burial_trend / monthly_revenue_trend functions).
+ * dashboard_summary / monthly_burial_trend / monthly_revenue_trend functions,
+ * the latter two now taking an optional p_anchor; post analytic-column
+ * migration: burials.funeral_home / counselor / age_at_death and
+ * vendors.category / known_spend).
  * NOT NULL timestamptz created_at/updated_at).
  */
 
@@ -138,16 +141,19 @@ export type Database = {
       }
       burials: {
         Row: {
+          age_at_death: number | null
           burial_date: string
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
+          counselor: string | null
           created_at: string
           date_of_birth: string | null
           date_of_death: string | null
           deceased_first_name: string
           deceased_last_name: string
           deceased_middle_name: string | null
+          funeral_home: string | null
           grave: string
           grave_id: string | null
           id: string
@@ -162,16 +168,19 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          age_at_death?: number | null
           burial_date: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          counselor?: string | null
           created_at?: string
           date_of_birth?: string | null
           date_of_death?: string | null
           deceased_first_name: string
           deceased_last_name: string
           deceased_middle_name?: string | null
+          funeral_home?: string | null
           grave: string
           grave_id?: string | null
           id?: string
@@ -186,16 +195,19 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          age_at_death?: number | null
           burial_date?: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          counselor?: string | null
           created_at?: string
           date_of_birth?: string | null
           date_of_death?: string | null
           deceased_first_name?: string
           deceased_last_name?: string
           deceased_middle_name?: string | null
+          funeral_home?: string | null
           grave?: string
           grave_id?: string | null
           id?: string
@@ -800,10 +812,12 @@ export type Database = {
       vendors: {
         Row: {
           address: string | null
+          category: string | null
           contact_name: string | null
           created_at: string
           email: string | null
           id: string
+          known_spend: number | null
           name: string
           notes: string | null
           phone: string | null
@@ -813,10 +827,12 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          category?: string | null
           contact_name?: string | null
           created_at?: string
           email?: string | null
           id?: string
+          known_spend?: number | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -826,10 +842,12 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          category?: string | null
           contact_name?: string | null
           created_at?: string
           email?: string | null
           id?: string
+          known_spend?: number | null
           name?: string
           notes?: string | null
           phone?: string | null
@@ -994,7 +1012,7 @@ export type Database = {
       is_active_user: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       monthly_burial_trend: {
-        Args: { p_months?: number }
+        Args: { p_anchor?: string; p_months?: number }
         Returns: {
           burials: number
           label: string
@@ -1002,7 +1020,7 @@ export type Database = {
         }[]
       }
       monthly_revenue_trend: {
-        Args: { p_months?: number }
+        Args: { p_anchor?: string; p_months?: number }
         Returns: {
           label: string
           month_start: string

@@ -74,6 +74,39 @@ require inventing the contract-to-customer relationship, so it was left out.
 contract-to-purchaser link. That folder could not be enumerated — Graph returned
 a transient HTTP 500 on two attempts — and is worth retrying.
 
+## Analytic columns and the backfill
+
+The first load had nowhere to put the three richest columns in `dim_party.csv`,
+so it concatenated them into `notes`:
+
+```
+Mortician: PYE FUNERAL HOME | Counselor: CHERYL BERRIEN | Age at death: 88
+```
+
+`vendors.notes` carried category and spend the same way. None of it could be
+grouped or aggregated, which is why the dashboard could not show any of it.
+
+Migration `20260804001947_burial_and_vendor_analytic_columns.sql` adds real
+columns — `burials.funeral_home`, `burials.counselor`, `burials.age_at_death`,
+`vendors.category`, `vendors.known_spend` — all additive and nullable.
+`load.py --backfill` then populates them in place.
+
+The source column is `mortician`, but every value in it is a firm
+("PYE FUNERAL HOME", "JAMES COLE") rather than a person, so the column is named
+`funeral_home` to stop anyone joining it to a staff table.
+
+What that unlocked, on the 2020 register:
+
+| Measure | Value |
+| --- | --- |
+| Referral concentration | PYE 26.0% + James Cole 23.5% = **49.5% from two homes**; top 5 = 64.8% of 47 |
+| Counselors | 7; the largest holds 46% of arrangements |
+| Age at death | median 69, range 0–106 |
+| April 2020 interments | **123 against a ~55 monthly baseline** — Detroit's first COVID wave |
+
+`notes` is left untouched. After the backfill it is redundant rather than wrong,
+and it remains the only copy of anything the parse did not pick up.
+
 ## Running an import
 
 ```bash
@@ -91,6 +124,23 @@ policies the application runs under. It resolves foreign keys by `source_ref`
 and skips rows already present, so it is safe to re-run and safe to restart
 part-way through. `--replace` deletes the load's own rows first (in reverse
 dependency order) and reloads from scratch.
+
+`--backfill` is the third mode, and the right one for widening an existing load:
+
+```bash
+python3 scripts/import/load.py party --csv /path/to/dim_party.csv --backfill
+```
+
+It patches rows in place, matched on `source_ref`, writing only the columns
+added after the original import. It inserts nothing and deletes nothing.
+
+Prefer it over `--replace` for a column addition. `--replace` deletes and
+reloads ~3,150 rows across six tables in foreign-key order, which briefly
+empties a database someone may be looking at and leaves it empty if the run
+fails part way — which is exactly what happened on the first attempt, when a
+dropped TLS handshake aborted the job at 600 of 796 rows. Requests now retry
+with exponential backoff on connection resets and on 429/5xx, so a single bad
+connection no longer costs the whole run.
 
 `scripts/import/build_import_sql.py` emits the same load as `.sql` files, for
 review or for applying through a SQL client instead of the API.
