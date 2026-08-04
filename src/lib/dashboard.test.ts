@@ -9,10 +9,17 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  AGE_BANDS,
   INVENTORY_CATEGORIES,
+  ageBandSeries,
   burialTrendSeries,
+  formatMonthYear,
   inventoryCategoryData,
+  namedCountSeries,
+  periodLabel,
+  referralSeries,
   revenueTrendSeries,
+  vendorSpendSeries,
   workOrderChartData,
   type WorkOrderStatusColors,
 } from './dashboard';
@@ -133,5 +140,101 @@ describe('trend series', () => {
   it('returns an empty series for an empty result set', () => {
     expect(burialTrendSeries([])).toEqual([]);
     expect(revenueTrendSeries([])).toEqual([]);
+  });
+});
+
+describe('formatMonthYear', () => {
+  it('formats an ISO date as Mon YYYY', () => {
+    expect(formatMonthYear('2020-12-31')).toBe('Dec 2020');
+    expect(formatMonthYear('2020-01-03')).toBe('Jan 2020');
+  });
+
+  it('does not shift the month in negative UTC offsets', () => {
+    // `new Date('2020-12-31')` is UTC midnight, which is Dec 30 anywhere west
+    // of Greenwich. Parsing the string by hand is what keeps the stated period
+    // correct for a Detroit user.
+    expect(formatMonthYear('2020-12-01')).toBe('Dec 2020');
+    expect(formatMonthYear('2020-03-01')).toBe('Mar 2020');
+  });
+
+  it('returns null for no date and for an unparseable one', () => {
+    expect(formatMonthYear(null)).toBeNull();
+    expect(formatMonthYear('not-a-date')).toBeNull();
+    expect(formatMonthYear('2020-13-01')).toBeNull();
+  });
+});
+
+describe('periodLabel', () => {
+  it('states the window and where it ends', () => {
+    expect(periodLabel('2020-12-31', 12)).toBe('12 months to Dec 2020');
+    expect(periodLabel('2020-12-31', 6)).toBe('6 months to Dec 2020');
+  });
+
+  it('says so plainly when nothing is loaded', () => {
+    expect(periodLabel(null, 12)).toBe('no data loaded');
+  });
+});
+
+describe('ageBandSeries', () => {
+  it('presents bands in ascending age, not object key order', () => {
+    // Sorting these as strings would put '0-17' between '18-44' and '45-64'.
+    const series = ageBandSeries({ '80+': 225, '0-17': 11, '45-64': 211 });
+    expect(series.map((b) => b.band)).toEqual([...AGE_BANDS]);
+  });
+
+  it('keeps empty bands, because a gap in a distribution is information', () => {
+    const series = ageBandSeries({ '0-17': 11 });
+    expect(series).toHaveLength(AGE_BANDS.length);
+    expect(series.find((b) => b.band === '18-44')?.Interments).toBe(0);
+  });
+
+  it('renders every band as zero for an empty map', () => {
+    expect(ageBandSeries({}).every((b) => b.Interments === 0)).toBe(true);
+  });
+});
+
+describe('referralSeries', () => {
+  it('preserves the server ranking and carries the share through', () => {
+    const series = referralSeries([
+      { name: 'PYE FUNERAL HOME', n: 207, pct: 26 },
+      { name: 'JAMES COLE', n: 187, pct: 23.5 },
+    ]);
+    expect(series).toEqual([
+      { name: 'PYE FUNERAL HOME', Interments: 207, pct: 26 },
+      { name: 'JAMES COLE', Interments: 187, pct: 23.5 },
+    ]);
+  });
+
+  it('handles no referral data', () => {
+    expect(referralSeries([])).toEqual([]);
+  });
+});
+
+describe('vendorSpendSeries', () => {
+  it('orders categories by spend, largest first', () => {
+    const series = vendorSpendSeries({ Fuel: 51215.69, Vaults: 413186.66, Card: 251129.57 });
+    expect(series.map((v) => v.category)).toEqual(['Vaults', 'Card', 'Fuel']);
+  });
+
+  it('drops categories with no known spend rather than drawing empty axis', () => {
+    // Only 9 of 47 vendors carry a spend figure; keeping the rest would render
+    // a chart that is mostly blank.
+    expect(vendorSpendSeries({ Fuel: 100, Unknown: 0 }).map((v) => v.category))
+      .toEqual(['Fuel']);
+  });
+
+  it('handles an empty map', () => {
+    expect(vendorSpendSeries({})).toEqual([]);
+  });
+});
+
+describe('namedCountSeries', () => {
+  it('keeps the server order rather than re-sorting', () => {
+    const series = namedCountSeries([
+      { name: 'CHERYL BERRIEN', n: 366 },
+      { name: 'ANTHONY MCKINNEY', n: 203 },
+    ]);
+    expect(series.map((s) => s.name)).toEqual(['CHERYL BERRIEN', 'ANTHONY MCKINNEY']);
+    expect(series[0].Interments).toBe(366);
   });
 });

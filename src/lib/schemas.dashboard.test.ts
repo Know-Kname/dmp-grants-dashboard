@@ -19,6 +19,47 @@ import {
 /** A payload matching what `dashboard_summary()` returns against seeded data. */
 const SUMMARY = {
   generatedAt: '2026-07-31T12:00:00+00:00',
+
+  // Anchored on the newest interment rather than on today.
+  dataAsOf: '2020-12-31',
+  burialsLatestMonth: 75,
+  burialsPriorMonth: 55,
+  burialsTrailing12: 796,
+  totalInterments: 796,
+  intermentsByYear: { '2020': 796 },
+
+  topFuneralHomes: [
+    { name: 'PYE FUNERAL HOME', n: 207, pct: 26 },
+    { name: 'JAMES COLE', n: 187, pct: 23.5 },
+  ],
+  referralTop5Pct: 64.8,
+  distinctFuneralHomes: 47,
+
+  topCounselors: [{ name: 'CHERYL BERRIEN', n: 366 }],
+
+  ageBands: { '0-17': 11, '18-44': 93, '45-64': 211, '65-79': 255, '80+': 225 },
+  medianAgeAtDeath: 69,
+
+  sectionsInUse: 41,
+  topSections: [{ name: '2', n: 226 }],
+
+  capacity: {
+    gravesTotal: 795,
+    gravesOccupied: 795,
+    lotsTotal: 733,
+    runwayYears: null,
+    runwayReason: 'Only graves with a recorded interment were imported.',
+  },
+
+  customerCount: 779,
+
+  vendorCount: 47,
+  vendorSpendKnown: 925466,
+  vendorSpendByCategory: { 'Burial Vault Supplier': 413186.66 },
+  topVendorsBySpend: [
+    { name: 'Comerica Bank', category: 'Payment Processing', spend: 251129.57 },
+  ],
+
   burialsThisMonth: 2,
   burialsLastMonth: 1,
   burialsYTD: 9,
@@ -131,6 +172,76 @@ describe('dashboardSummarySchema', () => {
   it('rejects a non-object payload', () => {
     expect(dashboardSummarySchema.safeParse(null).success).toBe(false);
     expect(dashboardSummarySchema.safeParse('{}').success).toBe(false);
+  });
+});
+
+describe('dashboardSummarySchema — cemetery fields', () => {
+  it('allows a null dataAsOf, which is how "nothing loaded" is expressed', () => {
+    // Distinct from a date equal to today: the UI shows "no data loaded"
+    // rather than a period label, so this must not be coerced.
+    expect(dashboardSummarySchema.parse({ ...SUMMARY, dataAsOf: null }).dataAsOf).toBeNull();
+  });
+
+  it('allows a null runwayYears while keeping its reason', () => {
+    // Runway is not computable from an import that only created occupied
+    // graves. The null is the answer, and the reason is what the card renders.
+    const parsed = dashboardSummarySchema.parse(SUMMARY);
+    expect(parsed.capacity.runwayYears).toBeNull();
+    expect(parsed.capacity.runwayReason).toContain('recorded interment');
+  });
+
+  it('allows null referral and median-age figures when there is nothing to compute', () => {
+    const parsed = dashboardSummarySchema.parse({
+      ...SUMMARY,
+      referralTop5Pct: null,
+      medianAgeAtDeath: null,
+    });
+    expect(parsed.referralTop5Pct).toBeNull();
+    expect(parsed.medianAgeAtDeath).toBeNull();
+  });
+
+  it('coerces string-encoded referral percentages and spend', () => {
+    const parsed = dashboardSummarySchema.parse({
+      ...SUMMARY,
+      referralTop5Pct: '64.8',
+      medianAgeAtDeath: '69',
+      topFuneralHomes: [{ name: 'PYE FUNERAL HOME', n: 207, pct: '26.0' }],
+      vendorSpendKnown: '925466.00',
+    });
+    expect(parsed.referralTop5Pct).toBe(64.8);
+    expect(parsed.medianAgeAtDeath).toBe(69);
+    expect(parsed.topFuneralHomes[0].pct).toBe(26);
+    expect(parsed.vendorSpendKnown).toBe(925466);
+  });
+
+  it('rejects a referral row missing its share', () => {
+    expect(dashboardSummarySchema.safeParse({
+      ...SUMMARY,
+      topFuneralHomes: [{ name: 'PYE FUNERAL HOME', n: 207 }],
+    }).success).toBe(false);
+  });
+
+  it('accepts empty rankings and band maps', () => {
+    const parsed = dashboardSummarySchema.parse({
+      ...SUMMARY,
+      topFuneralHomes: [],
+      topCounselors: [],
+      topSections: [],
+      ageBands: {},
+      intermentsByYear: {},
+      vendorSpendByCategory: {},
+      topVendorsBySpend: [],
+    });
+    expect(parsed.topFuneralHomes).toEqual([]);
+    expect(parsed.ageBands).toEqual({});
+  });
+
+  it('allows a vendor with no category', () => {
+    const parsed = dashboardSummarySchema.parse({
+      ...SUMMARY,
+      topVendorsBySpend: [{ name: 'Comerica Bank', category: null, spend: 251129.57 }],
+    });
+    expect(parsed.topVendorsBySpend[0].category).toBeNull();
   });
 });
 

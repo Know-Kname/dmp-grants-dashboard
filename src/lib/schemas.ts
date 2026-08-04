@@ -430,6 +430,55 @@ export const upcomingGrantSchema = z.object({
 
 export type UpcomingGrant = z.infer<typeof upcomingGrantSchema>;
 
+/** A `{name, n}` pair: one counselor, section, or similar ranked dimension. */
+export const namedCountSchema = z.object({
+  name: z.string(),
+  n: dbCountSchema,
+});
+
+export type NamedCount = z.infer<typeof namedCountSchema>;
+
+/** One referring funeral home, with its share of all referred interments. */
+export const referralSchema = z.object({
+  name: z.string(),
+  n: dbCountSchema,
+  pct: dbNumberSchema,
+});
+
+export type Referral = z.infer<typeof referralSchema>;
+
+/** One vendor's known spend, for the spend ranking. */
+export const vendorSpendSchema = z.object({
+  name: z.string(),
+  category: z.string().nullable(),
+  spend: dbNumberSchema,
+});
+
+export type VendorSpend = z.infer<typeof vendorSpendSchema>;
+
+/**
+ * Interment capacity.
+ *
+ * `runwayYears` is nullable and currently always null. Runway — available
+ * spaces ÷ annual absorption — is the real cemetery capacity metric, but the
+ * import only created graves that already hold an interment, so there is no
+ * available-space denominator. `runwayReason` carries that explanation to the
+ * UI so the card can say why rather than show a hyphen.
+ *
+ * Note what is deliberately absent: an occupancy percentage. Every grave here
+ * is occupied, so it would read 100%, and high occupancy means *less left to
+ * sell* — it is not a performance figure and must never be scored as one.
+ */
+export const capacitySchema = z.object({
+  gravesTotal: dbCountSchema,
+  gravesOccupied: dbCountSchema,
+  lotsTotal: dbCountSchema,
+  runwayYears: dbNumberSchema.nullable(),
+  runwayReason: z.string().nullable(),
+});
+
+export type Capacity = z.infer<typeof capacitySchema>;
+
 /**
  * The single `jsonb` object returned by the `dashboard_summary()` RPC.
  *
@@ -438,12 +487,58 @@ export type UpcomingGrant = z.infer<typeof upcomingGrantSchema>;
  * are stripped rather than rejected, so the database may grow a new KPI before
  * the client learns to render it.
  *
- * `workOrdersByStatus` and `inventoryByCategory` omit keys with no rows — an
- * absent key means zero, not missing data.
+ * `workOrdersByStatus`, `inventoryByCategory`, `ageBands`, `intermentsByYear`
+ * and `vendorSpendByCategory` omit keys with no rows — an absent key means
+ * zero, not missing data.
  */
 export const dashboardSummarySchema = z.object({
   generatedAt: z.string(),
 
+  /**
+   * The latest date that actually has data — the anchor every burial window
+   * below resolves against. Null only when there are no burials at all, which
+   * is what lets the UI distinguish "nothing loaded" from "loaded, and it ends
+   * today".
+   */
+  dataAsOf: z.string().nullable(),
+
+  // Anchored burial counters. These are what the page renders: with a purely
+  // historical register the calendar-relative ones below are all zero, which is
+  // true but useless.
+  burialsLatestMonth: dbCountSchema,
+  burialsPriorMonth: dbCountSchema,
+  burialsTrailing12: dbCountSchema,
+  totalInterments: dbCountSchema,
+  intermentsByYear: z.record(z.string(), dbCountSchema),
+
+  // Referral channel. Concentration here is the headline business fact, not the
+  // per-home counts.
+  topFuneralHomes: z.array(referralSchema),
+  referralTop5Pct: dbNumberSchema.nullable(),
+  distinctFuneralHomes: dbCountSchema,
+
+  topCounselors: z.array(namedCountSchema),
+
+  ageBands: z.record(z.string(), dbCountSchema),
+  medianAgeAtDeath: dbNumberSchema.nullable(),
+
+  sectionsInUse: dbCountSchema,
+  topSections: z.array(namedCountSchema),
+
+  capacity: capacitySchema,
+
+  customerCount: dbCountSchema,
+
+  vendorCount: dbCountSchema,
+  vendorSpendKnown: dbNumberSchema,
+  vendorSpendByCategory: z.record(z.string(), dbNumberSchema),
+  topVendorsBySpend: z.array(vendorSpendSchema),
+
+  /**
+   * Calendar-relative counters, kept because the RPC still returns them and
+   * removing a required field would break any client still deployed. The page
+   * no longer reads them.
+   */
   burialsThisMonth: dbCountSchema,
   burialsLastMonth: dbCountSchema,
   burialsYTD: dbCountSchema,
