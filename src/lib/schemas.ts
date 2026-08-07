@@ -479,6 +479,100 @@ export const capacitySchema = z.object({
 
 export type Capacity = z.infer<typeof capacitySchema>;
 
+/** One cemetery's slice of the contract ledger. */
+export const cemeterySalesSchema = z.object({
+  name: z.string(),
+  contracts: dbCountSchema,
+  value: dbNumberSchema,
+  avgValue: dbNumberSchema,
+  preNeed: dbCountSchema,
+});
+
+export type CemeterySales = z.infer<typeof cemeterySalesSchema>;
+
+/** One year of contracts, split by need type. */
+export const yearSalesSchema = z.object({
+  year: dbCountSchema,
+  contracts: dbCountSchema,
+  value: dbNumberSchema,
+  preNeed: dbCountSchema,
+  atNeed: dbCountSchema,
+  preNeedValue: dbNumberSchema,
+});
+
+export type YearSales = z.infer<typeof yearSalesSchema>;
+
+/**
+ * One product line of the ledger.
+ *
+ * `code` and `group` are the source system's own tokens — `SRVM`, `MINC`,
+ * `CARE`, and 527 more. They are stored and rendered exactly as recorded,
+ * because the export defines no expansion for them and inventing one would put
+ * a made-up product name on the page.
+ */
+export const productSalesSchema = z.object({
+  code: z.string(),
+  group: z.string().nullable(),
+  lines: dbCountSchema,
+  value: dbNumberSchema,
+});
+
+export type ProductSales = z.infer<typeof productSalesSchema>;
+
+/** One salesperson's book. */
+export const salespersonSchema = z.object({
+  name: z.string(),
+  contracts: dbCountSchema,
+  value: dbNumberSchema,
+});
+
+export type Salesperson = z.infer<typeof salespersonSchema>;
+
+/**
+ * The contract ledger, as `dashboard_summary().sales`.
+ *
+ * **`value` is booked sale value, not revenue.** It sums `total_amount` over
+ * contracts the CemSites "paid in full" register says are settled: a pre-need
+ * contract is cash collected years before the service is delivered, the report
+ * records the period a contract was *paid off* rather than earned, and trust
+ * and perpetual-care components sit inside these totals. Every label the UI
+ * renders from this object says "sale value" and carries that qualifier — none
+ * of it may be titled "Revenue".
+ *
+ * Five fields go null on an empty ledger rather than zero, because each is a
+ * quotient with no denominator: `avgValue`, `linesPerContract` and
+ * `preNeedSharePct` divide by the contract count, and the two dates are a
+ * `max`/`min` over no rows. Coercing any of them to 0 would state a fact the
+ * data does not support.
+ *
+ * `dataAsOf` is the ledger's own anchor and is deliberately separate from the
+ * summary's burial `dataAsOf` — the interment register covers 2020 while
+ * contracts run to 2026, and sharing one date would mislabel every sales card.
+ */
+export const salesSchema = z.object({
+  dataAsOf: z.string().nullable(),
+  earliestSignedDate: z.string().nullable(),
+
+  contracts: dbCountSchema,
+  lines: dbCountSchema,
+  value: dbNumberSchema,
+  avgValue: dbNumberSchema.nullable(),
+  linesPerContract: dbNumberSchema.nullable(),
+
+  preNeedContracts: dbCountSchema,
+  preNeedValue: dbNumberSchema,
+  preNeedSharePct: dbNumberSchema.nullable(),
+
+  byCemetery: z.array(cemeterySalesSchema),
+  byYear: z.array(yearSalesSchema),
+  topProducts: z.array(productSalesSchema),
+  distinctProducts: dbCountSchema,
+  topSalespeople: z.array(salespersonSchema),
+  valueBands: z.record(z.string(), dbCountSchema),
+});
+
+export type Sales = z.infer<typeof salesSchema>;
+
 /**
  * The single `jsonb` object returned by the `dashboard_summary()` RPC.
  *
@@ -533,6 +627,8 @@ export const dashboardSummarySchema = z.object({
   vendorSpendKnown: dbNumberSchema,
   vendorSpendByCategory: z.record(z.string(), dbNumberSchema),
   topVendorsBySpend: z.array(vendorSpendSchema),
+
+  sales: salesSchema,
 
   /**
    * Calendar-relative counters, kept because the RPC still returns them and
@@ -602,11 +698,29 @@ export const revenueTrendRowSchema = z.object({
   revenue: dbNumberSchema,
 });
 
+/**
+ * Rows from `contract_trend()`.
+ *
+ * `sale_value`, not `revenue` — same distinction as `salesSchema.value`, and
+ * the reason this is a separate row type rather than a reuse of
+ * `revenueTrendRowSchema`: the two measure different things from different
+ * tables, and a shared name would invite one chart to be relabelled as the
+ * other.
+ */
+export const contractTrendRowSchema = z.object({
+  month_start: z.string(),
+  label: z.string(),
+  contracts: dbCountSchema,
+  sale_value: dbNumberSchema,
+});
+
 export const burialTrendSchema = z.array(burialTrendRowSchema);
 export const revenueTrendSchema = z.array(revenueTrendRowSchema);
+export const contractTrendSchema = z.array(contractTrendRowSchema);
 
 export type BurialTrendRow = z.infer<typeof burialTrendRowSchema>;
 export type RevenueTrendRow = z.infer<typeof revenueTrendRowSchema>;
+export type ContractTrendRow = z.infer<typeof contractTrendRowSchema>;
 
 // ============================================
 // VALIDATION HELPERS

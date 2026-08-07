@@ -13,7 +13,12 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { supabase } from '../lib/supabase';
 import { isUUID, toCamelCaseKeys, toSnakeCaseKeys } from '../lib/utils';
 import { queryKeys } from '../lib/query';
-import { burialTrendSchema, dashboardSummarySchema, revenueTrendSchema } from '../lib/schemas';
+import {
+  burialTrendSchema,
+  contractTrendSchema,
+  dashboardSummarySchema,
+  revenueTrendSchema,
+} from '../lib/schemas';
 import { affectedRow, affectedRows, WriteBlockedError } from '../lib/writeResult';
 import { profilesTable, type Profile, type ProfileRow } from '../lib/profiles';
 import { toAppRole, type AppRole } from '../lib/permissions';
@@ -227,6 +232,24 @@ export function useRevenueTrend(months: number) {
     queryKey: queryKeys.dashboard.revenueTrend(months),
     queryFn: async () =>
       revenueTrendSchema.parse(await sb(supabase.rpc('monthly_revenue_trend', { p_months: months }))),
+  });
+}
+
+/**
+ * Contracts written per month and their booked sale value, zero-filled and
+ * ordered ascending by the database.
+ *
+ * Grouped by `signed_date` — when the sale happened — not by when the contract
+ * was paid off. Separate from the summary for the same reason as
+ * {@link useBurialTrend}.
+ *
+ * @param months How many months back to return, inclusive of the current one.
+ */
+export function useContractTrend(months: number) {
+  return useQuery({
+    queryKey: queryKeys.dashboard.contractTrend(months),
+    queryFn: async () =>
+      contractTrendSchema.parse(await sb(supabase.rpc('contract_trend', { p_months: months }))),
   });
 }
 

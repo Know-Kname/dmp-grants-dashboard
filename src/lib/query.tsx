@@ -95,7 +95,7 @@ export const queryKeys = {
   /**
    * Server-side dashboard aggregates.
    *
-   * `summary` and the two trends are separate keys on purpose: the dashboard's
+   * `summary` and the trends are separate keys on purpose: the dashboard's
    * 6M/12M/24M control changes only the trend range, and a single bundled key
    * would refetch every KPI on each toggle. The range is part of the trend keys
    * so each range is cached independently instead of thrashing one entry.
@@ -105,6 +105,8 @@ export const queryKeys = {
     summary: () => [...queryKeys.dashboard.all, 'summary'] as const,
     burialTrend: (months: number) => [...queryKeys.dashboard.all, 'burial-trend', months] as const,
     revenueTrend: (months: number) => [...queryKeys.dashboard.all, 'revenue-trend', months] as const,
+    contractTrend: (months: number) =>
+      [...queryKeys.dashboard.all, 'contract-trend', months] as const,
   },
 
   // Work Orders

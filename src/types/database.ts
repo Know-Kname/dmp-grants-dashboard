@@ -14,12 +14,14 @@
  * boundary between the two. Both are needed — this file keeps the schema honest,
  * `index.ts` keeps the components readable.
  *
- * Last generated: 2026-08-04 (17 tables, post Phase 6 RBAC: profiles;
+ * Last generated: 2026-08-07 (17 tables, post Phase 6 RBAC: profiles;
  * post Phase 2 aggregation: the v_ar_aging / v_ap_aging views and the
  * dashboard_summary / monthly_burial_trend / monthly_revenue_trend functions,
- * the latter two now taking an optional p_anchor; post analytic-column
+ * the latter two taking an optional p_anchor; post analytic-column
  * migration: burials.funeral_home / counselor / age_at_death and
- * vendors.category / known_spend).
+ * vendors.category / known_spend; post contract-sales migration:
+ * contracts.cemetery_id / salesperson, contract_items.product_group /
+ * product_code, and the contract_trend function).
  * NOT NULL timestamptz created_at/updated_at).
  */
 
@@ -284,6 +286,8 @@ export type Database = {
           description: string
           id: string
           inventory_id: string | null
+          product_code: string | null
+          product_group: string | null
           quantity: number
           source_ref: string | null
           source_system: string | null
@@ -295,6 +299,8 @@ export type Database = {
           description: string
           id?: string
           inventory_id?: string | null
+          product_code?: string | null
+          product_group?: string | null
           quantity?: number
           source_ref?: string | null
           source_system?: string | null
@@ -306,6 +312,8 @@ export type Database = {
           description?: string
           id?: string
           inventory_id?: string | null
+          product_code?: string | null
+          product_group?: string | null
           quantity?: number
           source_ref?: string | null
           source_system?: string | null
@@ -330,11 +338,13 @@ export type Database = {
       contracts: {
         Row: {
           amount_paid: number
+          cemetery_id: string | null
           contract_number: string
           created_at: string
           customer_id: string
           id: string
           payment_plan: Json | null
+          salesperson: string | null
           signed_date: string
           source_ref: string | null
           source_system: string | null
@@ -345,11 +355,13 @@ export type Database = {
         }
         Insert: {
           amount_paid?: number
+          cemetery_id?: string | null
           contract_number: string
           created_at?: string
           customer_id: string
           id?: string
           payment_plan?: Json | null
+          salesperson?: string | null
           signed_date: string
           source_ref?: string | null
           source_system?: string | null
@@ -360,11 +372,13 @@ export type Database = {
         }
         Update: {
           amount_paid?: number
+          cemetery_id?: string | null
           contract_number?: string
           created_at?: string
           customer_id?: string
           id?: string
           payment_plan?: Json | null
+          salesperson?: string | null
           signed_date?: string
           source_ref?: string | null
           source_system?: string | null
@@ -374,6 +388,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contracts_cemetery_id_fkey"
+            columns: ["cemetery_id"]
+            isOneToOne: false
+            referencedRelation: "cemeteries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contracts_customer_id_fkey"
             columns: ["customer_id"]
@@ -1007,6 +1028,15 @@ export type Database = {
     }
     Functions: {
       can_write: { Args: never; Returns: boolean }
+      contract_trend: {
+        Args: { p_anchor?: string; p_months?: number }
+        Returns: {
+          contracts: number
+          label: string
+          month_start: string
+          sale_value: number
+        }[]
+      }
       current_app_role: { Args: never; Returns: string }
       dashboard_summary: { Args: never; Returns: Json }
       is_active_user: { Args: never; Returns: boolean }
