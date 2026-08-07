@@ -384,6 +384,26 @@ function ModalPanel({ onClose, title, description, children, footer, size = 'md'
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * `onClose` reaches the effect below through a ref, never through its deps.
+   *
+   * Not a micro-optimisation — the effect's cleanup calls `previous?.focus()`,
+   * so anything that re-runs it yanks focus out of whatever the user is typing
+   * into. Every call site passes `onClose` as an inline arrow (there is not one
+   * `useCallback` anywhere under `src/pages/`), so its identity changes on every
+   * parent render, and a controlled input re-renders its parent on every
+   * keystroke. Keyed on `[onClose]`, that chain cost the user every character
+   * after the first, in every modal in the app.
+   *
+   * Re-pointing the ref on each render is what keeps this honest: the handler
+   * invoked on Escape is always the current one, so nothing observes a closure
+   * over stale state.
+   */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
@@ -391,7 +411,7 @@ function ModalPanel({ onClose, title, description, children, footer, size = 'md'
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab') {
         // Focus trap: cycle within the dialog
         const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
@@ -414,7 +434,12 @@ function ModalPanel({ onClose, title, description, children, footer, size = 'md'
       document.body.style.overflow = prevOverflow;
       previous?.focus();
     };
-  }, [onClose]);
+    // Empty deps, deliberately. `Modal` renders this panel only while open (the
+    // `isOpen && <ModalPanel/>` guard above), so mount *is* open and unmount
+    // *is* close — the effect's whole lifecycle already matches the modal's.
+    // Restoring focus to the opener on the way out is the desired behaviour;
+    // running that cleanup mid-edit was the fault.
+  }, []);
 
   const sizes = {
     sm: 'max-w-md',

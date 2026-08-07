@@ -1,60 +1,92 @@
-# 07 — Modal focus trap may steal focus between keystrokes
+# 07 — Modal focus trap stole focus between keystrokes
 
-**Severity:** Unknown — **plausibly High** · **Status:** ⚠️ **UNVERIFIED IN A REAL BROWSER** · **Found:** while writing tests for runbook 01, not by the original review.
+**Severity:** **High** · **Status:** ✅ **Fixed** — confirmed in real Chromium, then fixed and verified · **Found:** while writing tests for runbook 01, not by the original review.
 
 ## Read this first
 
-This runbook is **not** at the same evidence standard as 01–06. Those were each
-reproduced and independently re-verified. This one has a confirmed mechanism in
-**jsdom only**, and there is strong circumstantial evidence it does *not*
-reproduce in a real browser.
+An earlier revision of this runbook was marked **UNVERIFIED / jsdom only** and
+made a browser reproduction its first step, on the theory that jsdom's
+synchronous focus model might be manufacturing the failure.
 
-**Do not fix this until it is reproduced against a running app.** Step 1 below is
-that reproduction. If it does not reproduce, close this runbook as jsdom-only
-and note it in `00-not-actionable.md`.
+**That reproduction has now been done, and the bug is real.** Everything below
+about doubt is kept only as a record of how the question was settled; none of it
+is still open. The severity is **High**, not "unknown".
 
-The initial write-up argued this was probably jsdom-only because production has
-~1,575 rows that "must have been typed in." That turned out to be false — see
-below. The doubt has narrowed considerably.
+## What it did
+
+**You could type exactly one character into any modal field in this app.** Every
+modal, every field, every page. The first keystroke landed, focus left the input,
+and every subsequent keystroke went nowhere.
+
+## Confirmed in a real browser
+
+Reproduced with Playwright against real Chromium, using a harness rendering the
+real `Modal` + `Input` with an inline-arrow `onClose` — the same shape every page
+uses.
+
+```
+BEFORE FIX
+after .type("Alexandra", delay 40): "A"   | active: DIV[dialog]
+after .type("Bartholomew", delay 0):  "B"   | active: DIV[dialog]
+
+AFTER FIX
+after .type("Alexandra", delay 40): "Alexandra"    | active: firstName
+after .type("Bartholomew", delay 0):  "Bartholomew"  | active: firstName
+```
+
+Note the `active:` column — before the fix, focus sits on the dialog container,
+not the input. Typing speed made no difference: `delay 40` (normal human speed)
+and `delay 0` (as fast as the driver can go) both dropped everything after the
+first character.
+
+**`.fill()` works either way**, which is why this hid for so long. `fill()` sets
+the value in one shot and never exercises per-keystroke focus. Only discrete
+keystrokes reveal it — in Playwright, and equally in jsdom, where
+`userEvent.type` catches it and `fireEvent.change` does not.
 
 ## The mechanism
 
-`Modal` in `src/components/ui.tsx` keys its focus-trap `useEffect` on `onClose`.
-Every page passes that prop **unmemoised** — an inline arrow re-created on each
-render. So the effect's dependency changes every render, tearing down and
-re-running the effect, and its cleanup calls `previous?.focus()`.
+`ModalPanel` in `src/components/ui.tsx` keyed its focus-trap `useEffect` on
+`[onClose]`. The chain:
 
-The consequence in jsdom: focus is pulled off the active input between
-keystrokes. `userEvent.type` registered only the first character.
+1. Every call site passes `onClose` as an **inline arrow**, so its identity is
+   new on every parent render.
+2. A controlled input inside the modal re-renders its parent on every keystroke.
+3. New `onClose` identity → the effect tears down and re-runs.
+4. Its cleanup calls `previous?.focus()` — focus leaves the input for whatever
+   was focused before the modal opened.
+5. Every later keystroke goes nowhere.
 
-## The circumstantial defence has collapsed — treat this as plausible
+## Why it hit every modal
 
-The original reasoning was: 779 customers and 796 burials exist in production, so
-if modals dropped keystrokes somebody would have noticed.
+There is not a single `useCallback` anywhere under `src/pages/`:
 
-**That argument is dead.** Every one of those rows was bulk imported:
+```
+$ grep -rn "useCallback" src/pages/ | wc -l
+0
+```
+
+So no call site accidentally escaped it. All eight CRUD pages plus
+`CommandPalette` were affected uniformly.
+
+## Why "surely someone would have noticed" was worthless here
+
+The original write-up argued this was probably jsdom-only because production has
+~1,575 rows that "must have been typed in." That argument was already dead before
+the browser test, and it is worth recording why.
+
+Every one of those rows was bulk imported:
 
 ```sql
 SELECT source_system, count(*) FROM burials  GROUP BY 1;  -- dim_party_dmp_west | 796
 SELECT source_system, count(*) FROM customers GROUP BY 1;  -- dim_party_dmp_west | 779
 ```
 
-100% of both tables came through `scripts/import/load.py`, not the UI. **Nobody
-has typed into these modals at scale.** Every other table — contracts, AR, AP,
-work orders, inventory, payment schedule — is at zero rows.
-
-So the app has effectively **no hand-entry usage history at all**, and the
-absence of complaints is evidence of nothing.
-
-Two possibilities remain, and only a browser test separates them:
-
-1. **jsdom-only.** React batching, `flushSync`, and real focus-event ordering
-   differ from jsdom's synchronous model. Still entirely possible.
-2. **Real and simply unencountered**, because the first person to do sustained
-   data entry has not done it yet.
-
-Given the blast radius — every modal in the app — option 2 is worth ruling out
-before anyone starts entering contracts or work orders by hand.
+100% of both tables came through `scripts/import/load.py`, not the UI. Every
+other table — contracts, AR, AP, work orders, inventory, payment schedule — is at
+zero rows. The app had **no hand-entry usage history at all**, so the absence of
+complaints was evidence of nothing. Check row provenance before leaning on that
+argument again.
 
 ## How it was found
 
@@ -62,58 +94,70 @@ Not by review, and not by looking at `ui.tsx`. Writing a DOM test for runbook 01
 `userEvent.type` registered only the first character. An isolated `useForm` +
 `Input` harness typed correctly, which localised the fault to the modal wrapper.
 
-Worth noting as a method: the bug was found by a test failing *for the wrong
+Worth keeping as method: the bug was found by a test failing *for the wrong
 reason*. A test that fails unexpectedly is evidence about the system, not just an
-obstacle to route around — the temptation to switch to `fireEvent` and move on
-would have buried it.
+obstacle to route around — switching to `fireEvent` and moving on would have
+buried it. (Runbook 01's tests do use `fireEvent.change`, and that was the right
+call for them; they document why, and point here.)
 
-## Reproduction to attempt (step 1 — do this first)
+## The fix
 
-1. `npm run dev`
-2. Open any page with a modal — Customers is the highest-traffic one
-3. Click **New Customer**
-4. Type a multi-character name **at normal speed** into First Name
-5. Observe whether every character lands
+Applied in `src/components/ui.tsx`, `ModalPanel`:
 
-Then repeat typing fast, and repeat immediately after the modal opens.
+1. Hold the latest `onClose` in a ref, re-pointed on every render.
+2. Escape calls `onCloseRef.current()` rather than `onClose()`.
+3. The focus-trap effect's deps drop from `[onClose]` to `[]`.
 
-Also check whether focus visibly jumps — the cleanup calls `previous?.focus()`,
-so focus should land on whatever was focused before the modal opened.
+Empty deps are correct, not a suppression: `Modal` renders `ModalPanel` only
+while open (the `isOpen && <ModalPanel/>` guard), so **mount is open and unmount
+is close** — the effect's lifecycle already matches the modal's exactly. ESLint's
+`exhaustive-deps` agrees; the effect no longer closes over `onClose`, so no
+disable directive is needed (and one would fail `--report-unused-disable-directives`).
 
-If characters are dropped or focus jumps: **confirmed**, continue below. If
-typing is normal: close this as jsdom-only.
+Re-pointing the ref on every render is load-bearing: it keeps Escape running the
+*current* handler, so nothing observes a closure over stale state.
 
-## Fix, if confirmed
+### Rejected alternatives
 
-The dependency, not the trap. Options:
+**Memoise `onClose` with `useCallback` at every call site.** A component must not
+depend on its callers memoising their props. It fixes the symptom site by site,
+and the next unmemoised handler someone writes silently reintroduces the bug with
+no test to catch it.
 
-**A — hold `onClose` in a ref** that the effect reads, so the effect's deps no
-longer include an identity that changes every render. Local to `Modal`, fixes
-every caller at once. Recommended.
+**Remove `previous?.focus()` from the cleanup.** That call restores focus to the
+opener when the modal closes, which is correct and desirable accessibility
+behaviour. It was never the fault — running it mid-edit was.
 
-**B — memoise `onClose` at every call site** with `useCallback`. Fixes the
-symptom caller-by-caller and the next unmemoised handler reintroduces it. Worse.
+## Verification
 
-**C — split the effect** so mount/unmount focus handling is keyed on `isOpen`
-only, and anything genuinely needing `onClose` lives in its own effect. Cleanest
-conceptually, largest change.
+`src/components/Modal.test.tsx`. Two tests target the defect using
+`userEvent.type` (never `fireEvent.change`, which passes either way), and both
+were observed **failing against unfixed `main`** with the same signature as the
+browser:
 
-Prefer **A**. A component should not depend on its callers memoising their props.
+```
+ ❯ src/components/Modal.test.tsx  (7 tests | 2 failed)
+   → expect(element).toHaveValue(Alexandra)   Received: A
+   → expect(element).toHaveValue(Bartholomew) Received: B
+```
 
-## Verification, if confirmed
+After the fix: `7 passed`.
 
-A DOM test using `userEvent.type` (not `fireEvent.change`) asserting a
-multi-character string lands intact in a modal input — failing before, passing
-after. Runbook 01's tests deliberately use `fireEvent.change` so they neither
-depend on nor mask this; once fixed, one of them could be switched to
-`userEvent` as a canary.
+The other five tests pin the rest of that single effect, all of which the fix had
+to preserve — Escape still closes (including after a re-render), Tab still cycles
+within the dialog in both directions, body scroll stays locked while open and is
+restored on close, and focus still returns to the opener. A seventh guards the
+fix's own hazard: that the ref cannot go stale and invoke a handler closed over
+outdated state.
 
-## Blast radius, if confirmed
+Full suite after the fix: 17 files, 200 tests, all passing; lint, typecheck, and
+build clean.
 
-Every modal in the app — all eight CRUD pages plus `CommandPalette`. That is what
-makes it worth the reproduction effort despite the doubt.
+## Blast radius
+
+Every modal in the app — all eight CRUD pages plus `CommandPalette`.
 
 ## Not in scope
 
-Runbook 01's fix is independent and already merged separately. Nothing here
-blocks it.
+The stale-validation-error issue (seven pages lack a `handleCloseModal`) is
+runbook 05 and a separate PR. Runbook 01's fix is independent and already merged.
