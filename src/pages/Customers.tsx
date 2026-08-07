@@ -95,9 +95,27 @@ export default function Customers() {
 
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
+  // Every path that opens the modal normalises the form first. `reset` sets
+  // values *and* clears `errors`/`touched`; `setValues` cleared neither, so a
+  // failed create used to leave its complaints on whatever opened next.
+  const handleOpenCreate = () => {
+    form.reset(initialForm);
+    setEditingCustomer(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingCustomer(null);
+    form.reset(initialForm);
+  };
+
   const handleEdit = (c: Customer) => {
     setEditingCustomer(c);
-    form.setValues({
+    // Spread `initialForm` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`.
+    form.reset({
+      ...initialForm,
       firstName: c.firstName,
       lastName: c.lastName,
       email: c.email || '',
@@ -152,7 +170,7 @@ export default function Customers() {
             Refresh
           </Button>
           {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingCustomer(null); setShowModal(true); }}>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
               New Customer
             </Button>
           )}
@@ -215,7 +233,7 @@ export default function Customers() {
                 icon={<Users size={48} />}
                 title="No customers found"
                 description={searchTerm ? 'Try a different search term' : 'Add your first customer to get started'}
-                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Customer</Button> : undefined}
+                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Add Customer</Button> : undefined}
               />
             </CardBody>
           }
@@ -269,12 +287,12 @@ export default function Customers() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingCustomer(null); }}
+        onClose={handleCloseModal}
         title={editingCustomer ? 'Edit Customer' : 'New Customer'}
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             {(editingCustomer ? canEdit : canCreate) && (
               <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
                 {editingCustomer ? 'Save Changes' : 'Add Customer'}

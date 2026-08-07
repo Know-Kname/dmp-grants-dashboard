@@ -113,9 +113,27 @@ export default function Inventory() {
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
 
+  // Every path that opens the modal normalises the form first. `reset` sets
+  // values *and* clears `errors`/`touched`; `setValues` cleared neither, so a
+  // failed create used to leave its complaints on whatever opened next.
+  const handleOpenCreate = () => {
+    form.reset(initialForm);
+    setEditingItem(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+    form.reset(initialForm);
+  };
+
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item);
-    form.setValues({
+    // Spread `initialForm` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`.
+    form.reset({
+      ...initialForm,
       name: item.name,
       category: item.category,
       sku: item.sku || '',
@@ -142,7 +160,7 @@ export default function Inventory() {
             Refresh
           </Button>
           {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingItem(null); setShowModal(true); }}>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
               Add Item
             </Button>
           )}
@@ -222,7 +240,7 @@ export default function Inventory() {
               title="No items found"
               description={searchTerm || categoryFilter !== 'all' || lowStockOnly ? 'Try adjusting your filters' : 'Add your first inventory item'}
               action={canCreate && !searchTerm && categoryFilter === 'all' && !lowStockOnly
-                ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Item</Button>
+                ? <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Add Item</Button>
                 : undefined}
             />
           </CardBody>
@@ -295,12 +313,12 @@ export default function Inventory() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingItem(null); }}
+        onClose={handleCloseModal}
         title={editingItem ? 'Edit Inventory Item' : 'Add Inventory Item'}
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             {(editingItem ? canEdit : canCreate) && (
               <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
                 {editingItem ? 'Save Changes' : 'Add Item'}

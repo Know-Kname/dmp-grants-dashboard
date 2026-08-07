@@ -221,7 +221,11 @@ export default function Contracts() {
 
   const handleEdit = (c: Contract) => {
     setEditingContract(c);
-    form.setValues({
+    // Spread `initialForm` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`. It also
+    // clears `errors`/`touched`, which `setValues` did not.
+    form.reset({
+      ...initialForm,
       contractNumber: c.contractNumber,
       type: c.type,
       customerId: c.customerId,
@@ -242,6 +246,13 @@ export default function Contracts() {
     deleteMutation.mutate(deleteTarget.id, {
       onSuccess: () => setDeleteTarget(null),
     });
+  };
+
+  const handleOpenCreate = () => {
+    form.reset(initialForm);
+    setEditingContract(null);
+    setLineItems([]);
+    setShowModal(true);
   };
 
   const handleCloseModal = () => {
@@ -282,7 +293,7 @@ export default function Contracts() {
             Refresh
           </Button>
           {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingContract(null); setLineItems([]); setShowModal(true); }}>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
               New Contract
             </Button>
           )}
@@ -350,7 +361,7 @@ export default function Contracts() {
               title="No contracts found"
               description={searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Create your first contract'}
               action={canCreate && !searchTerm && typeFilter === 'all' && statusFilter === 'all'
-                ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>New Contract</Button>
+                ? <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>New Contract</Button>
                 : undefined}
             />
           </CardBody>

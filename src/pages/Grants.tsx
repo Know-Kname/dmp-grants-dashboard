@@ -169,7 +169,12 @@ export default function Grants() {
 
   const handleEdit = (grant: Grant) => {
     setEditingGrant(grant);
-    form.setValues({
+    // Spread `initialFormData` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`. It also
+    // clears `errors`/`touched`, which `setValues` did not — so a failed create
+    // used to leave its complaints on top of the record being edited.
+    form.reset({
+      ...initialFormData,
       title: grant.title,
       description: grant.description || '',
       type: grant.type,
@@ -204,6 +209,20 @@ export default function Grants() {
   };
 
   const resetForm = () => form.reset(initialFormData);
+
+  // Every path in or out of the modal goes through these, so the form cannot be
+  // left holding a previous session's values or validation errors.
+  const handleOpenCreate = () => {
+    resetForm();
+    setEditingGrant(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingGrant(null);
+    resetForm();
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'primary'> = {
@@ -252,11 +271,7 @@ export default function Grants() {
             <Button
               variant="primary"
               icon={<Plus size={20} />}
-              onClick={() => {
-                resetForm();
-                setEditingGrant(null);
-                setShowModal(true);
-              }}
+              onClick={handleOpenCreate}
             >
               Add Grant
             </Button>
@@ -368,7 +383,7 @@ export default function Grants() {
                 ? "Try adjusting your filters"
                 : "Add your first grant or funding opportunity"}
               action={canCreate ? (
-                <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>
+                <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
                   Add Grant
                 </Button>
               ) : undefined}
@@ -554,16 +569,12 @@ export default function Grants() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setEditingGrant(null);
-          resetForm();
-        }}
+        onClose={handleCloseModal}
         title={editingGrant ? 'Edit Grant/Opportunity' : 'Add New Grant/Opportunity'}
         size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>
+            <Button variant="ghost" onClick={handleCloseModal}>
               Cancel
             </Button>
             {(editingGrant ? canEdit : canCreate) && (

@@ -1,6 +1,6 @@
 # 05 — Stale validation errors bleed into the next modal
 
-**Severity:** Low (cosmetic, not data-corrupting) · **Status:** Live on `main` @ `83dd6b7` · **Exposure:** **the only finding users can hit today** — Customers (779 rows) and Burials (796 rows) are in active use.
+**Severity:** Low (cosmetic, not data-corrupting) · **Status:** ✅ **Fixed** — see *Resolution* below · **Exposure when open:** the only finding users could hit — Customers (779 rows) and Burials (796 rows) are in active use.
 
 ## Summary
 
@@ -113,3 +113,78 @@ are unreachable once records exist — fix them anyway while you are in the file
 
 The two dormant `useForm` defects — runbook 06. Different mechanisms, no user
 impact today.
+
+---
+
+## Resolution
+
+Fixed by **option A, applied at the entry points rather than the exits.**
+
+### What was actually implemented, and why it differs from the recommendation
+
+The recommendation above says "reset on modal close." That is necessary but it is
+not the guarantee, and surveying the pages showed why: each one had **three**
+ways into the modal and they had already drifted apart.
+
+| Entry point | Before | Cleared errors? |
+|---|---|---|
+| Header "New X" button | `form.reset(initialForm)` | yes |
+| Empty-state "New X" button | `setShowModal(true)` and nothing else | **no** |
+| `handleEdit` | `form.setValues({...})` | **no** |
+
+Exit-normalisation only holds while every exit stays wired; entry-normalisation
+is self-sufficient. If the form is in a known state whenever the modal opens,
+stale state is unreachable no matter how it was last closed — including from
+paths nobody has written yet.
+
+So every page now routes all three entry points through `handleOpenCreate` or
+`handleEdit`, and both exits through `handleCloseModal`.
+
+The core change needed **no new machinery** — it deletes a wrong call:
+
+```ts
+// before — leaves errors and touched from a prior failed create
+form.setValues({ firstName: c.firstName, ... });
+
+// after — one existing API, seeds values and clears errors + touched
+form.reset({ ...initialForm, firstName: c.firstName, ... });
+```
+
+`reset(newValues?)` already did the whole job (`useForm.ts`). Seven pages were
+reaching for the weaker sibling. The `...initialForm` spread is load-bearing:
+`reset` **replaces** wholesale where `setValues` merged, so any field a page
+omits would otherwise land as `undefined`.
+
+### Correction: Contracts was not immune
+
+This runbook says Contracts is "the one page immune." That is true of the
+*reported* reproduction — its `handleCloseModal` is wired to both exits — but its
+**empty-state button had the same un-normalised entry point** as everyone else's.
+It survived only because its exit happened to be clean. Contracts now has a
+`handleOpenCreate` too, and its `handleEdit` uses `reset` like the rest.
+
+This is the same shape of error as the original review's: judging a page by the
+one path that was tested rather than by every path that exists.
+
+### Coverage
+
+`src/pages/Customers.test.tsx` and `src/pages/Financial.test.tsx`, both observed
+**failing against unfixed `main`** first:
+
+- Customers — Edit after a cancelled failed create still showed
+  *"First name is required"* over `Ada` / `Lovelace`.
+- Customers — the empty-state entry point reopened with errors intact.
+- Financial — an abandoned deposit came back with `500` still in the Amount
+  field. This was the stale-**values** variant, and the one a user would read as
+  the app having kept data they discarded.
+
+`src/hooks/useForm.test.ts` additionally pins the *difference* between `setValues`
+and `reset`, so the distinction stays a decision rather than something a later
+"simplification" quietly erases — which is precisely what option B would have
+done.
+
+### Prevention, implemented
+
+`useForm`'s header now answers the question this runbook asked it to: what clears
+validation state, when, and what that means for a form whose owner outlives its
+inputs.

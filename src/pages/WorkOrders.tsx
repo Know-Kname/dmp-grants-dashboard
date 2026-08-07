@@ -175,9 +175,27 @@ export default function WorkOrders() {
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
 
+  // Every path that opens the modal normalises the form first. `reset` sets
+  // values *and* clears `errors`/`touched`; `setValues` cleared neither, so a
+  // failed create used to leave its complaints on whatever opened next.
+  const handleOpenCreate = () => {
+    form.reset(initialForm);
+    setEditingOrder(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingOrder(null);
+    form.reset(initialForm);
+  };
+
   const handleEdit = (wo: WorkOrder) => {
     setEditingOrder(wo);
-    form.setValues({
+    // Spread `initialForm` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`.
+    form.reset({
+      ...initialForm,
       title: wo.title,
       description: wo.description || '',
       type: wo.type,
@@ -210,7 +228,7 @@ export default function WorkOrders() {
             Refresh
           </Button>
           {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingOrder(null); setShowModal(true); }}>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
               New Work Order
             </Button>
           )}
@@ -267,7 +285,7 @@ export default function WorkOrders() {
                 ? 'Try adjusting your filters'
                 : 'Create your first work order to get started'}
               action={canCreate && 
-                <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>
+                <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
                   New Work Order
                 </Button>
               }
@@ -425,11 +443,11 @@ export default function WorkOrders() {
 
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingOrder(null); }}
+        onClose={handleCloseModal}
         title={editingOrder ? 'Edit Work Order' : 'New Work Order'}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             {(editingOrder ? canEdit : canCreate) && (
               <Button variant="primary" onClick={() => form.handleSubmit()} loading={isMutating}>
                 {editingOrder ? 'Save Changes' : 'Create'}

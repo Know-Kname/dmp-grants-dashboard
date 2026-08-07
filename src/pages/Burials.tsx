@@ -124,11 +124,29 @@ export default function Burials() {
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
 
+  // Every path that opens the modal normalises the form first. `reset` sets
+  // values *and* clears `errors`/`touched`; `setValues` cleared neither, so a
+  // failed create used to leave its complaints on whatever opened next.
+  const handleOpenCreate = () => {
+    form.reset(initialForm);
+    setEditingBurial(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingBurial(null);
+    form.reset(initialForm);
+  };
+
   const handleEdit = (b: Burial) => {
     setEditingBurial(b);
     // Parse plotLocation back to section/lot/grave if possible
     const parts = (b.plotLocation || '').split('-');
-    form.setValues({
+    // Spread `initialForm` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`.
+    form.reset({
+      ...initialForm,
       deceasedFirstName: b.deceasedFirstName,
       deceasedLastName: b.deceasedLastName,
       deceasedMiddleName: b.deceasedMiddleName || '',
@@ -163,7 +181,7 @@ export default function Burials() {
             Refresh
           </Button>
           {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingBurial(null); setShowModal(true); }}>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
               Record Burial
             </Button>
           )}
@@ -217,7 +235,7 @@ export default function Burials() {
                 icon={<BookOpen size={48} />}
                 title="No burial records found"
                 description={searchTerm ? 'Try a different search term' : 'Record your first burial to get started'}
-                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Record Burial</Button> : undefined}
+                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Record Burial</Button> : undefined}
               />
             </CardBody>
           }
@@ -331,12 +349,12 @@ export default function Burials() {
       {/* Burial Record Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingBurial(null); }}
+        onClose={handleCloseModal}
         title={editingBurial ? 'Edit Burial Record' : 'Record New Burial'}
         size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             {(editingBurial ? canEdit : canCreate) && (
               <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
                 {editingBurial ? 'Save Changes' : 'Record Burial'}
