@@ -134,7 +134,7 @@ unconditional. Reword the comment, or move the assignment into a Vitest
 
 ## What this exercise cost and returned
 
-Fifteen findings in, five actionable out. The three outright refutations and the
+Fifteen findings in, five actionable out — one of which (01) is now fixed and merged as `a750828`. The three outright refutations and the
 four staleness invalidations would each have become a wasted fix — and worse, a
 confident commit message asserting a bug that was not there.
 

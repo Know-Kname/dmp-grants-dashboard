@@ -17,11 +17,13 @@ against `main` at **`83dd6b7`**, because the audit had run against the older
 failure of it — see [00-not-actionable.md](00-not-actionable.md), which records
 every rejected finding and why, so none of them get re-raised.
 
-## Live findings
+## Findings
+
+One of the six is fixed. The rest are open.
 
 | # | Runbook | Severity | Exposure today |
 |---|---|---|---|
-| 01 | [contracts-total-amount](01-contracts-total-amount.md) | **High** | Blocks on first use — `contracts` has 0 rows |
+| ~~01~~ | [contracts-total-amount](01-contracts-total-amount.md) | ~~High~~ | ✅ **Fixed** — `a750828` (PR #96) |
 | 02 | [contracts-line-item-deletion](02-contracts-line-item-deletion.md) | Medium | Blocks on first use — 0 rows |
 | 03 | [financial-invoice-status](03-financial-invoice-status.md) | High | Latent — AR/AP have 0 rows |
 | 04 | [workorder-status-unreachable](04-workorder-status-unreachable.md) | High | Latent — 0 rows |
@@ -64,8 +66,8 @@ first time someone genuinely uses those modules.
 Runbook 05 is *cosmetic* and is the only one users can hit **today**, because
 Customers (779 rows) and Burials (796 rows) are in active use.
 
-Fix 01 before anyone tries to write a contract. Fix 05 because people are looking
-at it right now.
+~~Fix 01 before anyone tries to write a contract.~~ Done — `a750828`.
+Fix 05 next: it is the only remaining finding anyone can encounter today.
 
 ## Shared root cause
 

@@ -1,6 +1,11 @@
 # 01 — A contract priced with line items cannot be created
 
-**Severity:** High · **Status:** Live on `main` @ `83dd6b7` · **Exposure:** `contracts` = 0 rows, so this blocks on first real use rather than corrupting existing data.
+**Severity:** High · **Status:** ✅ **FIXED** — merged to `main` as `a750828` (PR #96) · **Exposure while live:** `contracts` = 0 rows, so it blocked on first real use rather than corrupting existing data.
+
+> This runbook is kept as the record of the defect, why it shipped, and what was
+> rejected — not as outstanding work. The *Fix options* section below was
+> corrected after implementation; read the callout there before trusting any
+> recommendation in the other runbooks.
 
 ## Summary
 
