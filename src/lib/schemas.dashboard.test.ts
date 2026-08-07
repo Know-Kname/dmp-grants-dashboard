@@ -10,11 +10,43 @@
 import { describe, expect, it } from 'vitest';
 import {
   burialTrendSchema,
+  contractTrendSchema,
   dashboardSummarySchema,
   dbNumberSchema,
   revenueTrendSchema,
+  salesSchema,
   upcomingGrantSchema,
 } from './schemas';
+
+/** `dashboard_summary().sales` as it comes back against the loaded ledger. */
+const SALES = {
+  dataAsOf: '2026-06-30',
+  earliestSignedDate: '1962-04-11',
+
+  contracts: 17311,
+  lines: 67019,
+  value: 43528654.77,
+  avgValue: 2514.51,
+  linesPerContract: 3.87,
+
+  preNeedContracts: 2007,
+  preNeedValue: 6120000,
+  preNeedSharePct: 11.6,
+
+  byCemetery: [
+    {
+      name: 'Detroit Memorial Park West',
+      contracts: 10596, value: 28203544.9, avgValue: 2661.72, preNeed: 1200,
+    },
+  ],
+  byYear: [
+    { year: 2025, contracts: 2055, value: 6836593.8, preNeed: 240, atNeed: 1815, preNeedValue: 900000 },
+  ],
+  topProducts: [{ code: 'SRVM', group: 'S', lines: 6793, value: 8410233.12 }],
+  distinctProducts: 530,
+  topSalespeople: [{ name: 'BERRIEN, CHERYL', contracts: 4210, value: 10200000 }],
+  valueBands: { '<$500': 2100, '$1K-2.4K': 5400, '$10K+': 120 },
+};
 
 /** A payload matching what `dashboard_summary()` returns against seeded data. */
 const SUMMARY = {
@@ -52,6 +84,8 @@ const SUMMARY = {
   },
 
   customerCount: 779,
+
+  sales: SALES,
 
   vendorCount: 47,
   vendorSpendKnown: 925466,
@@ -246,6 +280,112 @@ describe('dashboardSummarySchema — cemetery fields', () => {
       topVendorsBySpend: [{ name: 'Comerica Bank', category: null, spend: 251129.57 }],
     });
     expect(parsed.topVendorsBySpend[0].category).toBeNull();
+  });
+});
+
+describe('salesSchema', () => {
+  it('parses a well-formed ledger', () => {
+    const parsed = salesSchema.parse(SALES);
+    expect(parsed.contracts).toBe(17311);
+    expect(parsed.value).toBeCloseTo(43528654.77);
+    expect(parsed.byCemetery[0].name).toBe('Detroit Memorial Park West');
+  });
+
+  it('nulls the three quotients on an empty ledger rather than reporting zero', () => {
+    // Each divides by the contract count. Coercing them to 0 would state an
+    // average contract value of $0.00 for a database that has no contracts —
+    // a fact the data does not support.
+    const parsed = salesSchema.parse({
+      ...SALES,
+      contracts: 0, lines: 0, value: 0,
+      avgValue: null, linesPerContract: null, preNeedSharePct: null,
+      dataAsOf: null, earliestSignedDate: null,
+      byCemetery: [], byYear: [], topProducts: [], topSalespeople: [], valueBands: {},
+    });
+    expect(parsed.avgValue).toBeNull();
+    expect(parsed.linesPerContract).toBeNull();
+    expect(parsed.preNeedSharePct).toBeNull();
+    expect(parsed.dataAsOf).toBeNull();
+  });
+
+  it('coerces string-encoded money and percentages', () => {
+    const parsed = salesSchema.parse({
+      ...SALES,
+      value: '43528654.77',
+      avgValue: '2514.51',
+      preNeedSharePct: '11.6',
+      byCemetery: [{
+        name: 'Gracelawn Cemetery', contracts: 2089,
+        value: '2533770.41', avgValue: '1212.91', preNeed: 200,
+      }],
+    });
+    expect(parsed.value).toBe(43528654.77);
+    expect(parsed.avgValue).toBe(2514.51);
+    expect(parsed.byCemetery[0].value).toBe(2533770.41);
+  });
+
+  it('keeps its own dataAsOf, separate from the burial register', () => {
+    // The interment register ends in 2020 and the ledger runs to 2026. One
+    // shared date would mislabel the period under every sales card.
+    const parsed = dashboardSummarySchema.parse(SUMMARY);
+    expect(parsed.dataAsOf).toBe('2020-12-31');
+    expect(parsed.sales.dataAsOf).toBe('2026-06-30');
+  });
+
+  it('allows a product line with no group', () => {
+    const parsed = salesSchema.parse({
+      ...SALES,
+      topProducts: [{ code: 'MISC', group: null, lines: 1, value: 5 }],
+    });
+    expect(parsed.topProducts[0].group).toBeNull();
+  });
+
+  it('rejects a cemetery row missing its value', () => {
+    expect(salesSchema.safeParse({
+      ...SALES,
+      byCemetery: [{ name: 'Gracelawn Cemetery', contracts: 2089, avgValue: 1212.91, preNeed: 200 }],
+    }).success).toBe(false);
+  });
+
+  it('rejects a fractional contract count', () => {
+    expect(salesSchema.safeParse({ ...SALES, contracts: 1.5 }).success).toBe(false);
+  });
+
+  it('rejects a null where a total is required', () => {
+    expect(salesSchema.safeParse({ ...SALES, value: null }).success).toBe(false);
+    expect(salesSchema.safeParse({ ...SALES, contracts: null }).success).toBe(false);
+  });
+
+  it('rejects a summary with no sales block at all', () => {
+    const { sales: _omitted, ...withoutSales } = SUMMARY;
+    expect(dashboardSummarySchema.safeParse(withoutSales).success).toBe(false);
+  });
+});
+
+describe('contractTrendSchema', () => {
+  it('parses snake_case rows and coerces a string sale_value', () => {
+    const parsed = contractTrendSchema.parse([
+      { month_start: '2025-05-01', label: 'May 2025', contracts: 3, sale_value: '7500.50' },
+    ]);
+    expect(parsed[0].sale_value).toBe(7500.5);
+    expect(parsed[0].contracts).toBe(3);
+  });
+
+  it('accepts a zero-filled month', () => {
+    const parsed = contractTrendSchema.parse([
+      { month_start: '2025-06-01', label: 'Jun 2025', contracts: 0, sale_value: 0 },
+    ]);
+    expect(parsed[0].contracts).toBe(0);
+  });
+
+  it('accepts an empty result set', () => {
+    expect(contractTrendSchema.parse([])).toEqual([]);
+  });
+
+  it('rejects a row missing its sale_value', () => {
+    expect(contractTrendSchema.safeParse([
+      { month_start: '2025-06-01', label: 'Jun 2025', contracts: 1 },
+    ]).success).toBe(false);
   });
 });
 

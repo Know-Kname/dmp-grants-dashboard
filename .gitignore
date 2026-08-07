@@ -21,5 +21,10 @@ supabase/.branches
 scripts/import/data/
 scripts/import/sql/
 
+# Bytecode from the import scripts. load_cemsites.py imports load.py as a
+# sibling module, so running either one leaves a __pycache__ behind.
+__pycache__/
+*.py[cod]
+
 # Agent worktrees (transient)
 .claude/worktrees/

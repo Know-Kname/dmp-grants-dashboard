@@ -36,6 +36,10 @@ Microsoft 365 connector.
 - **`DMP-W_Ops_Undated_dim_party.csv`** — 796 rows, DMP-West, 2020, derived from
   `2020-01-01_DMP_Burial_BURIAL_RECORDS_DMP-WEST_2020.csv`.
 - **`dim_vendor.csv`** — 51 rows, from `01_DMP_.../Operations/_PowerBI_Feed/`.
+- **`paid_in_full_*.csv`** — 21 raw CemSites reports, 73,564 rows, from
+  `01_DMP_.../DMP/CemSites_Exports/{East,West,Gracelawn}/raw/`. Files matching
+  `*-sample.csv` are superseded extracts and are never fetched: Gracelawn's
+  `2025-sample.csv` is byte-identical to its `202501-202512.csv`.
 
 The `.xlsx` Silver workbooks cannot be used directly: Microsoft Graph returns
 **HTTP 406, "couldn't convert this file for text extraction"** for every
@@ -53,26 +57,107 @@ card issuers and travel lines, the same category of noise that made the original
 131 legacy rows worthless. Loading them would recreate the problem the
 2026-07-30 wipe was meant to solve.
 
-## Not loaded: contracts
+## Contracts: the CemSites paid-in-full exports
 
-`dim_contract.csv` holds 11,720 contracts and its `gross_sales` sums to
-**18,195,444.30**, matching the Silver workbook's stated total to the cent. It is
-real. It is not loaded, because of four problems — three fixable, one not.
+Contracts were blocked through 2026-08-04 and are not blocked any more.
 
-| Problem | Scale | Status |
-| --- | --- | --- |
-| `need_type = 'Other/General'` is illegal under `contracts_type_check`, which permits only `pre_need` and `at_need` | 1,595 rows (13.6%) | fixable — drop the rows, or widen the CHECK |
-| `contract_nbr` collides across entities (e.g. `8160` exists as both a DMP-East and a DMP-West contract, different amounts) against a global `UNIQUE` | 19 rows | fixable — prefix with entity |
-| Rows belong to Zoom2Day, a separate Wright business, not a cemetery | 610 rows / $281,612.69 | fixable — filter; leaves 11,110 rows / $17,913,831.61 |
-| **No customer linkage exists.** `dim_contract.csv` has no purchaser column and `dim_party.csv` has no contract number. `contracts.customer_id` is `NOT NULL`. | all 11,720 | **blocking** |
+The derived `dim_contract.csv` holds 11,720 contracts summing to **$18,195,444.30**
+— real, and matching the Silver workbook to the cent — but it carries no
+purchaser column, and `contracts.customer_id` is `NOT NULL`. Loading it would
+have meant inventing the contract-to-customer relationship, so it was left out.
 
-Nothing in either export can satisfy the foreign key. Loading contracts would
-require inventing the contract-to-customer relationship, so it was left out.
+**The raw exports do carry the purchaser.** Twenty-one files under
+`01_DMP_.../DMP/CemSites_Exports/{East,West,Gracelawn}/raw/paid_in_full_*.csv`,
+2020 through mid-2026, one row per contract *line*, with `Customer Name` and a
+full postal address on the row.
 
-**Next step:** the CemSites/CemBooks exports under
-`01_DMP_.../DMP/CemSites_Exports/` are the likely home of a real
-contract-to-purchaser link. That folder could not be enumerated — Graph returned
-a transient HTTP 500 on two attempts — and is worth retrying.
+### Control totals
+
+Measured by `load_cemsites.py --dry-run`, and independently by a separate
+characterisation pass that agrees to the cent:
+
+| | Contracts | Lines | Customers | Sale value |
+| --- | ---: | ---: | ---: | ---: |
+| DMP East | 4,626 | 19,046 | 2,730 | $12,791,339.46 |
+| DMP West | 10,596 | 42,054 | 6,324 | $28,203,544.90 |
+| Gracelawn | 2,089 | 5,919 | 1,367 | $2,533,770.41 |
+| **Total** | **17,311** | **67,019** | **10,421** | **$43,528,654.77** |
+
+Average contract $2,514.51; 3.87 lines per contract; pre-need 11.6% of contracts.
+Contract dates span 1962–2026, because a pre-need contract written decades ago
+enters a paid-in-full report in the year it is finally settled.
+
+Cross-check against `dim_contract.csv`: 17,311 / $43.5M against 11,720 / $18.2M.
+It does not tie and is not meant to — different periods, different derivation,
+and the derived file includes Zoom2Day. As a magnitude check it passes.
+
+The 10,421 customers are per-cemetery. Deduplicated globally the figure is
+10,220; the 201-row difference is purchasers who bought at more than one
+location, which is the deliberate cost of tagging customers per cemetery so a
+single location can be rolled back without orphaning them.
+
+### What is rejected, and why
+
+Of 73,564 raw rows, 70,497 become contract lines. The rest:
+
+| Reason | Rows |
+| --- | ---: |
+| Report furniture — preamble and per-product subtotal blocks, 1/5/9 fields wide against the header's 22 | 2,713 |
+| `AN/PN` neither `A` nor `P` | 13 |
+| Duplicate lines, same contract reprinted in a second report period | 205 |
+
+and 1,751 whole contracts are skipped for carrying no `Customer Name` on any
+line. Those are **not** given a placeholder purchaser — fabricating one is the
+exact thing that blocked this import in the first place.
+
+### Three traps that turned out not to exist
+
+An earlier pass over these files reported a column-shift defect (~180 rows with
+a dollar amount where `A`/`P` belongs) and an embedded report subtotal of
+`4,372,752.33` sitting in a data row. **Neither is real.** Both were artifacts of
+splitting the CSV on commas: customer addresses contain quoted commas, and every
+field after one shifts left. Read with a real CSV parser, the largest single
+line is $99,598.00 (`PRIV`) and the largest contract $125,918.00 — both
+plausible — and only 13 rows in the entire corpus have an unusable `AN/PN`.
+
+The third, superseded `*-sample.csv` extracts, is real and is handled by never
+fetching those files.
+
+### Two judgement calls
+
+**Leading-hyphen contract numbers are kept as recorded.** 351 line rows carry a
+number like `-514420`. They are not credit reversals: they have ordinary
+contract types, dates and product codes, positive amounts, and a digit length
+matching the normal population. Stripping the hyphen would merge 17 of them into
+an existing contract — 14 correctly, but 2 into a *different purchaser's*
+contract. Keeping them costs nothing and loses none of the $181,833 they carry.
+
+**Product codes are stored and displayed as codes.** `Product Group` is a single
+letter (23 distinct) and `Product Code` a four-character token (`SRVM`, `MINC`,
+`CARE` — 530 distinct). The export defines no expansion for them, DMP staff read
+them directly, and inventing readable names would put invented products on the
+dashboard.
+
+### Schema changes
+
+`20260807014352_contract_sales_dimensions_and_all_three_cemeteries.sql` adds
+`contracts.cemetery_id` and `contracts.salesperson`, `contract_items.product_group`
+and `contract_items.product_code`, all additive and nullable — and seeds
+`cemeteries` with **DMP East** and **Gracelawn** from `src/config/company.ts`,
+so the location FK is satisfiable for all three.
+
+The export agrees with that seed independently: each file carries a `Department`
+code that is constant within the file and matches its own report preamble —
+`01` East, `02` West, `03` Gracelawn — on all 73,564 rows, with zero mismatches
+against the folder the file came from. The loader checks it per row.
+
+### Status
+
+The loader is written and its dry run ties to the table above. **The load itself
+has not been run**: it needs `DMP_EMAIL` / `DMP_PASSWORD`, which were not
+available in the session that wrote it. Nothing downstream is blocked by that —
+`dashboard_summary().sales` and every chart it feeds render an honest empty
+state until the rows land, and were verified against a synthetic fixture.
 
 ## Analytic columns and the backfill
 
@@ -142,8 +227,28 @@ dropped TLS handshake aborted the job at 600 of 796 rows. Requests now retry
 with exponential backoff on connection resets and on 429/5xx, so a single bad
 connection no longer costs the whole run.
 
-`scripts/import/build_import_sql.py` emits the same load as `.sql` files, for
-review or for applying through a SQL client instead of the API.
+### The CemSites contract load
+
+`scripts/import/load_cemsites.py` reuses `load.py`'s `Api` class — same
+authentication, retry/backoff and provenance — and takes a directory of
+`{east,west,gracelawn}_{year}.csv` rather than a single file:
+
+```bash
+# Parse and report control totals only. Touches nothing, needs no credentials.
+python3 scripts/import/load_cemsites.py --dir /path/to/cemsites --dry-run
+
+# Load everything, or one cemetery at a time.
+python3 scripts/import/load_cemsites.py --dir /path/to/cemsites
+python3 scripts/import/load_cemsites.py --dir /path/to/cemsites --only gracelawn
+python3 scripts/import/load_cemsites.py --dir /path/to/cemsites --only west --replace
+```
+
+Run `--dry-run` first and check its totals against the control table above. A
+cemetery whose figures do not tie should be rolled back by its `source_system`
+tag rather than patched in place.
+
+`scripts/import/build_import_sql.py` emits the `load.py` load as `.sql` files,
+for review or for applying through a SQL client instead of the API.
 
 Both idempotency and rollback were exercised on 2026-07-31: re-running `party`
 with no flag inserted nothing, and `--replace` on `vendors` cleared and reloaded
@@ -164,6 +269,20 @@ delete from lots       where source_system = 'dim_party_dmp_west';
 delete from sections   where source_system = 'dim_party_dmp_west';
 delete from cemeteries where source_system = 'dim_party_dmp_west';
 ```
+
+The CemSites contract load is tagged per cemetery, so one location comes out
+without disturbing the other two:
+
+```sql
+-- reverse dependency order; repeat for cemsites_east / cemsites_west
+delete from contract_items where source_system = 'cemsites_gracelawn';
+delete from contracts      where source_system = 'cemsites_gracelawn';
+delete from customers      where source_system = 'cemsites_gracelawn';
+```
+
+The two cemetery rows seeded by migration `20260807014352` are tagged
+`company_config` and are deliberately *not* part of any load's rollback —
+they describe the business, not an import.
 
 This works because `(source_system, source_ref)` is covered on all 16 tables by
 the partial unique index `uq_<table>_source ... WHERE source_system IS NOT NULL`,

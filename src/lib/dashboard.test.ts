@@ -11,16 +11,23 @@ import { describe, expect, it } from 'vitest';
 import {
   AGE_BANDS,
   INVENTORY_CATEGORIES,
+  SALES_TREND_YEARS,
+  VALUE_BANDS,
   ageBandSeries,
+  cemeterySalesSeries,
+  contractTrendSeries,
   modulesLoaded,
   burialTrendSeries,
   formatMonthYear,
   inventoryCategoryData,
   periodLabel,
+  productSeries,
   referralSeries,
   revenueTrendSeries,
+  valueBandSeries,
   vendorSpendSeries,
   workOrderChartData,
+  yearSalesSeries,
   type WorkOrderStatusColors,
 } from './dashboard';
 
@@ -228,6 +235,179 @@ describe('vendorSpendSeries', () => {
   });
 });
 
+
+describe('contractTrendSeries', () => {
+  it('maps rows onto the sales chart keys, preserving order', () => {
+    expect(contractTrendSeries([
+      { month_start: '2025-05-01', label: 'May 2025', contracts: 3, sale_value: 7500 },
+      { month_start: '2025-06-01', label: 'Jun 2025', contracts: 0, sale_value: 0 },
+    ])).toEqual([
+      { month: 'May 2025', Contracts: 3, 'Sale value': 7500 },
+      { month: 'Jun 2025', Contracts: 0, 'Sale value': 0 },
+    ]);
+  });
+
+  it('keeps zero-filled months rather than closing the gap', () => {
+    // Recharts draws a straight line through a missing point, which would
+    // invent sales in a month that had none.
+    const rows = [
+      { month_start: '2025-04-01', label: 'Apr 2025', contracts: 0, sale_value: 0 },
+      { month_start: '2025-05-01', label: 'May 2025', contracts: 0, sale_value: 0 },
+      { month_start: '2025-06-01', label: 'Jun 2025', contracts: 2, sale_value: 900 },
+    ];
+    expect(contractTrendSeries(rows)).toHaveLength(3);
+  });
+
+  it('handles an empty ledger', () => {
+    expect(contractTrendSeries([])).toEqual([]);
+  });
+});
+
+describe('cemeterySalesSeries', () => {
+  const ROWS = [
+    { name: 'Gracelawn Cemetery', contracts: 2089, value: 2533770.41, avgValue: 1212.91, preNeed: 200 },
+    { name: 'Detroit Memorial Park West', contracts: 10596, value: 28203544.9, avgValue: 2661.72, preNeed: 1200 },
+    { name: 'Detroit Memorial Park East', contracts: 4626, value: 12791339.46, avgValue: 2765.1, preNeed: 607 },
+  ];
+
+  it('orders by sale value, largest book first', () => {
+    expect(cemeterySalesSeries(ROWS).map((c) => c.short))
+      .toEqual(['West', 'East', 'Gracelawn Cemetery']);
+  });
+
+  it('strips the shared prefix so the axis shows the distinguishing word', () => {
+    // All three names share 'Detroit Memorial Park', so a full-name axis is
+    // 26 characters of which 22 are identical.
+    const series = cemeterySalesSeries(ROWS);
+    expect(series[0].short).toBe('West');
+    expect(series[0].name).toBe('Detroit Memorial Park West');
+  });
+
+  it('leaves a name without the prefix alone', () => {
+    expect(cemeterySalesSeries([
+      { name: 'Gracelawn Cemetery', contracts: 1, value: 1, avgValue: 1, preNeed: 0 },
+    ])[0].short).toBe('Gracelawn Cemetery');
+  });
+
+  it('derives the pre-need share per cemetery', () => {
+    const west = cemeterySalesSeries(ROWS).find((c) => c.short === 'West');
+    expect(west?.preNeedPct).toBeCloseTo((1200 / 10596) * 100, 5);
+  });
+
+  it('reports a zero pre-need share rather than dividing by zero', () => {
+    const series = cemeterySalesSeries([
+      { name: 'Empty Cemetery', contracts: 0, value: 0, avgValue: 0, preNeed: 0 },
+    ]);
+    expect(series[0].preNeedPct).toBe(0);
+  });
+
+  it('does not mutate the array it was given', () => {
+    const input = [...ROWS];
+    cemeterySalesSeries(input);
+    expect(input[0].name).toBe('Gracelawn Cemetery');
+  });
+});
+
+describe('yearSalesSeries', () => {
+  const year = (y: number, contracts: number) => ({
+    year: y, contracts, value: contracts * 1000, preNeed: 1, atNeed: contracts - 1,
+    preNeedValue: 1000,
+  });
+
+  it('shows only the trailing window, ascending', () => {
+    const rows = Array.from({ length: 12 }, (_, i) => year(2015 + i, 10));
+    const { series } = yearSalesSeries(rows);
+    expect(series).toHaveLength(SALES_TREND_YEARS);
+    expect(series[0].year).toBe('2019');
+    expect(series[series.length - 1].year).toBe('2026');
+  });
+
+  it('reports what it truncated instead of hiding it', () => {
+    // The ledger reaches back to 1962 because a pre-need contract written then
+    // was paid off inside the export window. Silently starting the chart in
+    // 2019 would be a truncation the reader cannot see.
+    const rows = [year(1962, 1), year(1985, 2), ...Array.from({ length: 8 }, (_, i) => year(2019 + i, 10))];
+    const { omittedContracts, omittedYears } = yearSalesSeries(rows);
+    expect(omittedYears).toBe(2);
+    expect(omittedContracts).toBe(3);
+  });
+
+  it('omits nothing when the ledger is short', () => {
+    const { series, omittedContracts, omittedYears } = yearSalesSeries([year(2025, 4)]);
+    expect(series).toHaveLength(1);
+    expect(omittedContracts).toBe(0);
+    expect(omittedYears).toBe(0);
+  });
+
+  it('sorts by year even when the server order is not relied upon', () => {
+    const { series } = yearSalesSeries([year(2026, 1), year(2024, 1), year(2025, 1)]);
+    expect(series.map((s) => s.year)).toEqual(['2024', '2025', '2026']);
+  });
+
+  it('splits the columns by need type', () => {
+    const { series } = yearSalesSeries([
+      { year: 2025, contracts: 10, value: 5000, preNeed: 3, atNeed: 7, preNeedValue: 1500 },
+    ]);
+    expect(series[0]).toEqual({ year: '2025', 'At-need': 7, 'Pre-need': 3, value: 5000 });
+  });
+
+  it('handles an empty ledger', () => {
+    expect(yearSalesSeries([])).toEqual({ series: [], omittedContracts: 0, omittedYears: 0 });
+  });
+});
+
+describe('productSeries', () => {
+  it('passes the source codes through untouched', () => {
+    // SRVM is what CemSites records and what DMP staff read. The export defines
+    // no expansion, so inventing one would put a made-up product on the page.
+    expect(productSeries([
+      { code: 'SRVM', group: 'S', lines: 6793, value: 15360 },
+    ])).toEqual([
+      { code: 'SRVM', group: 'S', Lines: 6793, 'Sale value': 15360 },
+    ]);
+  });
+
+  it('preserves the server ranking rather than re-sorting', () => {
+    const series = productSeries([
+      { code: 'SRVM', group: 'S', lines: 1, value: 900 },
+      { code: 'CARE', group: 'R', lines: 9, value: 100 },
+    ]);
+    expect(series.map((p) => p.code)).toEqual(['SRVM', 'CARE']);
+  });
+
+  it('allows a line with no product group', () => {
+    expect(productSeries([{ code: 'MISC', group: null, lines: 1, value: 5 }])[0].group)
+      .toBeNull();
+  });
+
+  it('handles no product data', () => {
+    expect(productSeries([])).toEqual([]);
+  });
+});
+
+describe('valueBandSeries', () => {
+  it('presents bands in ascending value, not object key order', () => {
+    // Sorted as strings, '$10K+' leads and '<$500' trails — exactly backwards.
+    const series = valueBandSeries({ '$10K+': 12, '<$500': 900, '$1K-2.4K': 400 });
+    expect(series.map((b) => b.band)).toEqual([...VALUE_BANDS]);
+  });
+
+  it('keeps empty bands, because a gap in a distribution is information', () => {
+    const series = valueBandSeries({ '<$500': 5 });
+    expect(series).toHaveLength(VALUE_BANDS.length);
+    expect(series.find((b) => b.band === '$5K-9.9K')?.Contracts).toBe(0);
+  });
+
+  it('renders every band as zero for an empty ledger', () => {
+    expect(valueBandSeries({}).every((b) => b.Contracts === 0)).toBe(true);
+  });
+
+  it('ignores a band the client does not render', () => {
+    const series = valueBandSeries({ '<$500': 3, '$1M+': 99 });
+    expect(series).toHaveLength(VALUE_BANDS.length);
+    expect(series.some((b) => b.band === '$1M+')).toBe(false);
+  });
+});
 
 describe('modulesLoaded', () => {
   const EMPTY = {
