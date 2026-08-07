@@ -27,6 +27,8 @@ import {
   Skeleton, SkeletonStatRow, SkeletonChart, Tabs,
 } from '../components/ui';
 import { m, staggerContainer, fadeInUp } from '../lib/motion';
+import Grove from '../components/visuals/Grove';
+import Aurora from '../components/visuals/Aurora';
 import { useTheme } from '../lib/theme';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
@@ -122,7 +124,7 @@ function PendingCard({
   return (
     <Link to={to} className="contents">
       <m.div variants={fadeInUp} className="h-full">
-        <Card hoverable className="h-full border-dashed">
+        <Card tilt className="h-full border-dashed">
           <CardBody className="flex flex-col gap-3 p-4">
             <div className="flex items-center justify-between">
               <p className="text-[11px] text-foreground-subtle font-medium uppercase tracking-wide">{label}</p>
@@ -320,15 +322,28 @@ export default function Dashboard() {
 
       <PageError error={combinedError} />
 
-      {/* ── Brand Hero ── */}
+      {/* ── Brand Hero ──
+          Four stacked layers, back to front: a flat gradient that guarantees
+          the brand colour even with no WebGL, the Aurora shader for material,
+          the Grove particle field for depth, and a left-weighted scrim that
+          buys back contrast under the logo and tagline. The gradient is not
+          redundant — it is what the other two fall back to. */}
       <div
-        className="rounded-2xl overflow-hidden relative"
-        style={{ background: `linear-gradient(135deg, ${BRAND.greenDeep} 0%, ${BRAND.green} 50%, #2d5a3d 100%)` }}
+        className="rounded-2xl overflow-hidden relative isolate"
+        style={{ background: `linear-gradient(135deg, ${BRAND.greenDeep} 0%, ${BRAND.green} 55%, #2d5a3d 100%)` }}
       >
+        <Aurora alpha={0.85} />
+        <Grove intensity={0.85} />
         <div
-          className="absolute inset-0 opacity-10"
+          className="absolute inset-0 opacity-[0.07] mix-blend-overlay"
           style={{ backgroundImage: 'url(/dmp-hero.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
         />
+        {/* Scrim weighted at both ends and open through the middle. The logo
+            sits left and the stat readout sits right, and the aurora puts its
+            brightest gold folds exactly where that readout lands — a purely
+            left-weighted scrim left `text-white/50` sublines sitting on near-
+            white. The middle stays clear so the shaders still show. */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/60 via-black/25 to-black/45" />
         <div className="relative p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-5">
@@ -358,7 +373,9 @@ export default function Dashboard() {
               <div className="w-px h-10 bg-white/20" />
               <div>
                 <p className="text-white/40 text-xs uppercase tracking-widest">Interments</p>
-                <p className="text-white font-bold text-2xl mt-0.5">{stats.totalInterments}</p>
+                <p className="text-white font-bold text-2xl mt-0.5 tabular-nums">
+                  <AnimatedNumber to={stats.totalInterments} />
+                </p>
                 <p className="text-white/50 text-xs">
                   {yearSpan ? `across ${yearSpan}` : 'none recorded'}
                 </p>
@@ -366,7 +383,9 @@ export default function Dashboard() {
               <div className="w-px h-10 bg-white/20" />
               <div>
                 <p className="text-white/40 text-xs uppercase tracking-widest">Sections</p>
-                <p className="text-white font-bold text-2xl mt-0.5">{stats.sectionsInUse}</p>
+                <p className="text-white font-bold text-2xl mt-0.5 tabular-nums">
+                  <AnimatedNumber to={stats.sectionsInUse} />
+                </p>
                 <p className="text-white/50 text-xs">{stats.capacity.gravesTotal} graves mapped</p>
               </div>
             </div>
@@ -421,7 +440,7 @@ export default function Dashboard() {
       >
         <Link to="/burials" className="contents">
           <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
+          <Card tilt className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Interments</p>
@@ -460,7 +479,7 @@ export default function Dashboard() {
         {/* Concentration, not the leader's name: one home leaving is the risk. */}
         <Link to="/burials" className="contents">
           <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
+          <Card tilt className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Top 5 Referrers</p>
@@ -483,7 +502,7 @@ export default function Dashboard() {
 
         <Link to="/cemeteries" className="contents">
           <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
+          <Card tilt className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Graves Mapped</p>
@@ -504,7 +523,7 @@ export default function Dashboard() {
 
         <Link to="/customers" className="contents">
           <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
+          <Card tilt className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Customers</p>
@@ -523,7 +542,7 @@ export default function Dashboard() {
 
         <Link to="/vendors" className="contents">
           <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
+          <Card tilt className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Vendors</p>
@@ -544,7 +563,7 @@ export default function Dashboard() {
 
         <Link to="/burials" className="contents">
           <m.div variants={fadeInUp} className="h-full">
-          <Card hoverable className="h-full">
+          <Card tilt className="h-full">
             <CardBody className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Median Age</p>
@@ -583,7 +602,7 @@ export default function Dashboard() {
         {loaded.contracts ? (
           <Link to="/contracts" className="contents">
             <m.div variants={fadeInUp} className="h-full">
-            <Card hoverable className="h-full">
+            <Card tilt className="h-full">
               <CardBody className="flex flex-col gap-3 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Contracts</p>
@@ -608,7 +627,7 @@ export default function Dashboard() {
         {loaded.receivables ? (
           <Link to="/financial" className="contents">
             <m.div variants={fadeInUp} className="h-full">
-            <Card hoverable className={`h-full ${stats.overdueAR > 0 ? 'border-warning' : ''}`}>
+            <Card tilt className={`h-full ${stats.overdueAR > 0 ? "border-warning" : ""}`}>
               <CardBody className="flex flex-col gap-3 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Receivables</p>
@@ -632,7 +651,7 @@ export default function Dashboard() {
         {loaded.workOrders ? (
           <Link to="/work-orders" className="contents">
             <m.div variants={fadeInUp} className="h-full">
-            <Card hoverable className="h-full">
+            <Card tilt className="h-full">
               <CardBody className="flex flex-col gap-3 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Work Orders</p>
@@ -656,7 +675,7 @@ export default function Dashboard() {
         {loaded.inventory ? (
           <Link to="/inventory" className="contents">
             <m.div variants={fadeInUp} className="h-full">
-            <Card hoverable className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
+            <Card tilt className={`h-full ${stats.lowStock > 0 ? 'border-warning' : ''}`}>
               <CardBody className="flex flex-col gap-3 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Inventory</p>
@@ -693,7 +712,7 @@ export default function Dashboard() {
         {loaded.deposits ? (
           <Link to="/financial" className="contents">
             <m.div variants={fadeInUp} className="h-full">
-            <Card hoverable className="h-full">
+            <Card tilt className="h-full">
               <CardBody className="flex flex-col gap-3 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Deposits (30d)</p>

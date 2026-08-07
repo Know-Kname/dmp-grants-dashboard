@@ -1,7 +1,10 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AlertCircle, AlertTriangle, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
-import { m, AnimatePresence, scalePop, useCountUp } from '../lib/motion';
+import {
+  m, AnimatePresence, scalePop, useCountUp, useReducedMotion,
+  useMagnetic, useTilt, useMotionTemplate, SPRING, EASE_LUX,
+} from '../lib/motion';
 
 // ============================================
 // PAGE ERROR
@@ -120,29 +123,59 @@ export function AnimatedNumber({ to, format }: { to: number; format?: (n: number
   return <>{format ? format(v) : Math.round(v).toLocaleString()}</>;
 }
 
-/** Tiny inline SVG sparkline — deliberately not Recharts, to stay chunk-light. */
+/**
+ * Tiny inline SVG sparkline — deliberately not Recharts, to stay chunk-light.
+ *
+ * Draws itself on mount via stroke-dashoffset, fills a soft gradient under the
+ * line, and marks the latest point. The draw-on is what makes a stat tile feel
+ * live rather than printed; it runs once, not on a loop.
+ */
 function Sparkline({ data, className = '' }: { data: number[]; className?: string }) {
+  const gradientId = useId();
+  const reduced = useReducedMotion();
   if (data.length < 2) return null;
+
   const w = 88, h = 28, pad = 2;
   const min = Math.min(...data);
   const range = (Math.max(...data) - min) || 1;
-  const points = data
-    .map((v, i) => {
-      const x = pad + (i * (w - pad * 2)) / (data.length - 1);
-      const y = h - pad - ((v - min) / range) * (h - pad * 2);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+  const pts = data.map((v, i) => {
+    const x = pad + (i * (w - pad * 2)) / (data.length - 1);
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return [x, y] as const;
+  });
+  const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = `${pad},${h} ${line} ${w - pad},${h}`;
+  const last = pts[pts.length - 1];
+
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden>
-      <polyline
-        points={points}
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#${gradientId})`} />
+      <m.polyline
+        points={line}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity={0.7}
+        opacity={0.85}
+        initial={reduced ? false : { pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 1.1, ease: EASE_LUX }}
+      />
+      <m.circle
+        cx={last[0]}
+        cy={last[1]}
+        r="2"
+        fill="currentColor"
+        initial={reduced ? false : { scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: reduced ? 0 : 1, duration: 0.3, ease: EASE_LUX }}
       />
     </svg>
   );
@@ -176,12 +209,18 @@ export function StatCard({
   const t = STAT_TONES[tone];
   const trendUp = trend && trend.delta >= 0;
   return (
-    <Card>
-      <CardBody>
-        <div className="flex items-center justify-between gap-3">
+    <Card tilt>
+      <CardBody className="relative overflow-hidden rounded-xl">
+        {/* Tonal wash bleeding from the icon corner — gives the tile a light
+            source, so the icon chip reads as the brightest thing on it. */}
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full blur-2xl opacity-[0.13] ${t.chip}`}
+        />
+        <div className="relative flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm text-foreground-muted mb-1">{label}</p>
-            <p className={`text-2xl font-bold ${t.value}`}>{value}</p>
+            <p className={`text-2xl font-bold tabular-nums tracking-tight ${t.value}`}>{value}</p>
             {trend && (
               <p
                 className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${
@@ -196,7 +235,12 @@ export function StatCard({
             {hint && <div className="mt-1 text-xs text-foreground-muted">{hint}</div>}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <div className={`p-3 ${t.chip} rounded-lg`}>
+            {/* Lifted onto its own Z plane so it parallaxes against the label
+                as the card tilts. That separation is the whole trick. */}
+            <div
+              className={`p-3 ${t.chip} rounded-xl ring-1 ring-inset ring-white/10 shadow-sm transition-transform duration-300 ease-out group-hover:scale-105`}
+              style={{ transform: 'translateZ(34px)' }}
+            >
               <Icon className={t.icon} size={24} />
             </div>
             {sparkline && <Sparkline data={sparkline} className={t.icon} />}
@@ -216,13 +260,38 @@ export const TABLE_HEAD_CLASS =
   'px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider';
 
 // Button Component
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+//
+// The native animation and drag handlers are omitted because Framer redefines
+// them with different signatures (`onAnimationStart` takes an animation
+// definition, not a DOM event). Keeping both would make the prop type
+// unsatisfiable. Nothing in the app passes them to a Button, and anything
+// needing them wants a plain <button> rather than this one.
+type ConflictingDomHandlers =
+  | 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'
+  | 'onDrag' | 'onDragStart' | 'onDragEnd' | 'onDragEnter'
+  | 'onDragExit' | 'onDragLeave' | 'onDragOver' | 'onDrop';
+
+interface ButtonProps
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, ConflictingDomHandlers> {
   variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
   loading?: boolean;
 }
 
+/**
+ * The primary interactive control, with four layers of feedback stacked on it.
+ *
+ * In order of subtlety: a magnetic lean toward the cursor, a specular sheen
+ * that sweeps across on hover, a ripple seeded at the actual click point, and a
+ * spring press. None of them is individually noticeable — together they are the
+ * difference between a rectangle that changes colour and something that feels
+ * like it has a surface.
+ *
+ * Every layer is decorative and every layer collapses under
+ * prefers-reduced-motion, so the button is still a button: same hit area, same
+ * focus ring, same disabled semantics.
+ */
 export function Button({
   variant = 'primary',
   size = 'md',
@@ -231,18 +300,35 @@ export function Button({
   children,
   className = '',
   disabled,
+  onPointerDown,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
+  const reduced = useReducedMotion();
+  const magnetic = useMagnetic(variant === 'ghost' || variant === 'outline' ? 3 : 5);
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
 
+  const baseStyles =
+    'group/btn relative isolate inline-flex items-center justify-center overflow-hidden font-medium rounded-lg ' +
+    'transition-[background-color,border-color,color,box-shadow] duration-200 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
+    'disabled:pointer-events-none disabled:opacity-50';
+
+  // Solid variants carry the sheen and a lifted shadow; quiet variants get a
+  // tint only — a sheen on a ghost button is noise with nothing to reflect off.
   const variants = {
-    primary: 'bg-primary text-primary-foreground hover:bg-primary-hover shadow-sm hover:shadow-md active:scale-[0.98]',
+    primary:
+      'bg-primary text-primary-foreground hover:bg-primary-hover shadow-[0_1px_2px_rgb(0_0_0/0.14),0_0_0_1px_rgb(255_255_255/0.06)_inset] hover:shadow-[0_6px_20px_-6px_hsl(var(--primary)/0.55),0_0_0_1px_rgb(255_255_255/0.10)_inset]',
     secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover',
-    success: 'bg-success-600 text-white hover:bg-success-700 shadow-sm active:scale-[0.98]',
-    danger: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover shadow-sm active:scale-[0.98]',
+    success:
+      'bg-success-600 text-white hover:bg-success-700 shadow-[0_1px_2px_rgb(0_0_0/0.14)] hover:shadow-[0_6px_20px_-6px_hsl(var(--success-600)/0.5)]',
+    danger:
+      'bg-destructive text-destructive-foreground hover:bg-destructive-hover shadow-[0_1px_2px_rgb(0_0_0/0.14)] hover:shadow-[0_6px_20px_-6px_hsl(var(--destructive)/0.5)]',
     ghost: 'bg-transparent hover:bg-accent text-foreground hover:text-accent-foreground',
-    outline: 'border border-border bg-transparent hover:bg-accent text-foreground hover:border-border-hover',
+    outline:
+      'border border-border bg-transparent hover:bg-accent text-foreground hover:border-border-hover',
   };
+
+  const hasSheen = variant === 'primary' || variant === 'success' || variant === 'danger';
 
   const sizes = {
     sm: 'h-8 px-3 text-sm gap-1.5',
@@ -250,22 +336,72 @@ export function Button({
     lg: 'h-12 px-6 text-base gap-2',
   };
 
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!reduced) {
+      const r = e.currentTarget.getBoundingClientRect();
+      const id = Date.now() + Math.random();
+      setRipples((prev) => [...prev, { id, x: e.clientX - r.left, y: e.clientY - r.top }]);
+      // Self-cleaning: the ripple removes itself rather than accumulating nodes
+      // over a long session on a page someone leaves open all day.
+      window.setTimeout(() => setRipples((prev) => prev.filter((p) => p.id !== id)), 620);
+    }
+    onPointerDown?.(e);
+  };
+
   return (
-    <button
+    <m.button
+      ref={magnetic.ref}
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || loading}
+      style={{ x: magnetic.x, y: magnetic.y }}
+      whileTap={reduced ? undefined : { scale: 0.97 }}
+      transition={SPRING.press}
+      onPointerDown={handlePointerDown}
+      {...magnetic.handlers}
       {...props}
     >
+      {/* Specular sweep. -z-10 keeps it under the label; the group-hover
+          translate is what moves it, so it costs nothing when idle. */}
+      {hasSheen && !reduced && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 -left-full -z-10 w-1/2 -skew-x-12
+                     bg-gradient-to-r from-transparent via-white/25 to-transparent
+                     transition-transform duration-700 ease-out
+                     group-hover/btn:translate-x-[400%]"
+        />
+      )}
+
+      {/* Ripple, seeded where the pointer actually landed. */}
+      <AnimatePresence>
+        {ripples.map((r) => (
+          <m.span
+            key={r.id}
+            aria-hidden
+            className="pointer-events-none absolute -z-10 rounded-full bg-current"
+            initial={{ opacity: 0.28, width: 0, height: 0, x: '-50%', y: '-50%' }}
+            animate={{ opacity: 0, width: 320, height: 320, x: '-50%', y: '-50%' }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: EASE_LUX }}
+            style={{ left: r.x, top: r.y }}
+          />
+        ))}
+      </AnimatePresence>
+
       {loading ? (
-        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+        <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
       ) : icon ? (
-        <span className="shrink-0">{icon}</span>
+        // Icons lead the label out by a hair on hover — a small cue that the
+        // control is directional.
+        <span className="shrink-0 transition-transform duration-300 ease-out group-hover/btn:-translate-y-px">
+          {icon}
+        </span>
       ) : null}
       {children}
-    </button>
+    </m.button>
   );
 }
 
@@ -275,9 +411,21 @@ interface CardProps {
   className?: string;
   hoverable?: boolean;
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  /**
+   * Lean the card in 3D toward the pointer. Reserve it for short, glanceable
+   * tiles — on a card holding a table or a paragraph the motion competes with
+   * reading, and the effect stops being free.
+   */
+  tilt?: boolean;
 }
 
-export function Card({ children, className = '', hoverable = false, padding = 'none' }: CardProps) {
+export function Card({
+  children,
+  className = '',
+  hoverable = false,
+  padding = 'none',
+  tilt = false,
+}: CardProps) {
   const paddingStyles = {
     none: '',
     sm: 'p-4',
@@ -285,16 +433,74 @@ export function Card({ children, className = '', hoverable = false, padding = 'n
     lg: 'p-8',
   };
 
+  const surface =
+    'relative bg-card text-card-foreground rounded-xl border border-border ' +
+    // Layered shadow rather than one blur: a tight contact shadow plus a wide
+    // ambient one is what reads as "sitting on" a surface instead of "drawn
+    // over" it.
+    'shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(0_0_0/0.10)]';
+
+  if (!tilt) {
+    return (
+      <div
+        className={`
+          ${surface}
+          ${hoverable
+            ? 'transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-border-hover hover:shadow-[0_1px_2px_rgb(0_0_0/0.05),0_18px_40px_-18px_rgb(0_0_0/0.22)]'
+            : ''}
+          ${paddingStyles[padding]}
+          ${className}
+        `}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  return <TiltCard className={`${surface} ${paddingStyles[padding]} ${className}`}>{children}</TiltCard>;
+}
+
+/**
+ * A card that leans toward the pointer, with a glare that tracks it.
+ *
+ * Split out rather than branching inside `Card` because it has to call hooks
+ * unconditionally. The rotation is deliberately small (6°) — enough to catch
+ * the light, not enough to make text swim while someone is reading a figure
+ * off it.
+ *
+ * `perspective` is set on the wrapper, not the card. See `useTilt`.
+ */
+function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const { ref, rotateX, rotateY, pointerX, pointerY, handlers } = useTilt({ max: 6 });
+  const reduced = useReducedMotion();
+
+  const glare = useMotionTemplate`radial-gradient(600px circle at ${pointerX}% ${pointerY}%, hsl(var(--primary) / 0.10), transparent 42%)`;
+
   return (
-    <div
-      className={`
-        bg-card text-card-foreground rounded-xl shadow-sm border border-border
-        ${hoverable ? 'hover:shadow-lg hover:border-border-hover transition-all duration-200 hover:-translate-y-0.5' : ''}
-        ${paddingStyles[padding]}
-        ${className}
-      `}
-    >
-      {children}
+    // The wrapper carries `h-full` so a card in a stretched grid row still
+    // fills it — the extra element would otherwise break the height chain.
+    <div className="h-full" style={{ perspective: 1200 }}>
+      <m.div
+        ref={ref}
+        {...handlers}
+        className={`group h-full ${className} transform-gpu will-change-transform`}
+        style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
+        whileHover={reduced ? undefined : { y: -3 }}
+        transition={SPRING.glide}
+      >
+        {/* Glare rides above the surface but below the content. */}
+        {!reduced && (
+          <m.span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300"
+            style={{ backgroundImage: glare }}
+            whileHover={{ opacity: 1 }}
+          />
+        )}
+        <div className="relative h-full" style={{ transform: 'translateZ(28px)' }}>
+          {children}
+        </div>
+      </m.div>
     </div>
   );
 }
