@@ -8,6 +8,7 @@ import { getErrorRequestId } from '../lib/errors';
 import { Mail, Lock, Sun, Moon, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 import { COMPANY } from '../config/company';
 import { BRAND } from '../config/brand';
+import Grove from '../components/visuals/Grove';
 
 const heroLocations = [
   { name: COMPANY.locations.east.name, city: COMPANY.locations.east.city },
@@ -179,6 +180,12 @@ export default function Login() {
             mixBlendMode: 'multiply',
           }}
         />
+        {/* Motes of light through the trees. Sits above the duotone so it reads
+            as air in front of the landscape rather than texture printed on it,
+            and below the grain so both share the same film. Kept dim — the
+            photograph is the subject here, this is only atmosphere. */}
+        <Grove intensity={0.55} />
+
         <FilmGrain opacity={0.07} />
 
         {/* Vertical gold rule, very thin */}

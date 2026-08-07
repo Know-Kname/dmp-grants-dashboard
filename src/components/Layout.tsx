@@ -13,7 +13,8 @@ import { ROLE_LABELS } from '../lib/permissions';
 import { navItemsFor } from '../config/nav';
 import { CommandPalette } from './CommandPalette';
 import { useHotkeys } from '../hooks/useHotkeys';
-import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
+import { m, AnimatePresence, EASE_LUX, SPRING } from '../lib/motion';
+import { BRAND } from '../config/brand';
 import AIAssistant from './AIAssistant';
 
 /** Fade-scale wrapper for the two topbar dropdowns, with a real exit. */
@@ -205,21 +206,50 @@ export default function Layout() {
                 <Link
                   key={item.path}
                   to={item.path}
+                  aria-current={active ? 'page' : undefined}
                   className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150
+                    group relative flex items-center gap-3 rounded-lg px-3 py-2.5
+                    transition-colors duration-200
                     ${active
-                      ? 'bg-sidebar-active text-sidebar-active-foreground font-medium shadow-sm'
-                      : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-foreground'
+                      ? 'text-sidebar-active-foreground font-medium'
+                      : 'text-sidebar-foreground hover:text-foreground'
                     }
                   `}
                 >
-                  <item.icon size={20} className={active ? 'text-primary' : ''} />
-                  <div className="flex-1 min-w-0">
+                  {/* One shared element across every item, so React re-parents
+                      rather than re-creates it and the highlight *travels*
+                      between routes instead of cutting. This is why the motion
+                      provider loads `domMax`: `layoutId` is a layout feature,
+                      and under `domAnimation` it silently does nothing. */}
+                  {active && (
+                    <m.span
+                      layoutId="sidebar-active-pill"
+                      className="absolute inset-0 rounded-lg bg-sidebar-active shadow-sm ring-1 ring-inset ring-black/[0.03]"
+                      transition={SPRING.travel}
+                    />
+                  )}
+                  {/* Gold edge marker — the brand's accent, and a second,
+                      non-colour cue for which item is current. */}
+                  {active && (
+                    <m.span
+                      layoutId="sidebar-active-edge"
+                      className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
+                      style={{ backgroundColor: BRAND.gold }}
+                      transition={SPRING.travel}
+                    />
+                  )}
+                  {/* Idle hover wash, kept under the pill. */}
+                  <span className="absolute inset-0 rounded-lg bg-sidebar-hover opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-aria-[current=page]:opacity-0" />
+
+                  <item.icon
+                    size={20}
+                    className={`relative shrink-0 transition-transform duration-200 ${
+                      active ? 'text-primary' : 'group-hover:scale-110'
+                    }`}
+                  />
+                  <div className="relative min-w-0 flex-1">
                     <span className="block">{item.label}</span>
                   </div>
-                  {active && (
-                    <m.div layoutId="sidebar-active-dot" className="w-1.5 h-1.5 bg-primary rounded-full" />
-                  )}
                 </Link>
               );
             })}
