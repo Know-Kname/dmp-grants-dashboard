@@ -250,10 +250,35 @@ export const contractFormSchema = z.object({
   contractNumber: z.string().min(1, 'Contract number is required'),
   type: contractTypeSchema,
   customerId: uuidSchema,
-  totalAmount: z.union([
-    z.string().transform((val) => parseFloat(val)),
-    z.number(),
-  ]).pipe(positiveNumberSchema),
+  /**
+   * Optional on purpose: a contract is priced EITHER by a total typed here OR
+   * by line items, and a blank field is how the user says "use the line items".
+   *
+   * It cannot be required, and the "one or the other" rule cannot live in this
+   * schema, because line items are not part of this form — they are held in
+   * their own `useState` inside `Contracts.tsx` and merged in at submit time.
+   * A `.superRefine()` here would have nothing to look at. The page owns that
+   * rule instead, since it is the only place that can see both halves.
+   *
+   * The previous shape, `z.union([...]).pipe(positiveNumberSchema)`, piped the
+   * union as a whole: `''` became `parseFloat('') === NaN`, which the pipe
+   * rejected. That rejection happened inside `useForm.handleSubmit`'s parse
+   * gate, upstream of the page's line-item substitution, so a line-item-priced
+   * contract could never be submitted — and because the Total Amount input is
+   * unmounted once a line item exists, the error had nowhere to render and
+   * "Create Contract" became a silent no-op.
+   *
+   * Coercion stays a single step ahead of a single validator so failures are
+   * one clean issue at path `['totalAmount']`, rather than the generic
+   * "Invalid input" that a union of individually-piped branches would produce.
+   */
+  totalAmount: z.union([z.string(), z.number()])
+    .transform((val) => (typeof val === 'string' && val.trim() === '' ? undefined : Number(val)))
+    .pipe(
+      z.number({ invalid_type_error: 'Enter a valid amount' })
+        .min(0, 'Must be a positive number')
+        .optional()
+    ),
   signedDate: z.string().min(1, 'Signed date is required').pipe(dateStringSchema),
   status: contractStatusSchema,
   // paymentPlan and items are deliberately absent: neither is a field on this
