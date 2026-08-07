@@ -253,19 +253,49 @@ export default function Financial() {
     else payablesQuery.refetch();
   };
 
+  /**
+   * Put all five forms back to their initial state.
+   *
+   * One modal serves five forms here, and it is the page — not the modal — that
+   * owns them, so closing the modal discards nothing on its own. Without this,
+   * an abandoned create came back with its values intact on the next open, and
+   * a failed one came back with its errors. `reset` is what clears `errors` and
+   * `touched`; nothing else does.
+   *
+   * Called only on open and close. Deliberately *not* called on tab switch —
+   * that would throw away a form the user is part-way through.
+   */
+  const resetForms = () => {
+    depositForm.reset(initialDepositForm);
+    receivableForm.reset(initialReceivableForm);
+    payableForm.reset(initialPayableForm);
+    setReceivableEditForm(initialReceivableEditForm);
+    setPayableEditForm(initialPayableEditForm);
+  };
+
   const handleOpenCreate = () => {
+    resetForms();
     setEditingReceivable(null);
     setEditingPayable(null);
     setShowModal(true);
   };
 
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingReceivable(null);
+    setEditingPayable(null);
+    resetForms();
+  };
+
   const handleEditReceivable = (r: AccountsReceivable) => {
+    resetForms();
     setEditingReceivable(r);
     setReceivableEditForm({ amountPaid: String(r.amountPaid) });
     setShowModal(true);
   };
 
   const handleEditPayable = (p: AccountsPayable) => {
+    resetForms();
     setEditingPayable(p);
     setPayableEditForm({ amountPaid: String(p.amountPaid) });
     setShowModal(true);
@@ -548,12 +578,12 @@ export default function Financial() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingReceivable(null); setEditingPayable(null); }}
+        onClose={handleCloseModal}
         title={modalTitle}
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             {((editingReceivable || editingPayable) ? canEdit : canCreate) && (
               <Button variant="primary" loading={isMutating} onClick={handleSubmit}>
                 Save

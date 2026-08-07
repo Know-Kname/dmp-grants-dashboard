@@ -19,7 +19,7 @@ every rejected finding and why, so none of them get re-raised.
 
 ## Findings
 
-Two of the seven are fixed. The rest are open.
+Three of the seven are fixed. The rest are open.
 
 | # | Runbook | Severity | Exposure today |
 |---|---|---|---|
@@ -27,7 +27,7 @@ Two of the seven are fixed. The rest are open.
 | 02 | [contracts-line-item-deletion](02-contracts-line-item-deletion.md) | Medium | Blocks on first use — 0 rows |
 | 03 | [financial-invoice-status](03-financial-invoice-status.md) | High | Latent — AR/AP have 0 rows |
 | 04 | [workorder-status-unreachable](04-workorder-status-unreachable.md) | High | Latent — 0 rows |
-| 05 | [useform-stale-errors](05-useform-stale-errors.md) | Low (cosmetic) | **Live now** — Customers 779 rows, Burials 796 rows |
+| ~~05~~ | [useform-stale-errors](05-useform-stale-errors.md) | ~~Low (cosmetic)~~ | ✅ **Fixed** — was live on Customers and Burials |
 | 06 | [useform-latent-defects](06-useform-latent-defects.md) | Low | Dormant — no consumer triggers them |
 | ~~07~~ | [modal-focus-trap](07-modal-focus-trap.md) | ~~High~~ | ✅ **Fixed** — was live in every modal, app-wide |
 
@@ -88,7 +88,11 @@ and the most immediately reachable one — and it was the one written up as
 
 ~~Fix 01 before anyone tries to write a contract.~~ Done — `a750828`.
 ~~Fix 07 before anyone types into anything.~~ Done.
-Fix 05 next: it is the only remaining finding anyone can encounter today.
+~~Fix 05 next: it is the only remaining finding anyone can encounter today.~~ Done.
+
+Nothing open is reachable today. 02, 03, 04 and 06 all wait on tables at zero
+rows, so the ordering from here is by severity rather than by exposure: 03 and 04
+(High), then 02 (Medium), then 06 (dormant).
 
 ## Shared root cause
 

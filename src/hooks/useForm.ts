@@ -93,6 +93,24 @@ function fieldSchemaFor(schema: z.ZodTypeAny, field: string): z.ZodTypeAny | nul
  * *produces* (a number) are different types. Collapsing both into one parameter
  * made `values` claim to be the parsed shape while actually holding raw strings.
  *
+ * ## What clears validation state, and when
+ *
+ * `errors` and `touched` are written by `handleSubmit` (which marks every field
+ * touched) and by `validateField`/`validate`. **`reset` is the only thing that
+ * clears both.** Nothing here clears them on its own, and this hook has no idea
+ * whether its form is on screen.
+ *
+ * That matters because these forms live in *page* components while their inputs
+ * live inside a `Modal` that unmounts when closed. The page outlives the modal,
+ * so closing one discards nothing: a failed create left its errors behind for
+ * whatever opened the modal next.
+ *
+ * **A form owned by a component that outlives its inputs must `reset` on every
+ * path that opens them** — create, edit, and any empty-state shortcut. Resetting
+ * on close as well is good hygiene, but it is the open paths that make the
+ * guarantee, because a new one can always be added later. `src/pages/*.tsx` all
+ * follow this via `handleOpenCreate` / `handleCloseModal`.
+ *
  * @typeParam TValues Shape of the live form state — the schema's input type.
  * @typeParam TParsed Shape handed to `onSubmit` — the schema's output type.
  */
@@ -181,7 +199,13 @@ export function useForm<TValues extends Record<string, unknown>, TParsed = TValu
     }
   }, [validateOnChange, validateField]);
 
-  // Set multiple values
+  // Patch several values at once, leaving `errors` and `touched` alone.
+  //
+  // The omission is deliberate: this is a general-purpose partial setter, and a
+  // caller patching one field mid-validation would be surprised to find the
+  // other fields' errors silently discarded. To seed a form *and* clear its
+  // validation state — which is what opening a modal for editing wants — call
+  // `reset(values)` instead. Pinned by a test in `useForm.test.ts`.
   const setValues = useCallback((newValues: Partial<TValues>) => {
     setValuesState((prev) => ({ ...prev, ...newValues }));
   }, []);

@@ -119,6 +119,46 @@ describe('useForm', () => {
   });
 });
 
+/**
+ * `setValues` and `reset` differ in exactly one way, and every page that opens a
+ * modal depends on which one it picked. Pinned here so the difference stays a
+ * decision rather than something a later "simplification" quietly erases.
+ */
+describe('validation-state lifecycle', () => {
+  const seeded = () =>
+    renderHook(() =>
+      useForm({
+        schema: coercingSchema,
+        initialValues: { label: '', amount: '10' },
+        onSubmit: vi.fn(),
+      })
+    );
+
+  it('setValues patches values and deliberately keeps errors and touched', async () => {
+    const { result } = seeded();
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.errors.label).toBe('Label is required');
+
+    act(() => { result.current.setValues({ amount: '25' }); });
+
+    expect(result.current.values).toEqual({ label: '', amount: '25' });
+    expect(result.current.errors.label).toBe('Label is required');
+    expect(result.current.touched.label).toBe(true);
+  });
+
+  it('reset seeds values and clears errors and touched', async () => {
+    const { result } = seeded();
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.errors.label).toBe('Label is required');
+
+    act(() => { result.current.reset({ label: 'Seeded', amount: '25' }); });
+
+    expect(result.current.values).toEqual({ label: 'Seeded', amount: '25' });
+    expect(result.current.errors).toEqual({});
+    expect(result.current.touched).toEqual({});
+  });
+});
+
 describe('getFieldError', () => {
   it('stays quiet until the field has been touched', () => {
     const errors = { title: 'Required' };

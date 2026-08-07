@@ -92,9 +92,27 @@ export default function Vendors() {
   const combinedError = error || createMutation.error || updateMutation.error || deleteMutation.error;
 
 
+  // Every path that opens the modal normalises the form first. `reset` sets
+  // values *and* clears `errors`/`touched`; `setValues` cleared neither, so a
+  // failed create used to leave its complaints on whatever opened next.
+  const handleOpenCreate = () => {
+    form.reset(initialForm);
+    setEditingVendor(null);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingVendor(null);
+    form.reset(initialForm);
+  };
+
   const handleEdit = (v: Vendor) => {
     setEditingVendor(v);
-    form.setValues({
+    // Spread `initialForm` first: `reset` replaces wholesale rather than
+    // merging, so any field not seeded here would land as `undefined`.
+    form.reset({
+      ...initialForm,
       name: v.name,
       contactName: v.contactName || '',
       email: v.email || '',
@@ -143,7 +161,7 @@ export default function Vendors() {
             Refresh
           </Button>
           {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => { form.reset(initialForm); setEditingVendor(null); setShowModal(true); }}>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
               New Vendor
             </Button>
           )}
@@ -206,7 +224,7 @@ export default function Vendors() {
                 icon={<Building2 size={48} />}
                 title="No vendors found"
                 description={searchTerm ? 'Try a different search term' : 'Add your first vendor to get started'}
-                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={() => setShowModal(true)}>Add Vendor</Button> : undefined}
+                action={canCreate && !searchTerm ? <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>Add Vendor</Button> : undefined}
               />
             </CardBody>
           }
@@ -262,12 +280,12 @@ export default function Vendors() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => { setShowModal(false); setEditingVendor(null); }}
+        onClose={handleCloseModal}
         title={editingVendor ? 'Edit Vendor' : 'New Vendor'}
         size="md"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCloseModal}>Cancel</Button>
             {(editingVendor ? canEdit : canCreate) && (
               <Button variant="primary" loading={isMutating} onClick={() => form.handleSubmit()}>
                 {editingVendor ? 'Save Changes' : 'Add Vendor'}
