@@ -19,7 +19,7 @@ every rejected finding and why, so none of them get re-raised.
 
 ## Findings
 
-One of the six is fixed. The rest are open.
+Two of the seven are fixed. The rest are open.
 
 | # | Runbook | Severity | Exposure today |
 |---|---|---|---|
@@ -29,15 +29,24 @@ One of the six is fixed. The rest are open.
 | 04 | [workorder-status-unreachable](04-workorder-status-unreachable.md) | High | Latent — 0 rows |
 | 05 | [useform-stale-errors](05-useform-stale-errors.md) | Low (cosmetic) | **Live now** — Customers 779 rows, Burials 796 rows |
 | 06 | [useform-latent-defects](06-useform-latent-defects.md) | Low | Dormant — no consumer triggers them |
-| 07 | [modal-focus-trap](07-modal-focus-trap.md) | ⚠️ Unknown | **Unverified** — jsdom only, reproduce before fixing |
+| ~~07~~ | [modal-focus-trap](07-modal-focus-trap.md) | ~~High~~ | ✅ **Fixed** — was live in every modal, app-wide |
 
-## Runbook 07 is held to a lower standard, deliberately
+## Runbook 07 was held to a lower standard — that no longer applies
 
-01–06 were each reproduced and independently re-verified. **07 was not** — its
-mechanism is confirmed in jsdom only, and circumstantial evidence argues against
-it reproducing in a browser. It is written up rather than discarded because its
-blast radius would be every modal in the app, but its first step is a
-reproduction, not a fix.
+07 was originally written up as **unverified**: its mechanism was confirmed in
+jsdom only, circumstantial evidence was read as arguing against it reproducing in
+a browser, and its first step was a reproduction rather than a fix.
+
+**The reproduction was done and the bug is real.** Confirmed in real Chromium via
+Playwright: one character landed per modal field, at any typing speed, with focus
+jumping to the dialog container. Severity **High** — every modal in the app, and
+unlike 02–06 it was **live**, not latent, because it needed no particular table
+to have rows in it. It is now fixed and verified; 07 is held to the same standard
+as the rest.
+
+The lesson is in the doubt, not the bug. The reason 07 was downgraded was
+"production has ~1,575 rows, someone would have noticed" — and 100% of those rows
+turned out to be bulk imported. See the section below.
 
 ## Context that reframes every severity here
 
@@ -53,7 +62,13 @@ Two consequences worth holding onto:
    fix them, not a reason to deprioritise.
 2. **"Surely someone would have noticed" is not available as evidence.** Nobody
    has exercised these paths. That argument was used to downgrade runbook 07 and
-   turned out to be worthless — check row provenance before leaning on it again.
+   turned out to be worthless — 07 was real, High, and live in every modal in the
+   app. Check row provenance before leaning on it again.
+
+One caveat on point 1, learned from 07: "zero rows" bounds defects in *table-
+specific write paths*. It says nothing about defects in shared UI, which are live
+the moment anyone opens the app. 07 was in `ui.tsx` and no row count could have
+predicted its exposure.
 
 ## The counterintuitive priority
 
@@ -63,10 +78,16 @@ Runbooks 01–04 are the severe ones, and every table they touch has **zero rows
 in production. They are not corrupting anything; they will block or corrupt the
 first time someone genuinely uses those modules.
 
-Runbook 05 is *cosmetic* and is the only one users can hit **today**, because
-Customers (779 rows) and Burials (796 rows) are in active use.
+Runbook 05 is *cosmetic* and is one of only two anyone could hit **today**,
+because Customers (779 rows) and Burials (796 rows) are in active use.
+
+Runbook 07 was the other, and it inverted the whole framing: it lived in shared
+UI, so no table needed rows for it to bite. It was both the most severe finding
+and the most immediately reachable one — and it was the one written up as
+"unverified".
 
 ~~Fix 01 before anyone tries to write a contract.~~ Done — `a750828`.
+~~Fix 07 before anyone types into anything.~~ Done.
 Fix 05 next: it is the only remaining finding anyone can encounter today.
 
 ## Shared root cause

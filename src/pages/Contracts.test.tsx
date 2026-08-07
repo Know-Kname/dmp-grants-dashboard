@@ -69,11 +69,11 @@ const renderContracts = () =>
 /**
  * Set a controlled field's value in one event.
  *
- * Deliberately not `userEvent.type`: `Modal`'s focus-trap effect depends on the
- * `onClose` identity, and every page here passes an unmemoised handler, so the
- * effect re-runs on each render and pulls focus back to the dialog between
- * keystrokes. That is a separate pre-existing wart in `ui.tsx`; these tests are
- * about the submit path, so they set values without depending on focus.
+ * Not `userEvent.type`, but no longer because it would break: `Modal`'s focus
+ * trap used to pull focus off the input between keystrokes, and these tests
+ * predated that fix. The trap is fixed and covered directly by
+ * `src/components/Modal.test.tsx`; typing is left there so these stay about the
+ * submit path and do not depend on focus behaviour at all.
  */
 const setField = (matcher: RegExp, value: string) =>
   fireEvent.change(screen.getByLabelText(matcher), { target: { value } });
