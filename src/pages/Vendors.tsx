@@ -12,7 +12,7 @@ import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../lib/toast';
 import type { Vendor } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Textarea,
+  PageHeader, Card, CardBody, Button, Modal, Input, Textarea,
   EmptyState, Badge, PageError, StatCard, AnimatedNumber,
   SkeletonTable, ConfirmDialog,
 } from '../components/ui';
@@ -150,23 +150,22 @@ export default function Vendors() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Vendors</h1>
-          <p className="text-foreground-muted mt-1">Supplier and service provider records</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              New Vendor
+      <PageHeader
+        title="Vendors"
+        subtitle="Supplier and service provider records"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                New Vendor
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={combinedError} />

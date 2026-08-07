@@ -116,8 +116,13 @@ export function DataTable<T>({
 
   return (
     <Card>
+      {/* Toolbar. The row count lives here rather than only in the pager so the
+          answer to "how many are there" is visible before you scroll. */}
       {csv && (
-        <div className="flex justify-end px-4 pt-3">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2.5">
+          <p className="text-xs tabular-nums text-foreground-muted">
+            {sorted.length.toLocaleString()} {sorted.length === 1 ? 'record' : 'records'}
+          </p>
           <Button
             variant="ghost"
             size="sm"
@@ -130,7 +135,9 @@ export function DataTable<T>({
       )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-background-subtle border-b border-border">
+          {/* Sticky header — these tables run to 20 rows a page and the column
+              meanings are not guessable from the values alone. */}
+          <thead className="sticky top-0 z-10 border-b border-border bg-background-subtle/95 backdrop-blur supports-[backdrop-filter]:bg-background-subtle/80">
             <tr>
               {columns.map((col) => {
                 const isSorted = sort?.key === col.key;
@@ -140,16 +147,22 @@ export function DataTable<T>({
                     {col.sortValue ? (
                       <button
                         onClick={() => toggleSort(col.key)}
-                        className={`inline-flex items-center gap-1 min-h-0 uppercase tracking-wider hover:text-foreground transition-colors ${
+                        className={`group/sort inline-flex min-h-0 items-center gap-1 uppercase tracking-wider transition-colors hover:text-foreground ${
                           isSorted ? 'text-foreground' : ''
                         }`}
                         aria-label={`Sort by ${col.key}`}
                       >
                         {col.header}
+                        {/* The neutral glyph stays hidden until hover, so a
+                            sorted column is the only arrow on screen and the
+                            header row stops looking like a row of controls. */}
                         {isSorted ? (
                           sort!.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
                         ) : (
-                          <ArrowUpDown size={12} className="opacity-40" />
+                          <ArrowUpDown
+                            size={12}
+                            className="opacity-0 transition-opacity group-hover/sort:opacity-50"
+                          />
                         )}
                       </button>
                     ) : (
@@ -167,14 +180,27 @@ export function DataTable<T>({
                 initial={didAnimate.current ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, ease: EASE_LUX, delay: Math.min(i * 0.025, 0.35) }}
-                className={`hover:bg-card-hover transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                className={`group/row relative transition-colors hover:bg-card-hover ${
+                  onRowClick ? 'cursor-pointer' : ''
+                }`}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
-                {columns.map((col) => (
+                {columns.map((col, ci) => (
                   <td
                     key={col.key}
-                    className={`px-6 py-4 ${col.align === 'right' ? 'text-right' : ''} ${col.className ?? ''}`}
+                    className={`relative px-6 py-4 ${col.align === 'right' ? 'text-right tabular-nums' : ''} ${col.className ?? ''}`}
                   >
+                    {/* Accent edge on the first cell only — a marker for which
+                        row the pointer is on, which plain background tint does
+                        poorly once rows are this tall. Drawn on the cell rather
+                        than the row because a <tr> cannot host a positioned
+                        pseudo-element reliably across browsers. */}
+                    {ci === 0 && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-[3px] origin-top scale-y-0 rounded-r bg-primary/70 transition-transform duration-200 ease-out group-hover/row:scale-y-100"
+                      />
+                    )}
                     {col.cell(row)}
                   </td>
                 ))}

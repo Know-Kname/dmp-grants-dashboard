@@ -8,7 +8,7 @@ import {
 } from '../hooks/useData';
 import type { Cemetery, Section, Lot, Grave } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Select, Textarea,
+  PageHeader, Card, CardBody, Button, Modal, Input, Select, Textarea,
   Badge, EmptyState, PageError, ConfirmDialog, Skeleton, SkeletonTable,
   TABLE_HEAD_CLASS } from '../components/ui';
 import { m, EASE_LUX } from '../lib/motion';
@@ -194,13 +194,11 @@ export default function Cemeteries() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Cemeteries</h1>
-          <p className="text-foreground-muted mt-1">Plot and grave inventory — cemetery → section → lot → grave</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Cemeteries"
+        subtitle="Plot and grave inventory — cemetery → section → lot → grave"
+        actions={
+          <>
           <Button
             variant="ghost"
             size="sm"
@@ -229,8 +227,9 @@ export default function Cemeteries() {
               New Grave
             </Button>
           )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={queryError} />

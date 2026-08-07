@@ -7,6 +7,19 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      // Mirrors --font-* in styles/index.css. Fraunces and Source Serif were
+      // already downloaded on every page load for the login and memorial
+      // headings; exposing them as utilities lets the app interior share that
+      // editorial voice at no additional network cost.
+      // Family names are quoted *inside* the string. Tailwind emits this list
+      // verbatim, and an unquoted `Source Serif 4` is invalid CSS — a bare `4`
+      // is not a valid identifier — so the browser drops the whole declaration
+      // and the utility silently does nothing. Same for `Times New Roman`.
+      fontFamily: {
+        display: ['Fraunces', '"Source Serif 4"', 'Georgia', 'serif'],
+        serif: ['"Source Serif 4"', 'Georgia', '"Times New Roman"', 'serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
         // Semantic colors using CSS variables
         background: {

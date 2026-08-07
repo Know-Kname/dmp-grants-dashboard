@@ -11,7 +11,7 @@ import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, cn } from '../lib/utils';
 import type { InventoryItem } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Select,
+  PageHeader, Card, CardBody, Button, Modal, Input, Select,
   Badge, EmptyState, PageError, StatCard, AnimatedNumber, SkeletonTable, ConfirmDialog,
   TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, Package, Edit, Trash2, RefreshCw, AlertTriangle, DollarSign } from 'lucide-react';
@@ -149,23 +149,22 @@ export default function Inventory() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory</h1>
-          <p className="text-foreground-muted mt-1">Caskets, urns, vaults, markers, and supplies</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              Add Item
+      <PageHeader
+        title="Inventory"
+        subtitle="Caskets, urns, vaults, markers, and supplies"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                Add Item
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={combinedError} />

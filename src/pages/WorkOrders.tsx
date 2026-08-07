@@ -11,7 +11,7 @@ import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../lib/toast';
 import type { WorkOrder } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState,
+  PageHeader, Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState,
   PageError, StatCard, TABLE_HEAD_CLASS, ConfirmDialog, SkeletonTable, Tabs,
 } from '../components/ui';
 import { m, AnimatePresence, EASE_LUX } from '../lib/motion';
@@ -218,22 +218,22 @@ export default function WorkOrders() {
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Work Orders</h1>
-          <p className="text-foreground-muted mt-1">Manage and track maintenance and service tasks</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              New Work Order
+      <PageHeader
+        title="Work Orders"
+        subtitle="Manage and track maintenance and service tasks"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                New Work Order
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <PageError error={combinedError} />
 
