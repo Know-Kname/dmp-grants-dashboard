@@ -74,28 +74,48 @@ Edit is unaffected because `handleEdit` seeds a numeric string.
 
 ## Fix options
 
-**A — make the schema model the real contract (recommended).** Total is optional
-when line items supply it. Express that in the schema rather than in the UI:
+> **Corrected after implementation (PR #96).** The original recommendation here
+> was wrong and is preserved below as a warning. It proposed a `.superRefine()`
+> on `contractFormSchema` requiring "a total **or** at least one line item."
+> That cannot work: `lineItems` is separate React state
+> (`src/pages/Contracts.tsx:166`), declared right after the `useForm` call and
+> never part of the form values. The schema has nothing to inspect.
+>
+> **The lesson generalises to every runbook here.** These were written from
+> audit evidence — the *diagnoses* were verified by reproduction, the
+> *recommended fixes* were not. Treat a recommendation as a starting point and
+> check its premises before following it.
+
+**A — schema permits blank, page enforces the rule (implemented).** Make
+`totalAmount` optional in the schema, parsing `''` to `undefined`. Enforce "a
+total or at least one line item" in the page's `onSubmit`, the only place that
+can see both halves:
 
 ```ts
-totalAmount: z.union([z.literal(''), z.string(), z.number()])
-  .transform((v) => (v === '' ? undefined : Number(v)))
-  .pipe(positiveNumberSchema.optional()),
+const totalAmount = lineItems.length > 0 ? computedTotal : data.totalAmount;
+if (totalAmount === undefined) {
+  form.setError('totalAmount', 'Enter a total amount or add at least one line item');
+  return;
+}
+form.clearError('totalAmount');
 ```
 
-then `.superRefine()` on the object to require a total *or* at least one line
-item. Keeps one source of truth and fixes the silent-failure class, not just
-this instance.
+The property that makes this the right shape: the guard can only trip when there
+are **no** line items — exactly when the Total Amount input is mounted. The error
+lands somewhere it can render, which was the actual defect. (`handleSubmit` does
+not clear errors on a successful parse, hence the explicit `clearError`.)
 
-**B — sync `computedTotal` into form values.** An effect writing `computedTotal`
-to `totalAmount` whenever line items change. Smaller, but adds a second writer
-to that field and leaves the schema lying about what is required.
+**B — sync a line-item count into form values.** Lets the schema own the whole
+rule. Rejected: duplicate state that can drift out of sync with `lineItems`.
 
-**C — always render the input, disabled and auto-filled, when line items exist.**
-Cheapest and makes the value visible — but leaves the schema/UI mismatch intact,
-so the next conditional field reintroduces the bug.
+**C — restore a `|| 0` fallback.** What the pre-regression code did. Rejected: it
+re-hides bad input and silently creates $0 contracts.
 
-Prefer A. B and C treat the symptom.
+**D — pipe each union branch separately.** Looks tidier. **Actively harmful**:
+when every branch fails, Zod emits a single generic `invalid_union` "Invalid
+input", degrading the existing negative/non-numeric messages. Keep coercion one
+step ahead of one validator so failures stay a single clean issue at
+`['totalAmount']`.
 
 ## Verification
 

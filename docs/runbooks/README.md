@@ -27,6 +27,31 @@ every rejected finding and why, so none of them get re-raised.
 | 04 | [workorder-status-unreachable](04-workorder-status-unreachable.md) | High | Latent — 0 rows |
 | 05 | [useform-stale-errors](05-useform-stale-errors.md) | Low (cosmetic) | **Live now** — Customers 779 rows, Burials 796 rows |
 | 06 | [useform-latent-defects](06-useform-latent-defects.md) | Low | Dormant — no consumer triggers them |
+| 07 | [modal-focus-trap](07-modal-focus-trap.md) | ⚠️ Unknown | **Unverified** — jsdom only, reproduce before fixing |
+
+## Runbook 07 is held to a lower standard, deliberately
+
+01–06 were each reproduced and independently re-verified. **07 was not** — its
+mechanism is confirmed in jsdom only, and circumstantial evidence argues against
+it reproducing in a browser. It is written up rather than discarded because its
+blast radius would be every modal in the app, but its first step is a
+reproduction, not a fix.
+
+## Context that reframes every severity here
+
+**This app has almost no hand-entry usage history.** Contracts, AR, AP, work
+orders, inventory, and payment schedule are all at **zero rows**. The only
+populated tables — burials (796) and customers (779) — are **100% bulk imported**
+(`source_system = 'dim_party_dmp_west'`, via `scripts/import/load.py`).
+
+Two consequences worth holding onto:
+
+1. **Nothing here is corrupting live data today.** Every defect blocks or
+   corrupts on first real use, which has not happened yet. That is a window to
+   fix them, not a reason to deprioritise.
+2. **"Surely someone would have noticed" is not available as evidence.** Nobody
+   has exercised these paths. That argument was used to downgrade runbook 07 and
+   turned out to be worthless — check row provenance before leaning on it again.
 
 ## The counterintuitive priority
 
