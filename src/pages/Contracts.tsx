@@ -142,6 +142,21 @@ export default function Contracts() {
     schema: contractFormSchema,
     initialValues: initialForm,
     onSubmit: (data) => {
+      // A contract is priced either by the typed total or by its line items.
+      // `contractFormSchema` therefore allows a blank total (it cannot see
+      // `lineItems`, which is local state), which leaves this the only place
+      // that can enforce "one or the other" — and, unlike the schema gate, a
+      // failure here can still be reported: the Total Amount input is on screen
+      // in exactly the case that trips it, i.e. when there are no line items.
+      const totalAmount = lineItems.length > 0 ? computedTotal : data.totalAmount;
+      if (totalAmount === undefined) {
+        form.setError('totalAmount', 'Enter a total amount or add at least one line item');
+        return;
+      }
+      // `handleSubmit` does not clear errors when the schema parses, so drop any
+      // complaint left over from a previous attempt that ended in the branch above.
+      form.clearError('totalAmount');
+
       const itemsPayload = lineItems.map(({ description, amount }) => ({
         description,
         amount: parseFloat(amount) || 0,
@@ -150,7 +165,7 @@ export default function Contracts() {
         contractNumber: data.contractNumber,
         type: data.type,
         customerId: data.customerId,
-        totalAmount: lineItems.length > 0 ? computedTotal : data.totalAmount,
+        totalAmount,
         amountPaid: editingContract ? editingContract.amountPaid : 0,
         signedDate: data.signedDate,
         status: data.status,
