@@ -12,7 +12,7 @@ import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../lib/toast';
 import type { Burial } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Textarea,
+  PageHeader, Card, CardBody, Button, Modal, Input, Textarea,
   EmptyState, PageError, StatCard, AnimatedNumber, SkeletonTable, ConfirmDialog } from '../components/ui';
 import { DataTable, type Column } from '../components/DataTable';
 import { Plus, Search, BookOpen, Edit, Trash2, RefreshCw, Calendar, QrCode, Globe } from 'lucide-react';
@@ -170,23 +170,22 @@ export default function Burials() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Burial Records</h1>
-          <p className="text-foreground-muted mt-1">Deceased records, plot locations, and permit tracking</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              Record Burial
+      <PageHeader
+        title="Burial Records"
+        subtitle="Deceased records, plot locations, and permit tracking"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                Record Burial
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={combinedError} />

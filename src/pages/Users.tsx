@@ -26,7 +26,7 @@ import { APP_ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, type AppRole } from '../lib/
 import type { Profile } from '../lib/profiles';
 import {
   Badge, Button, Card, CardBody, ConfirmDialog, EmptyState, Input,
-  Modal, PageError, Select, SkeletonTable,
+  Modal, PageError, PageHeader, Select, SkeletonTable,
 } from '../components/ui';
 import { DataTable, type Column } from '../components/DataTable';
 
@@ -205,20 +205,18 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Users & Access</h1>
-          <p className="text-foreground-muted mt-1">
-            Who can sign in, and what each of them is allowed to do
-          </p>
-        </div>
-        <Input
-          placeholder="Search users..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-      </div>
+      <PageHeader
+        title="Users & Access"
+        subtitle="Who can sign in, and what each of them is allowed to do"
+        actions={
+          <Input
+            placeholder="Search users..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs"
+          />
+        }
+      />
 
       <PageError error={error || updateMutation.error} />
 

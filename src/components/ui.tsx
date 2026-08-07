@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertCircle, AlertTriangle, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { getErrorDetails, getErrorMessage, getErrorRequestId } from '../lib/errors';
+import { BRAND } from '../config/brand';
 import {
   m, AnimatePresence, scalePop, useCountUp, useReducedMotion,
   useMagnetic, useTilt, useMotionTemplate, SPRING, EASE_LUX,
@@ -248,6 +249,61 @@ export function StatCard({
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+// ============================================
+// PAGE HEADER
+// ============================================
+
+/**
+ * The masthead every list page opens with.
+ *
+ * Extracted because all nine CRUD pages carried the same four lines of markup,
+ * and because that duplication is what let them drift: same heading, same
+ * subtitle position, same action cluster, retyped nine times.
+ *
+ * The title is set in Fraunces — the display face the login and memorial pages
+ * already use. It was being downloaded on every page load and then never used
+ * once you were signed in, so the app interior read like a different product
+ * from its own front door. A gold rule ties it to the brand without adding a
+ * third definition of the colour (see `config/brand`).
+ *
+ * @param actions Right-aligned controls. Wraps beneath the title on narrow
+ *                viewports rather than crushing the heading.
+ */
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+}) {
+  const reduced = useReducedMotion();
+  return (
+    <m.div
+      className="flex flex-wrap items-end justify-between gap-4"
+      initial={reduced ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: EASE_LUX }}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="h-7 w-[3px] shrink-0 rounded-full"
+            style={{ backgroundColor: BRAND.gold }}
+          />
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+            {title}
+          </h1>
+        </div>
+        {subtitle && <p className="mt-1.5 pl-[15px] text-foreground-muted">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </m.div>
   );
 }
 
@@ -916,23 +972,42 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+  const reduced = useReducedMotion();
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
-      {/* Icon container with brand gradient */}
-      <div className="relative mb-6">
-        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary-50 via-primary-100 to-primary-50 dark:from-primary-950 dark:via-primary-900 dark:to-primary-950 border border-primary-200/60 dark:border-primary-700/40 flex items-center justify-center shadow-sm">
-          <div className="text-primary/50 dark:text-primary/40">
-            {icon}
-          </div>
-        </div>
-        {/* Decorative accent dots */}
-        <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary-200 dark:bg-primary-800 rounded-full opacity-50" />
-        <div className="absolute -bottom-1 -left-2 w-3 h-3 bg-primary-100 dark:bg-primary-900 rounded-full opacity-50" />
-      </div>
+    <div className="relative flex select-none flex-col items-center justify-center overflow-hidden px-6 py-20 text-center">
+      {/* A single soft light behind the icon, replacing the two decorative dots
+          that used to sit beside it. Those read as debris at this scale; a
+          light source reads as depth and needs no explaining. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-16 h-56 w-56 -translate-x-1/2 rounded-full bg-primary/[0.07] blur-3xl"
+      />
 
-      <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-foreground-muted text-sm max-w-[22rem] mx-auto leading-relaxed mb-6">{description}</p>
-      {action}
+      <m.div
+        className="relative mb-6"
+        initial={reduced ? false : { opacity: 0, scale: 0.94, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: EASE_LUX }}
+      >
+        <div className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] border border-primary-200/60 bg-gradient-to-br from-primary-50 via-primary-100 to-primary-50 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_28px_-14px_hsl(var(--primary)/0.45)] ring-1 ring-inset ring-white/40 dark:border-primary-700/40 dark:from-primary-950 dark:via-primary-900 dark:to-primary-950 dark:ring-white/5">
+          <div className="text-primary/50 dark:text-primary/40">{icon}</div>
+        </div>
+      </m.div>
+
+      <m.div
+        className="relative"
+        initial={reduced ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.08, ease: EASE_LUX }}
+      >
+        {/* Fraunces here too, so an empty table still sounds like the product
+            rather than a browser default. */}
+        <h3 className="mb-2 font-display text-xl font-semibold tracking-tight text-foreground">{title}</h3>
+        <p className="mx-auto mb-6 max-w-[22rem] text-sm leading-relaxed text-foreground-muted">
+          {description}
+        </p>
+        {action}
+      </m.div>
     </div>
   );
 }

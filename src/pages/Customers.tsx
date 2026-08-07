@@ -11,7 +11,7 @@ import { getErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/utils';
 import type { Customer } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Textarea,
+  PageHeader, Card, CardBody, Button, Modal, Input, Textarea,
   EmptyState, Avatar, Badge, PageError, StatCard, AnimatedNumber,
   SkeletonTable, ConfirmDialog,
 } from '../components/ui';
@@ -159,23 +159,22 @@ export default function Customers() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Customers</h1>
-          <p className="text-foreground-muted mt-1">Contact records and family information</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              New Customer
+      <PageHeader
+        title="Customers"
+        subtitle="Contact records and family information"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                New Customer
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={combinedError} />

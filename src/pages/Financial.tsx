@@ -13,7 +13,7 @@ import { depositFormSchema, receivableFormSchema, payableFormSchema } from '../l
 import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Select, Textarea,
+  PageHeader, Card, CardBody, Button, Modal, Input, Select, Textarea,
   Badge, EmptyState, PageError, StatCard, AnimatedNumber, SkeletonTable, Tabs,
 } from '../components/ui';
 import { DataTable, type Column } from '../components/DataTable';
@@ -347,23 +347,22 @@ export default function Financial() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Financial</h1>
-          <p className="text-foreground-muted mt-1">Deposits, accounts receivable, and accounts payable</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={handleRefetch}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              {addLabel}
+      <PageHeader
+        title="Financial"
+        subtitle="Deposits, accounts receivable, and accounts payable"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={handleRefetch}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                {addLabel}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={combinedError} />

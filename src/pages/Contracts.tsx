@@ -13,7 +13,7 @@ import { getErrorMessage } from '../lib/errors';
 import { useToast } from '../lib/toast';
 import type { Contract, ContractItem } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Select,
+  PageHeader, Card, CardBody, Button, Modal, Input, Select,
   Badge, EmptyState, LoadingSpinner, PageError, StatCard, AnimatedNumber,
   ConfirmDialog, SkeletonTable, Tabs, TABLE_HEAD_CLASS } from '../components/ui';
 import { Plus, Search, FileText, Edit, Trash2, RefreshCw, DollarSign, TrendingUp, X, CalendarDays } from 'lucide-react';
@@ -282,23 +282,22 @@ export default function Contracts() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Contracts</h1>
-          <p className="text-foreground-muted mt-1">Pre-need and at-need contract management</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
-            Refresh
-          </Button>
-          {canCreate && (
-            <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
-              New Contract
+      <PageHeader
+        title="Contracts"
+        subtitle="Pre-need and at-need contract management"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" icon={<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button variant="primary" icon={<Plus size={20} />} onClick={handleOpenCreate}>
+                New Contract
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error */}
       <PageError error={combinedError} />

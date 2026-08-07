@@ -8,7 +8,7 @@ import { getErrorMessage } from '../lib/errors';
 import { formatCurrency, formatDateForInput } from '../lib/utils';
 import type { Grant } from '../types';
 import {
-  Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState,
+  PageHeader, Card, CardBody, Button, Modal, Input, Select, Textarea, Badge, EmptyState,
   PageError, StatCard, AnimatedNumber, ConfirmDialog, SkeletonStatRow, Skeleton, Tabs,
 } from '../components/ui';
 import { m, AnimatePresence, staggerContainer, fadeInUp, EASE_LUX } from '../lib/motion';
@@ -252,32 +252,31 @@ export default function Grants() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Grants & Opportunities</h1>
-          <p className="text-foreground-muted mt-1">Track funding opportunities and veteran benefits</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            icon={<RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />}
-            onClick={() => refetch()}
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
-          {canCreate && (
+      <PageHeader
+        title="Grants & Opportunities"
+        subtitle="Track funding opportunities and veteran benefits"
+        actions={
+          <>
             <Button
-              variant="primary"
-              icon={<Plus size={20} />}
-              onClick={handleOpenCreate}
+              variant="ghost"
+              icon={<RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />}
+              onClick={() => refetch()}
+              disabled={isLoading}
             >
-              Add Grant
+              Refresh
             </Button>
-          )}
-        </div>
-      </div>
+            {canCreate && (
+              <Button
+                variant="primary"
+                icon={<Plus size={20} />}
+                onClick={handleOpenCreate}
+              >
+                Add Grant
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Error display */}
       <PageError error={combinedError} />
