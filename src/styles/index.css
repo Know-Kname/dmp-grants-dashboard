@@ -338,10 +338,11 @@ a[role="button"],
   outline-offset: 2px;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
+/* Scrolling is native and immediate — see the note in `src/main.tsx`.
+   `scroll-behavior: smooth` is deliberately NOT set here: it animates every
+   programmatic jump, which fights the `scrollIntoView` calls in the command
+   palette and the AI assistant, and it delays anchor navigation for no gain in
+   a records system. */
 
 /* ========================================
    RESPONSIVE BREAKPOINTS

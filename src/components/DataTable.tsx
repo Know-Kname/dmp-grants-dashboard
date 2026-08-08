@@ -135,9 +135,26 @@ export function DataTable<T>({
       )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          {/* Sticky header — these tables run to 20 rows a page and the column
-              meanings are not guessable from the values alone. */}
-          <thead className="sticky top-0 z-10 border-b border-border bg-background-subtle/95 backdrop-blur supports-[backdrop-filter]:bg-background-subtle/80">
+          {/*
+            Deliberately NOT sticky, and it cannot be without a change nobody
+            wants here.
+
+            A `sticky` thead was tried and measured: it never stuck at all. The
+            scroll wrapper above carries `overflow-x-auto`, and CSS computes the
+            other axis to `auto` whenever one axis is not `visible` — so the
+            wrapper becomes the nearest scroll container, `sticky` resolves
+            against it, and since it has no height limit it never scrolls
+            vertically and the header just moves with the page.
+
+            The two ways to make it real are both worse than the problem:
+            constrain the wrapper's height so the table gets its own vertical
+            scrollport (a nested scroll region, in an app whose main complaint
+            was that navigating it is hard), or drop horizontal scrolling so the
+            axes can differ (which breaks wide tables on tablets). Pages hold 20
+            rows and the toolbar names the record count, so the header scrolling
+            away costs little.
+          */}
+          <thead className="border-b border-border bg-background-subtle">
             <tr>
               {columns.map((col) => {
                 const isSorted = sort?.key === col.key;
