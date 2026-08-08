@@ -43,7 +43,7 @@ npm run dev
 | Layer | Technology | Purpose |
 |---|---|---|
 | UI framework | React 18 + TypeScript 5 | Component-based SPA |
-| Build tool | Vite 4 | Dev server + production bundler |
+| Build tool | Vite 8 (Rolldown) | Dev server + production bundler |
 | Styling | Tailwind CSS 3 + CSS variables | Design tokens, dark/light mode |
 | Routing | React Router DOM v6 | Client-side page routing, incl. one public unauthenticated route |
 | Server state | TanStack React Query v5 | Data fetching, caching, mutations |
