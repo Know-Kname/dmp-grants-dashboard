@@ -1,6 +1,6 @@
 # 03 — Recording a payment never clears an invoice's status
 
-**Severity:** High · **Status:** Live on `main` @ `83dd6b7` · **Exposure:** `accounts_receivable` = 0 rows, `accounts_payable` = 0 rows. Latent today; corrupts from the first invoice onward.
+**Severity:** High · **Status:** ✅ **Fixed** — see *Resolution* · **Exposure when open:** `accounts_receivable` = 0 rows, `accounts_payable` = 0 rows. Latent; would have corrupted from the first invoice onward.
 
 ## Summary
 
@@ -124,3 +124,58 @@ Same pattern in `work_orders` — runbook 04. Check `deposits` and
 
 The `mark-overdue-schedule` cron job and `payment_schedule` generally — no
 app-side writer exists for that table at all.
+
+---
+
+## Resolution
+
+Fixed by **option A**, with the rule given a name rather than left inline.
+
+**Premises re-verified before fixing** — this was written against `83dd6b7` and
+`main` had moved seven merges:
+
+- `Financial.tsx:312` and `:321` still sent `{ id, amountPaid }` and no status.
+- All three cron jobs are **still active** — `mark-overdue-ar`,
+  `mark-overdue-ap`, `mark-overdue-schedule`, each `0 1 * * *`, queried from
+  `cron.job` rather than trusting the migration header, which still says
+  "awaiting pg_cron activation".
+- The CHECK constraint still permits `pending | partial | paid | overdue` on
+  both tables.
+
+### What was implemented
+
+`src/lib/invoiceStatus.ts` — `paymentStatus(amountPaid, amount)`:
+
+| Condition | Result |
+|---|---|
+| `amount > 0 && amountPaid >= amount` | `paid` |
+| `amountPaid > 0` | `partial` |
+| otherwise | `pending` |
+
+It lives in `lib/` rather than inline so the rule has a name, a test, and one
+place to change — the runbook's stated weakness of option A was "any future
+writer must remember it", and a named import is harder to forget than a literal.
+
+**It never returns `overdue`,** which is deliberate. That state depends on
+`due_date` and the clock, not the amounts, and the cron owns it. The interaction
+is self-correcting: a partial payment on an overdue invoice returns `partial`,
+and the next cron run re-flags it because `WHERE status IN ('pending','partial')`
+still matches. Settling it fully returns `paid`, which that clause excludes — so
+a paid invoice can never be dragged back to overdue.
+
+The degenerate case is guarded explicitly: with a zero or negative total,
+`amountPaid >= amount` would otherwise call an untouched invoice "paid".
+
+### Coverage
+
+Four tests in `src/pages/Financial.test.tsx`, all observed **failing first** with
+`status` absent from the mutation: full payment → `paid`, partial → `partial`,
+zero → `pending`, and overpayment → `paid` rather than an invented state.
+
+### Still outstanding
+
+**Option B — the database trigger — was not done.** The runbook is right that it
+is the durable answer: this is a data-integrity invariant and belongs in the
+database, where no client can bypass it. The application fix closes the live
+path; the trigger would close the class. Worth doing when the journey-test
+harness with a local database exists, since that is what would verify it.

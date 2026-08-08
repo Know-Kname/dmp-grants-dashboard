@@ -1,6 +1,11 @@
 # 04 — A work order can never leave "pending"
 
-**Severity:** High (functional gap; low data risk) · **Status:** Live on `main` @ `83dd6b7` · **Exposure:** `work_orders` = 0 rows.
+**Severity:** ~~High~~ → Medium once re-measured · **Status:** ✅ **Fixed** — see *Resolution* · **Exposure when open:** `work_orders` = 0 rows.
+
+> ⚠️ **This runbook's headline was already stale when it came to be fixed.**
+> A board view with Start/Complete quick actions had landed in the meantime, so
+> "a work order can never leave pending" was no longer true. Two narrower gaps
+> were real and are what got fixed. See *Resolution*.
 
 ## Summary
 
@@ -120,3 +125,59 @@ from the object literal. `Financial` (runbook 03) has the same shape.
 
 Any redesign of the work-order lifecycle. This is about making the existing four
 documented states reachable.
+
+---
+
+## Resolution
+
+### First: the diagnosis was partly out of date
+
+Re-checking against `628a9e8` before writing any test — `main` had moved seven
+merges since `83dd6b7` — the headline claim did not hold. `WorkOrders.tsx` now
+has a **board view** whose cards carry Start / Complete buttons calling
+`moveTo`, which does write `status`. Runbook 04's own *fix option B* had been
+implemented independently.
+
+Had I trusted the runbook, I would have written a test asserting a bug that no
+longer existed, watched it pass, and "fixed" nothing. Two narrower gaps were
+real:
+
+1. **`cancelled` was unreachable.** `NEXT_STATUS` only walks
+   pending → in_progress → completed. Nothing in the repository wrote
+   `cancelled`, yet the board rendered a Cancelled column and the filter offered
+   it — a column that could never fill.
+2. **`completedDate` was never written by anything.** `moveTo` sent only
+   `status`; the edit payload was hand-enumerated without it. Completing a work
+   order left `completed_date` null permanently, so "when was this done?" had no
+   answer. Confirmed by grep: the identifier appeared nowhere in the page or its
+   data module.
+
+### What was implemented
+
+**A Status `Select` in the edit modal**, edit-only — a new work order is always
+pending and the create mutation excludes status from its input type, so offering
+the control on create would imply a choice that does not exist. This is also the
+only path to `cancelled`, and the only way to move an order backwards after a
+misclick.
+
+**`completionDateFor(status, existing)`**, called from *both* writers so the
+board and the modal cannot disagree: stamps today's date on `completed`,
+preserves an existing date rather than moving it on re-save, and clears it on any
+other status — a completion date on a reopened order is worse than none.
+
+Also seeded `status` into `initialForm` and `handleEdit`.
+
+### Coverage
+
+Five tests in `src/pages/WorkOrders.test.tsx`, all observed **failing first** —
+four on the missing Status control, and the board test failing precisely on
+`completedDate` being `undefined`, which is the exact defect.
+
+### The prevention note holds, and was not acted on
+
+The runbook's *option C* — spread a validated payload instead of enumerating it
+— was **not** implemented. The payload object is still hand-enumerated, and it is
+still a silent dropper: the fix adds `status` and `completedDate` beside it
+rather than removing the hazard. That was a deliberate scope choice to keep this
+change small and reviewable, but the class of bug remains open here and on every
+other page with the same shape.

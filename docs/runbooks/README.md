@@ -19,14 +19,14 @@ every rejected finding and why, so none of them get re-raised.
 
 ## Findings
 
-Three of the seven are fixed. The rest are open.
+Five of the seven are fixed. Two remain, neither reachable today.
 
 | # | Runbook | Severity | Exposure today |
 |---|---|---|---|
 | ~~01~~ | [contracts-total-amount](01-contracts-total-amount.md) | ~~High~~ | ✅ **Fixed** — `a750828` (PR #96) |
 | 02 | [contracts-line-item-deletion](02-contracts-line-item-deletion.md) | Medium | Blocks on first use — 0 rows |
-| 03 | [financial-invoice-status](03-financial-invoice-status.md) | High | Latent — AR/AP have 0 rows |
-| 04 | [workorder-status-unreachable](04-workorder-status-unreachable.md) | High | Latent — 0 rows |
+| ~~03~~ | [financial-invoice-status](03-financial-invoice-status.md) | ~~High~~ | ✅ **Fixed** — was latent; AR/AP at 0 rows |
+| ~~04~~ | [workorder-status-unreachable](04-workorder-status-unreachable.md) | ~~High~~ | ✅ **Fixed** — headline was stale; two narrower gaps closed |
 | ~~05~~ | [useform-stale-errors](05-useform-stale-errors.md) | ~~Low (cosmetic)~~ | ✅ **Fixed** — was live on Customers and Burials |
 | 06 | [useform-latent-defects](06-useform-latent-defects.md) | Low | Dormant — no consumer triggers them |
 | ~~07~~ | [modal-focus-trap](07-modal-focus-trap.md) | ~~High~~ | ✅ **Fixed** — was live in every modal, app-wide |
@@ -90,9 +90,15 @@ and the most immediately reachable one — and it was the one written up as
 ~~Fix 07 before anyone types into anything.~~ Done.
 ~~Fix 05 next: it is the only remaining finding anyone can encounter today.~~ Done.
 
-Nothing open is reachable today. 02, 03, 04 and 06 all wait on tables at zero
-rows, so the ordering from here is by severity rather than by exposure: 03 and 04
-(High), then 02 (Medium), then 06 (dormant).
+Nothing open is reachable today. 02 (Medium) and 06 (dormant) both wait on
+tables at zero rows.
+
+**A runbook is a snapshot, not a standing truth.** 04's headline — "a work order
+can never leave pending" — was already false by the time it was fixed: a board
+view with Start/Complete quick actions had landed in between. Re-verify every
+premise against current `main` before writing a test, or you will write one that
+passes against a bug that no longer exists and "fix" nothing. This has now bitten
+twice: 05 wrongly called Contracts immune, and 04 overstated its own scope.
 
 ## Shared root cause
 

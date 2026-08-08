@@ -39,6 +39,30 @@ const NEXT_STATUS: Partial<Record<WorkOrder['status'], { to: WorkOrder['status']
   in_progress: { to: 'completed', label: 'Complete' },
 };
 
+/** Every status a work order can hold, for the edit modal's Select. */
+const STATUS_OPTIONS = BOARD_COLUMNS.map(({ status, label }) => ({ value: status, label }));
+
+/**
+ * Keep `completedDate` consistent with `status`.
+ *
+ * Called from both writers — the board's quick-action buttons and the edit
+ * modal — so the two cannot disagree. Without it, completing a work order left
+ * `completed_date` null forever and "when was this done?" had no answer.
+ *
+ * @param status   The status being written.
+ * @param existing A completion date already on the record, preserved so that
+ *                 re-saving a completed order does not move its date.
+ * @returns The date to write, or `undefined` to clear it — a completion date on
+ *          an order that is open again is worse than none.
+ */
+function completionDateFor(
+  status: WorkOrder['status'],
+  existing?: string
+): string | undefined {
+  if (status !== 'completed') return undefined;
+  return existing || format(new Date(), 'yyyy-MM-dd');
+}
+
 function isOverdue(wo: WorkOrder): boolean {
   return Boolean(
     wo.dueDate &&
@@ -55,6 +79,9 @@ const initialForm: WorkOrderFormData = {
   description: '',
   type: 'maintenance',
   priority: 'medium',
+  // A new work order is always pending — the create mutation excludes status
+  // structurally. This exists so the edit modal's Select has a bound field.
+  status: 'pending',
   assignedTo: '',
   dueDate: '',
 };
@@ -143,7 +170,18 @@ export default function WorkOrders() {
         dueDate: data.dueDate || undefined,
       };
       if (editingOrder) {
-        updateMutation.mutate({ id: editingOrder.id, ...payload });
+        // `status` and `completedDate` are edit-only: the create mutation
+        // structurally excludes status, and a new order is always pending.
+        // They are spelled out here rather than left to the payload above
+        // because that object is hand-enumerated — the exact shape that
+        // silently dropped `status` in the first place.
+        const status = data.status ?? editingOrder.status;
+        updateMutation.mutate({
+          id: editingOrder.id,
+          ...payload,
+          status,
+          completedDate: completionDateFor(status, editingOrder.completedDate),
+        });
       } else {
         createMutation.mutate(payload);
       }
@@ -202,6 +240,7 @@ export default function WorkOrders() {
       priority: wo.priority,
       assignedTo: wo.assignedTo || '',
       dueDate: wo.dueDate ? format(new Date(wo.dueDate), 'yyyy-MM-dd') : '',
+      status: wo.status,
     });
     setShowModal(true);
   };
@@ -212,7 +251,11 @@ export default function WorkOrders() {
   };
 
   const moveTo = (wo: WorkOrder, to: WorkOrder['status']) => {
-    updateMutation.mutate({ id: wo.id, status: to });
+    updateMutation.mutate({
+      id: wo.id,
+      status: to,
+      completedDate: completionDateFor(to, wo.completedDate),
+    });
   };
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -463,6 +506,20 @@ export default function WorkOrders() {
             <Select label="Type" {...form.getFieldProps('type')} error={getFieldError('type', form.errors, form.touched)} options={TYPE_OPTIONS} />
             <Select label="Priority" {...form.getFieldProps('priority')} error={getFieldError('priority', form.errors, form.touched)} options={PRIORITY_OPTIONS} />
           </div>
+          {/* Edit only. A new work order is always pending, and the create
+              mutation excludes status from its input type — offering the
+              control on create would imply a choice that does not exist.
+              This is also the only path to `cancelled`: the board's
+              quick-actions run pending → in_progress → completed, so without
+              it the Cancelled column and status filter were unreachable. */}
+          {editingOrder && (
+            <Select
+              label="Status"
+              {...form.getFieldProps('status')}
+              error={getFieldError('status', form.errors, form.touched)}
+              options={STATUS_OPTIONS}
+            />
+          )}
           <Input label="Assigned To" {...form.getFieldProps('assignedTo')} error={getFieldError('assignedTo', form.errors, form.touched)} placeholder="Staff name" />
           <Input label="Due Date" type="date" {...form.getFieldProps('dueDate')} error={getFieldError('dueDate', form.errors, form.touched)} />
         </form>

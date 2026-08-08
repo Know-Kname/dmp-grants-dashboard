@@ -11,6 +11,7 @@ import { getErrorMessage } from '../lib/errors';
 import { useForm, getFieldError } from '../hooks/useForm';
 import { depositFormSchema, receivableFormSchema, payableFormSchema } from '../lib/schemas';
 import { formatCurrency, formatDate, formatStatus, cn } from '../lib/utils';
+import { paymentStatus } from '../lib/invoiceStatus';
 import type { Deposit, AccountsReceivable, AccountsPayable } from '../types';
 import {
   PageHeader, Card, CardBody, Button, Modal, Input, Select, Textarea,
@@ -309,18 +310,26 @@ export default function Financial() {
       await depositForm.handleSubmit();
     } else if (activeTab === 'receivables') {
       if (editingReceivable) {
+        // `status` must travel with the payment. It is NOT NULL with no default
+        // and no trigger advancing it, so an update that carries only
+        // `amountPaid` leaves a settled invoice reading `pending` — and the
+        // nightly overdue cron then flags it permanently. See `paymentStatus`.
+        const amountPaid = parseFloat(receivableEditForm.amountPaid) || 0;
         receivableUpdateMutation.mutate({
           id: editingReceivable.id,
-          amountPaid: parseFloat(receivableEditForm.amountPaid) || 0,
+          amountPaid,
+          status: paymentStatus(amountPaid, editingReceivable.amount),
         });
       } else {
         await receivableForm.handleSubmit();
       }
     } else {
       if (editingPayable) {
+        const amountPaid = parseFloat(payableEditForm.amountPaid) || 0;
         payableUpdateMutation.mutate({
           id: editingPayable.id,
-          amountPaid: parseFloat(payableEditForm.amountPaid) || 0,
+          amountPaid,
+          status: paymentStatus(amountPaid, editingPayable.amount),
         });
       } else {
         await payableForm.handleSubmit();
