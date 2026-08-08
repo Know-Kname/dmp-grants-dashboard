@@ -536,12 +536,24 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
     // The wrapper carries `h-full` so a card in a stretched grid row still
     // fills it — the extra element would otherwise break the height chain.
     <div className="h-full" style={{ perspective: 1200 }}>
+      {/*
+        No `whileHover={{ y: -3 }}` here, and no `will-change`.
+
+        The lift moved the very element carrying the pointer handlers: with the
+        cursor within 3px of the bottom edge it slid out from under the pointer,
+        which fired leave → reset → enter → lift, and the tile oscillated. The
+        rotation already reads as lift, so the translation bought a flicker for
+        nothing.
+
+        `will-change: transform` on a twelve-tile dashboard pins twelve
+        compositing layers for the life of the page. The browser promotes on
+        demand during the animation anyway.
+      */}
       <m.div
         ref={ref}
         {...handlers}
-        className={`group h-full ${className} transform-gpu will-change-transform`}
+        className={`group h-full ${className} transform-gpu`}
         style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
-        whileHover={reduced ? undefined : { y: -3 }}
         transition={SPRING.glide}
       >
         {/* Glare rides above the surface but below the content. */}
