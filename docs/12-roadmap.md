@@ -341,12 +341,17 @@ npm run build
 
 **To analyze what's in the bundle:**
 ```bash
-npm install --save-dev rollup-plugin-visualizer
-# Add to vite.config.ts plugins:
-# visualizer({ open: true })
-# Then run: npm run build
-# A browser window opens showing the bundle treemap
+# Vite 8 bundles with Rolldown, not Rollup, so the long-standing
+# rollup-plugin-visualizer advice no longer applies here.
+npx vite build --mode production
+# Rolldown can emit its own report instead:
+#   build: { rolldownOptions: { output: { legalComments: 'none' } } }
+# or set `build.sourcemap: true` and inspect the map.
 ```
+
+The four named vendor chunks are configured in `vite.config.ts` under
+`build.rolldownOptions.output.codeSplitting`, and `e2e/bundle.spec.ts` asserts
+they survive — including that zod stays out of the entry chunk.
 
 ### ~~React Query cache settings~~ ✅ Already tuned
 

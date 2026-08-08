@@ -16,7 +16,7 @@ customers, and grants. Deployed on Vercel, database on Supabase.
 
 ## Tech Stack (one-liner)
 
-React 18 + TypeScript 5 + Vite 4 + Tailwind CSS 3 + TanStack React Query v5 +
+React 18 + TypeScript 5 + Vite 8 (Rolldown) + Tailwind CSS 3 + TanStack React Query v5 +
 Supabase (auth + PostgreSQL) + React Router DOM v6 + Recharts + Lucide icons.
 AI assistant via OpenRouter (Gemini 2.5 Pro). Deployed on Vercel.
 
@@ -182,6 +182,16 @@ while with no consumers at all; it has been removed.
    objects/arrays (relevant for `payment_plan` JSONB and joined `contract_items`).
 4. **Query invalidation pattern.** After every mutation, the relevant queryKey is
    invalidated, triggering an automatic refetch. See `src/hooks/useData.ts`.
+5. **Vendor chunks are configured, and asserted.** Vite 8 bundles with Rolldown,
+   which dropped Rollup's object form of `manualChunks`. Four vendor chunks
+   (`react`, `recharts`, `supabase`, `zod`) are carved out in `vite.config.ts`
+   under `build.rolldownOptions.output.codeSplitting`, matching module paths by
+   **regular expression** — a form that fails *silently* when the pattern is
+   wrong, where the old one errored on a typo. `e2e/bundle.spec.ts` is what
+   makes it loud; it asserts each chunk still exists and that zod stays out of
+   the entry chunk. Run the e2e suite after touching that config, not just the
+   build. Groups are ordered, first match wins, and `react` is deliberately
+   last.
 
 ---
 
