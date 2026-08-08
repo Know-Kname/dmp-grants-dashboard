@@ -22,8 +22,8 @@
 
 | Tool | Minimum version | How to check | How to get it |
 |---|---|---|---|
-| **Node.js** | 20.x | `node --version` | [nodejs.org](https://nodejs.org) — also pinned in `.nvmrc` |
-| **npm** | 9.x | `npm --version` | Comes with Node.js |
+| **Node.js** | 22.x | `node --version` | [nodejs.org](https://nodejs.org) — also pinned in `.nvmrc` |
+| **npm** | 10.x | `npm --version` | Comes with Node.js |
 | **Git** | any recent | `git --version` | [git-scm.com](https://git-scm.com) |
 | **A code editor** | — | — | [VS Code](https://code.visualstudio.com) recommended |
 
