@@ -25,7 +25,7 @@ jobs:
         # which fails to resolve it. That is why all 12 scheduled runs of this
         # workflow failed with "Unable to resolve action" before checkout even
         # produced useful output.
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: latest
 

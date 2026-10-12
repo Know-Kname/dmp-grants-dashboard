@@ -32,7 +32,7 @@ jobs:
         #   PRODUCTION_PROJECT_REF — mgpwjnxtqcnoyjgebytg
         #   PRODUCTION_DB_PASSWORD — the project's Postgres password
         # Full setup instructions: docs/13-ci-and-database-operations.md
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: latest
 
